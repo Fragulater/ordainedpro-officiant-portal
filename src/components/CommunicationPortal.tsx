@@ -5512,12 +5512,18 @@ pastor.michael@ordainedpro.com`,
 
       console.log("✅ Message saved:", data);
 
-      // Send email notification if requested
-      if (sendEmail && (editCoupleInfo.brideEmail || editCoupleInfo.groomEmail)) {
-        await sendEmailNotification(
-          editCoupleInfo.brideEmail || editCoupleInfo.groomEmail,
-          `New Message from ${officiantProfile.name || "Your Officiant"}`,
-          newMessage
+// Send email to BOTH bride and groom
+      const allEmails = [editCoupleInfo.brideEmail, editCoupleInfo.groomEmail].filter(Boolean);
+      if (sendEmail && allEmails.length > 0) {
+        for (const email of allEmails) {
+          await sendEmailNotification(
+            email,
+            `New Message from ${officiantProfile.name || "Your Officiant"}`,
+            newMessage
+          );
+          console.log("✅ Email sent to:", email);
+        }
+      }
         );
       }
     } catch (err) {
