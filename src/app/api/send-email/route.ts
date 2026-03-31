@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
           Authorization: `Bearer ${resendApiKey}`,
         },
         body: JSON.stringify({
-          from: `${fromName || "Wedding Officiant"} <notifications@ordainedpro.com>`,
+          from: `${fromName || "Wedding Officiant"} <info@ordainedpro.com>`,
           to: [to],
           subject: subject,
           html: generateEmailHtml(fromName, coupleName, message, subject),
