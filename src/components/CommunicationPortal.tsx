@@ -6870,8 +6870,7 @@ ${invoiceForm.items
                                                 "bg-pink-500"
                                                 } text-white`}
                                             >
-                                              {couple.brideName
-                                                .split(" ")
+                                             (editCoupleInfo.brideName || "").split
                                                 .map((n) => n[0])
                                                 .join("")}
                                             </AvatarFallback>
@@ -6914,7 +6913,7 @@ ${invoiceForm.items
                                                 "bg-blue-500"
                                                 } text-white`}
                                             >
-                                              {couple.groomName
+                                             {(couple.groomName || "")
                                                 .split(" ")
                                                 .map((n) => n[0])
                                                 .join("")}
@@ -7135,7 +7134,7 @@ ${invoiceForm.items
                                               "bg-blue-500"
                                               } text-white`}
                                           >
-                                            {couple.groomName
+                                            {(couple.groomName || "")
                                               .split(" ")
                                               .map((n) => n[0])
                                               .join("")}
