@@ -4,7 +4,7 @@ import { TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MessageCircle, FileText, Download, Edit, Share, Eye, X, Upload } from "lucide-react"
+import { MessageCircle, FileText, Download, Edit, Share, Eye, X, Upload, Trash2 } from "lucide-react"
 import { FileUpload } from "@/components/FileUpload"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
@@ -15,6 +15,7 @@ export function FilesTab() {
     handleEditScript,
     handleViewScript,
     handleDownloadScript,
+    handleDeleteScript,
     handleViewFile,
     handleFilesUploaded,
     handleFileRemoved,
@@ -106,6 +107,18 @@ export function FilesTab() {
                                     }}
                                   >
                                     <Download className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-red-600 hover:bg-red-100"
+                                    title="Delete script"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleDeleteScript(script)
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
                                   </Button>
                                 </div>
                               </div>

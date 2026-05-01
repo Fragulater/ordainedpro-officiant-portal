@@ -1835,6 +1835,33 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
     console.log('Downloaded script:', script.title)
   }
 
+  const handleDeleteScript = async (script: any) => {
+    if (!confirm(`Are you sure you want to delete "${script.title}"? This action cannot be undone.`)) {
+      return
+    }
+
+    // Check if it's a database script (has numeric id) or generated script (has string id)
+    const isDbScript = typeof script.id === 'number'
+
+    if (isDbScript) {
+      // Delete from database
+      const result = await deleteScriptFromDB(script.id)
+      if (result.ok) {
+        setCoupleScripts(prev => prev.filter(s => s.id !== script.id))
+        console.log('✅ Script deleted from database:', script.title)
+        alert(`Script "${script.title}" has been deleted.`)
+      } else {
+        console.error('❌ Failed to delete script:', result.error)
+        alert(`Failed to delete script: ${result.error}`)
+      }
+    } else {
+      // Remove from generated scripts (local state only)
+      setGeneratedScripts(prev => prev.filter(s => s.id !== script.id))
+      console.log('✅ Generated script removed:', script.title)
+      alert(`Script "${script.title}" has been removed.`)
+    }
+  }
+
   const handleRecordPayment = async () => {
     if (!currentUser?.id || !editCoupleInfo?.id) {
       console.error("❌ Cannot record payment: No user or couple selected")
@@ -4332,6 +4359,7 @@ ${invoiceContent}`)
     handleEditScript,
     handleViewScript,
     handleDownloadScript,
+    handleDeleteScript,
     handleRecordPayment,
     handleUploadScript,
     handleCreateNewScript,
