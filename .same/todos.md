@@ -1,6 +1,6 @@
 # OrdainedPro Portal - Task Tracker
 
-## Current Status (v437)
+## Current Status (v439)
 - ✅ Portal running and working
 - ✅ Email sender updated to info@ordainedpro.com
 - ✅ Outbound emails working (sending via Resend)
@@ -17,6 +17,21 @@
 - ✅ **TypeScript Fix v435 - Supabase singleton type safety** (Apr 29, 2026)
 - ✅ **Null Safety Fix v436 - Comprehensive .split() and .brideName fixes** (Apr 29, 2026)
 - ✅ **RLS Security Fix v437 - Row Level Security enabled on all tables** (Apr 30, 2026)
+- ✅ **handleDeleteScript added v439** (May 1, 2026)
+- ✅ **CORS/Avatar fixes** (Apr 30, 2026)
+- ✅ **Safe Marketplace Schema applied** (Apr 30, 2026)
+
+## Pending Tasks
+
+### Marketplace Integration
+- 🔲 Deploy marketplace project to production
+- 🔲 Update portal MARKETPLACE_URL environment variable with live URL
+- 🔲 Test real-time sync of scripts between portal and marketplace
+- 🔲 Test marketplace browsing and vendor dashboard access
+
+### GitHub Sync
+- ✅ CommunicationPortal.tsx synced to GitHub (v439)
+- Note: Large file (160KB+) - use Git CLI or GitHub Desktop for reliable pushes
 
 ## RLS Security Fix (v437) - Row Level Security Enabled
 
