@@ -25,6 +25,8 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { supabase } from "@/supabase/utils/client";
+import { CancelSubscriptionDialog } from "@/components/CancelSubscriptionDialog";
+import { UpgradeSubscriptionDialog } from "@/components/UpgradeSubscriptionDialog";
 import {
   LayoutDashboard,
   Heart,
@@ -57,6 +59,8 @@ import {
   Sparkles,
   CreditCard,
   Check,
+  AlertTriangle,
+  Shield,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -186,7 +190,18 @@ export function OfficiantDashboardDialog({
   initialView = "dashboard",
 }: OfficiantDashboardDialogProps) {
   // Subscription information
-  const { subscription, isProfessional, isAspirant } = useSubscription();
+  const {
+    subscription,
+    isProfessional,
+    isAspirant,
+    isDataRetention,
+    isCanceled,
+    canAccessFeatures,
+    refreshSubscription
+  } = useSubscription();
+
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
 
   const [activeView, setActiveView] = useState<
     | "dashboard"
@@ -212,8 +227,10 @@ export function OfficiantDashboardDialog({
       size: string;
       type: string;
       updated: string;
+      url?: string; // Supabase Storage URL
     }>
   >([]);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   // Form state for Add New Ceremony - mirrors Communication Portal
@@ -458,35 +475,76 @@ export function OfficiantDashboardDialog({
     }
   }, [open, initialView]);
 
-  // ✅ Load documents from Supabase (placeholder for now - can be implemented later)
+  // ✅ Load documents from Supabase Storage
   useEffect(() => {
-    // TODO: Implement document loading from Supabase storage or database
-    // For now, show sample documents
-    const defaultDocs = [
-      {
-        id: "1",
-        name: "Wedding Ceremony Template",
-        size: "245 KB",
-        type: "PDF",
-        updated: "2 days ago",
-      },
-      {
-        id: "2",
-        name: "Service Agreement",
-        size: "156 KB",
-        type: "PDF",
-        updated: "1 week ago",
-      },
-      {
-        id: "3",
-        name: "Vows Examples",
-        size: "389 KB",
-        type: "PDF",
-        updated: "3 weeks ago",
-      },
-    ];
-    setDocuments(defaultDocs);
-  }, []);
+    const loadDocumentsFromSupabase = async () => {
+      if (!user?.id) return;
+
+      try {
+        // List files in the user's documents folder
+        const { data: files, error } = await supabase.storage
+          .from("documents")
+          .list(user.id, {
+            sortBy: { column: "created_at", order: "desc" },
+          });
+
+        if (error) {
+          // If bucket doesn't exist or no files, show empty state
+          console.log("📁 No documents found or bucket not ready:", error.message);
+          setDocuments([]);
+          return;
+        }
+
+        if (files && files.length > 0) {
+          const loadedDocs = files
+            .filter(file => file.name !== ".emptyFolderPlaceholder") // Filter out placeholder
+            .map((file) => {
+              const { data } = supabase.storage
+                .from("documents")
+                .getPublicUrl(`${user.id}/${file.name}`);
+
+              const fileType = file.name.toLowerCase().includes(".pdf")
+                ? "PDF"
+                : file.name.toLowerCase().includes(".doc")
+                ? "DOC"
+                : "FILE";
+
+              // Calculate time ago
+              const createdAt = new Date(file.created_at || Date.now());
+              const now = new Date();
+              const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+              let timeAgo = "Just now";
+              if (diffDays === 1) timeAgo = "1 day ago";
+              else if (diffDays > 1 && diffDays < 7) timeAgo = `${diffDays} days ago`;
+              else if (diffDays >= 7 && diffDays < 14) timeAgo = "1 week ago";
+              else if (diffDays >= 14 && diffDays < 30) timeAgo = `${Math.floor(diffDays / 7)} weeks ago`;
+              else if (diffDays >= 30) timeAgo = `${Math.floor(diffDays / 30)} month(s) ago`;
+
+              return {
+                id: file.id || file.name,
+                name: file.name,
+                size: file.metadata?.size
+                  ? `${(file.metadata.size / 1024).toFixed(0)} KB`
+                  : "Unknown",
+                type: fileType,
+                updated: timeAgo,
+                url: data.publicUrl,
+              };
+            });
+
+          console.log("✅ Loaded documents from Supabase:", loadedDocs);
+          setDocuments(loadedDocs);
+        } else {
+          setDocuments([]);
+        }
+      } catch (err) {
+        console.error("❌ Error loading documents:", err);
+        setDocuments([]);
+      }
+    };
+
+    loadDocumentsFromSupabase();
+  }, [user?.id]);
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -562,25 +620,82 @@ export function OfficiantDashboardDialog({
     onOpenChange(false);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    const newDocs = Array.from(files).map((file) => ({
-      id: Date.now().toString() + Math.random(),
-      name: file.name,
-      size: `${(file.size / 1024).toFixed(0)} KB`,
-      type: file.type.includes("pdf")
-        ? "PDF"
-        : file.type.includes("doc")
-        ? "DOC"
-        : "FILE",
-      updated: "Just now",
-    }));
+    if (!user?.id) {
+      alert("⚠️ Please sign in to upload documents.");
+      return;
+    }
 
-    const updatedDocs = [...documents, ...newDocs];
-    setDocuments(updatedDocs);
-    localStorage.setItem("officiantDocuments", JSON.stringify(updatedDocs));
+    setUploadingDocument(true);
+
+    try {
+      const uploadedDocs: Array<{
+        id: string;
+        name: string;
+        size: string;
+        type: string;
+        updated: string;
+        url: string;
+      }> = [];
+
+      for (const file of Array.from(files)) {
+        console.log("📤 Uploading document:", file.name, "Size:", file.size);
+
+        // Validate file size (50MB max for documents)
+        if (file.size > 52428800) {
+          alert(`❌ "${file.name}" is over 50MB. Please use a smaller file.`);
+          continue;
+        }
+
+        const filePath = `${user.id}/${Date.now()}-${file.name}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("documents")
+          .upload(filePath, file, { upsert: true });
+
+        if (uploadError) {
+          console.error(`❌ Upload error for ${file.name}:`, uploadError);
+          // If bucket doesn't exist, try to create it first
+          if (uploadError.message?.includes("not found")) {
+            alert(`❌ Documents storage not configured. Please contact support.`);
+          }
+          continue;
+        }
+
+        const { data } = supabase.storage.from("documents").getPublicUrl(filePath);
+
+        const fileType = file.name.toLowerCase().includes(".pdf")
+          ? "PDF"
+          : file.name.toLowerCase().includes(".doc")
+          ? "DOC"
+          : "FILE";
+
+        uploadedDocs.push({
+          id: Date.now().toString() + Math.random(),
+          name: file.name,
+          size: `${(file.size / 1024).toFixed(0)} KB`,
+          type: fileType,
+          updated: "Just now",
+          url: data.publicUrl,
+        });
+
+        console.log(`✅ Uploaded document: ${file.name}`);
+      }
+
+      if (uploadedDocs.length > 0) {
+        setDocuments((prev) => [...uploadedDocs, ...prev]);
+        alert(`✅ ${uploadedDocs.length} document(s) uploaded and saved!`);
+      }
+    } catch (err: any) {
+      console.error("❌ Document upload error:", err);
+      const errorMsg = err?.message || "Unknown error";
+      alert(`❌ Failed to upload document(s).\n\nError: ${errorMsg}`);
+    } finally {
+      setUploadingDocument(false);
+    }
   };
 
   const handleAddCeremony = async () => {
@@ -770,6 +885,60 @@ export function OfficiantDashboardDialog({
     }
   };
 
+  // ✅ Helper function to auto-save profile to Supabase (silent mode)
+  const saveProfileToSupabase = async (
+    profileToSave: OfficiantProfile,
+    silent: boolean = true
+  ): Promise<boolean> => {
+    try {
+      if (!user?.id) {
+        if (!silent) alert("⚠️ Please sign in before saving your profile.");
+        return false;
+      }
+
+      const profileData = {
+        user_id: user.id,
+        full_name: profileToSave.fullName,
+        business_name: profileToSave.businessName || null,
+        city: profileToSave.city || null,
+        state: profileToSave.state || null,
+        phone: profileToSave.phone || null,
+        email: profileToSave.email,
+        website: profileToSave.website || null,
+        bio: profileToSave.bio || null,
+        headshot_url: profileToSave.headshot || null,
+        years_experience: profileToSave.yearsExperience || 0,
+        price_min: profileToSave.priceRange.min || 0,
+        price_max: profileToSave.priceRange.max || 0,
+        social_facebook: profileToSave.socialMedia.facebook || null,
+        social_instagram: profileToSave.socialMedia.instagram || null,
+        social_linkedin: profileToSave.socialMedia.linkedin || null,
+        social_youtube: profileToSave.socialMedia.youtube || null,
+        photo_gallery: profileToSave.photoGallery || [],
+        video_url: profileToSave.videoUrl || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("📝 Auto-saving profile to Supabase:", profileData);
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .upsert(profileData, { onConflict: "user_id" })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (!silent) alert("✅ Profile saved successfully!");
+      console.log("✅ Profile auto-saved to Supabase:", data);
+      return true;
+    } catch (err) {
+      console.error("❌ Error auto-saving profile:", err);
+      if (!silent) alert("❌ Failed to save profile. Please try again.");
+      return false;
+    }
+  };
+
   const ensureBucketExists = async (bucketName: string) => {
     const { data: buckets, error } = await supabase.storage.listBuckets();
     if (error) throw error;
@@ -826,8 +995,17 @@ export function OfficiantDashboardDialog({
       // Add cache-busting parameter to force browser to reload image
       const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
 
-      handleProfileUpdate("headshot", publicUrl);
-      alert("✅ Headshot uploaded successfully! Click 'Save Profile' to save permanently.");
+      // Update local state
+      const updatedProfile = { ...profile, headshot: publicUrl };
+      setProfile(updatedProfile);
+
+      // ✅ Auto-save to Supabase immediately
+      const saved = await saveProfileToSupabase(updatedProfile);
+      if (saved) {
+        alert("✅ Headshot uploaded and saved to your profile!");
+      } else {
+        alert("✅ Headshot uploaded! Note: Auto-save failed. Click 'Save Profile' to save permanently.");
+      }
       console.log("✅ Headshot URL:", publicUrl);
     } catch (err: any) {
       console.error("❌ Headshot upload error:", err);
@@ -878,11 +1056,21 @@ export function OfficiantDashboardDialog({
       });
 
       const urls = await Promise.all(uploadPromises);
-      setProfile((prev) => ({
-        ...prev,
-        photoGallery: [...prev.photoGallery, ...urls],
-      }));
-      alert(`✅ ${urls.length} gallery photos uploaded! Click 'Save Profile' to save permanently.`);
+
+      // Update local state with new gallery photos
+      const updatedProfile = {
+        ...profile,
+        photoGallery: [...profile.photoGallery, ...urls],
+      };
+      setProfile(updatedProfile);
+
+      // ✅ Auto-save to Supabase immediately
+      const saved = await saveProfileToSupabase(updatedProfile);
+      if (saved) {
+        alert(`✅ ${urls.length} gallery photo(s) uploaded and saved to your profile!`);
+      } else {
+        alert(`✅ ${urls.length} gallery photo(s) uploaded! Note: Auto-save failed. Click 'Save Profile' to save permanently.`);
+      }
     } catch (err: any) {
       console.error("❌ Gallery upload error:", err);
       const errorMsg = err?.message || err?.error || "Unknown error";
@@ -926,8 +1114,18 @@ export function OfficiantDashboardDialog({
       }
 
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-      handleProfileUpdate("videoUrl", data.publicUrl);
-      alert("✅ Video uploaded successfully! Click 'Save Profile' to save permanently.");
+
+      // Update local state
+      const updatedProfile = { ...profile, videoUrl: data.publicUrl };
+      setProfile(updatedProfile);
+
+      // ✅ Auto-save to Supabase immediately
+      const saved = await saveProfileToSupabase(updatedProfile);
+      if (saved) {
+        alert("✅ Video uploaded and saved to your profile!");
+      } else {
+        alert("✅ Video uploaded! Note: Auto-save failed. Click 'Save Profile' to save permanently.");
+      }
       console.log("✅ Video URL:", data.publicUrl);
     } catch (err: any) {
       console.error("❌ Video upload error:", err);
@@ -936,16 +1134,34 @@ export function OfficiantDashboardDialog({
     }
   };
 
-  const removeGalleryPhoto = (index: number) => {
-    setProfile((prev) => {
-      const updated = {
-        ...prev,
-        photoGallery: prev.photoGallery.filter((_, i) => i !== index),
-      };
-      // ❌ REMOVED: localStorage.setItem("officiantProfile", JSON.stringify(updated));
-      // ✅ Gallery changes will be saved to Supabase when user clicks "Save Profile"
-      return updated;
-    });
+  const removeGalleryPhoto = async (index: number) => {
+    const updatedProfile = {
+      ...profile,
+      photoGallery: profile.photoGallery.filter((_, i) => i !== index),
+    };
+    setProfile(updatedProfile);
+
+    // ✅ Auto-save to Supabase immediately
+    const saved = await saveProfileToSupabase(updatedProfile);
+    if (saved) {
+      console.log("✅ Gallery photo removed and profile updated in database");
+    } else {
+      console.warn("⚠️ Gallery photo removed locally but auto-save failed");
+    }
+  };
+
+  // ✅ Remove video with auto-save
+  const removeVideo = async () => {
+    const updatedProfile = { ...profile, videoUrl: "" };
+    setProfile(updatedProfile);
+
+    // ✅ Auto-save to Supabase immediately
+    const saved = await saveProfileToSupabase(updatedProfile);
+    if (saved) {
+      console.log("✅ Video removed and profile updated in database");
+    } else {
+      console.warn("⚠️ Video removed locally but auto-save failed");
+    }
   };
 
   return (
@@ -1039,9 +1255,17 @@ export function OfficiantDashboardDialog({
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">
                     Welcome Back
-                    {user
-                      ? `, ${user.user_metadata.full_name || user.email}`
-                      : ""}
+                    {(() => {
+                      // Priority: profile.fullName > user.user_metadata.full_name > first part of email
+                      const firstName = profile.fullName
+                        ? profile.fullName.split(" ")[0]
+                        : user?.user_metadata?.full_name
+                          ? user.user_metadata.full_name.split(" ")[0]
+                          : user?.email
+                            ? user.email.split("@")[0]
+                            : "";
+                      return firstName ? `, ${firstName}` : "";
+                    })()}
                     !
                   </h1>
                   <p className="text-gray-600">
@@ -1073,12 +1297,13 @@ export function OfficiantDashboardDialog({
                   </Avatar>
                   <div>
                     <p className="font-semibold text-gray-900">
-                      {user?.user_metadata?.full_name ||
+                      {profile.fullName ||
+                        user?.user_metadata?.full_name ||
                         user?.email ||
                         "Loading..."}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {user?.user_metadata?.role || "Officiant"}
+                      {profile.businessName || user?.user_metadata?.role || "Officiant"}
                     </p>
                   </div>
                 </div>
@@ -1392,7 +1617,12 @@ export function OfficiantDashboardDialog({
                   <div className="col-span-2">
                     <Card>
                       <CardHeader>
-                        <CardTitle>August 2024</CardTitle>
+                        <CardTitle>
+                          {selectedDate
+                            ? selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                            : new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                          }
+                        </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <CalendarComponent
@@ -1400,58 +1630,215 @@ export function OfficiantDashboardDialog({
                           selected={selectedDate}
                           onSelect={setSelectedDate}
                           className="rounded-md border"
+                          modifiers={{
+                            hasCeremony: ceremonies
+                              .filter(c => c.rawDate)
+                              .map(c => new Date(c.rawDate))
+                          }}
+                          modifiersClassNames={{
+                            hasCeremony: "bg-blue-100 text-blue-900 font-bold"
+                          }}
                         />
                       </CardContent>
                     </Card>
+
+                    {/* Selected Date Ceremony Details */}
+                    {selectedDate && (() => {
+                      const selectedDateStr = selectedDate.toISOString().split('T')[0];
+                      const selectedCeremony = ceremonies.find(c => c.rawDate === selectedDateStr);
+
+                      if (selectedCeremony) {
+                        return (
+                          <Card className="mt-6 border-blue-200 bg-blue-50">
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-blue-900 flex items-center">
+                                <Heart className="w-5 h-5 mr-2 text-pink-500" />
+                                Ceremony on {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="flex items-start space-x-4">
+                                <div className="flex -space-x-2">
+                                  <Avatar className="border-2 border-white w-12 h-12">
+                                    <AvatarFallback className={selectedCeremony.couple1Color}>
+                                      {selectedCeremony.couple1Initial}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <Avatar className="border-2 border-white w-12 h-12">
+                                    <AvatarFallback className={selectedCeremony.couple2Color}>
+                                      {selectedCeremony.couple2Initial}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                </div>
+                                <div className="flex-1">
+                                  <h3 className="font-bold text-lg text-gray-900">
+                                    {selectedCeremony.couple1Name} & {selectedCeremony.couple2Name}
+                                  </h3>
+                                  <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
+                                    <div className="flex items-center text-gray-600">
+                                      <Clock className="w-4 h-4 mr-2" />
+                                      {selectedCeremony.time}
+                                    </div>
+                                    <div className="flex items-center text-gray-600">
+                                      <MapPin className="w-4 h-4 mr-2" />
+                                      {selectedCeremony.location}
+                                    </div>
+                                    <div className="flex items-center text-gray-600">
+                                      <Mail className="w-4 h-4 mr-2" />
+                                      {selectedCeremony.email}
+                                    </div>
+                                    <div className="flex items-center text-gray-600">
+                                      <Phone className="w-4 h-4 mr-2" />
+                                      {selectedCeremony.phone}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    className="mt-4 bg-blue-500 hover:bg-blue-600"
+                                    onClick={() => handleCeremonyClick(selectedCeremony.id)}
+                                  >
+                                    Open Ceremony Details
+                                    <ChevronRight className="w-4 h-4 ml-2" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
-                  {/* Upcoming Events */}
-                  <div>
+                  {/* Sidebar - All Ceremonies List */}
+                  <div className="space-y-6">
+                    {/* Upcoming Ceremonies */}
                     <Card>
-                      <CardHeader>
-                        <CardTitle>Upcoming Events</CardTitle>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center">
+                          <CalendarIcon className="w-5 h-5 mr-2 text-green-600" />
+                          Upcoming Ceremonies
+                        </CardTitle>
+                        <CardDescription>Next 30 days</CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                        {upcomingCeremonies.map((ceremony) => (
-                          <div
-                            key={ceremony.id}
-                            className="p-4 bg-purple-50 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors"
-                            onClick={() => handleCeremonyClick(ceremony.id)}
-                          >
-                            <div className="flex items-center space-x-2 mb-2">
-                              <CalendarIcon className="w-4 h-4 text-purple-600" />
-                              <p className="text-sm font-medium text-purple-900">
-                                {ceremony.date
-                                  .split(",")[0]
-                                  .replace(/\d+/, (d) => d)}
+                      <CardContent className="space-y-3 max-h-64 overflow-y-auto">
+                        {upcomingCeremonies.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">No upcoming ceremonies</p>
+                        ) : (
+                          upcomingCeremonies.map((ceremony) => (
+                            <div
+                              key={ceremony.id}
+                              className="p-3 bg-green-50 rounded-lg cursor-pointer hover:bg-green-100 transition-colors border border-green-200"
+                              onClick={() => handleCeremonyClick(ceremony.id)}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <Badge className="bg-green-100 text-green-800 text-xs">
+                                  {ceremony.rawDate ? getDaysUntilCeremony(ceremony.rawDate) : "TBD"}
+                                </Badge>
+                                <span className="text-xs text-gray-500">{ceremony.time}</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className="flex -space-x-1">
+                                  <Avatar className="border-2 border-white w-6 h-6">
+                                    <AvatarFallback className={`${ceremony.couple1Color} text-xs`}>
+                                      {ceremony.couple1Initial}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <Avatar className="border-2 border-white w-6 h-6">
+                                    <AvatarFallback className={`${ceremony.couple2Color} text-xs`}>
+                                      {ceremony.couple2Initial}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                </div>
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {(ceremony.couple1Name || "").split(" ")[0]} & {(ceremony.couple2Name || "").split(" ")[0]}
+                                </p>
+                              </div>
+                              <p className="text-xs text-gray-600 flex items-center mt-1 truncate">
+                                <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
+                                {ceremony.location}
                               </p>
                             </div>
-                            <div className="flex -space-x-2 mb-2">
-                              <Avatar className="border-2 border-white w-8 h-8">
-                                <AvatarFallback
-                                  className={ceremony.couple1Color}
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* All My Couples */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-lg flex items-center">
+                          <Heart className="w-5 h-5 mr-2 text-pink-500" />
+                          All My Couples
+                        </CardTitle>
+                        <CardDescription>{ceremonies.length} total ceremonies</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3 max-h-80 overflow-y-auto">
+                        {ceremonies.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">No ceremonies yet</p>
+                        ) : (
+                          ceremonies.map((ceremony) => (
+                            <div
+                              key={ceremony.id}
+                              className={`p-3 rounded-lg cursor-pointer transition-colors border ${
+                                ceremony.status === "Active"
+                                  ? "bg-white hover:bg-gray-50 border-gray-200"
+                                  : "bg-gray-50 hover:bg-gray-100 border-gray-200 opacity-75"
+                              }`}
+                              onClick={() => handleCeremonyClick(ceremony.id)}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <div className="flex -space-x-1">
+                                    <Avatar className="border-2 border-white w-8 h-8">
+                                      <AvatarFallback className={`${ceremony.couple1Color} text-xs`}>
+                                        {ceremony.couple1Initial}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <Avatar className="border-2 border-white w-8 h-8">
+                                      <AvatarFallback className={`${ceremony.couple2Color} text-xs`}>
+                                        {ceremony.couple2Initial}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-semibold text-gray-900">
+                                      {(ceremony.couple1Name || "").split(" ")[0]} & {(ceremony.couple2Name || "").split(" ")[0]}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {ceremony.couple1Name} & {ceremony.couple2Name}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge
+                                  className={ceremony.status === "Active"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-gray-100 text-gray-600"
+                                  }
                                 >
-                                  {ceremony.couple1Initial}
-                                </AvatarFallback>
-                              </Avatar>
-                              <Avatar className="border-2 border-white w-8 h-8">
-                                <AvatarFallback
-                                  className={ceremony.couple2Color}
-                                >
-                                  {ceremony.couple2Initial}
-                                </AvatarFallback>
-                              </Avatar>
+                                  {ceremony.status}
+                                </Badge>
+                              </div>
+                              <div className="space-y-1 text-xs text-gray-600 ml-10">
+                                <div className="flex items-center">
+                                  <CalendarIcon className="w-3 h-3 mr-1" />
+                                  {ceremony.date} at {ceremony.time}
+                                </div>
+                                <div className="flex items-center">
+                                  <MapPin className="w-3 h-3 mr-1" />
+                                  {ceremony.location}
+                                </div>
+                                <div className="flex items-center">
+                                  <Mail className="w-3 h-3 mr-1" />
+                                  {ceremony.email}
+                                </div>
+                                <div className="flex items-center">
+                                  <Phone className="w-3 h-3 mr-1" />
+                                  {ceremony.phone}
+                                </div>
+                              </div>
                             </div>
-                            <p className="text-sm font-semibold text-gray-900">
-                              {(ceremony.couple1Name || "").split(" ")[0] || "Bride"} &{" "}
-                              {(ceremony.couple2Name || "").split(" ")[0] || "Groom"}
-                            </p>
-                            <p className="text-xs text-gray-600 flex items-center mt-1">
-                              <Clock className="w-3 h-3 mr-1" />
-                              {ceremony.time}
-                            </p>
-                          </div>
-                        ))}
+                          ))
+                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -1993,9 +2380,7 @@ export function OfficiantDashboardDialog({
                             />
                             <Button
                               variant="destructive"
-                              onClick={() =>
-                                handleProfileUpdate("videoUrl", "")
-                              }
+                              onClick={removeVideo}
                               className="w-full mt-3"
                             >
                               <X className="w-4 h-4 mr-2" />
@@ -2045,10 +2430,20 @@ export function OfficiantDashboardDialog({
                     <Button
                       className="bg-blue-500 hover:bg-blue-600 text-white"
                       asChild
+                      disabled={uploadingDocument}
                     >
                       <span>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Document
+                        {uploadingDocument ? (
+                          <>
+                            <Clock className="w-4 h-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload Document
+                          </>
+                        )}
                       </span>
                     </Button>
                   </label>
@@ -2059,55 +2454,77 @@ export function OfficiantDashboardDialog({
                     className="hidden"
                     onChange={handleFileUpload}
                     accept=".pdf,.doc,.docx,.txt"
+                    disabled={uploadingDocument}
                   />
                 </div>
 
                 {/* Documents Grid */}
-                <div className="grid grid-cols-3 gap-6 mb-6">
-                  {documents.map((doc) => (
-                    <Card key={doc.id}>
-                      <CardContent className="pt-6">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3">
-                            <div
-                              className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                                doc.type === "PDF"
-                                  ? "bg-blue-100"
-                                  : doc.type === "DOC"
-                                  ? "bg-green-100"
-                                  : "bg-purple-100"
-                              }`}
-                            >
-                              <FileText
-                                className={`w-5 h-5 ${
+                {documents.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-lg mb-6">
+                    <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="font-medium text-gray-900 mb-1">No documents yet</p>
+                    <p className="text-sm text-gray-500">
+                      Upload your first document using the button above
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-6 mb-6">
+                    {documents.map((doc) => (
+                      <Card key={doc.id}>
+                        <CardContent className="pt-6">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-3">
+                              <div
+                                className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                   doc.type === "PDF"
-                                    ? "text-blue-600"
+                                    ? "bg-blue-100"
                                     : doc.type === "DOC"
-                                    ? "text-green-600"
-                                    : "text-purple-600"
+                                    ? "bg-green-100"
+                                    : "bg-purple-100"
                                 }`}
-                              />
+                              >
+                                <FileText
+                                  className={`w-5 h-5 ${
+                                    doc.type === "PDF"
+                                      ? "text-blue-600"
+                                      : doc.type === "DOC"
+                                      ? "text-green-600"
+                                      : "text-purple-600"
+                                  }`}
+                                />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-gray-900 text-sm">
+                                  {doc.name}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {doc.type} • {doc.size}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  Updated {doc.updated}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-semibold text-gray-900 text-sm">
-                                {doc.name}
-                              </p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                {doc.type} • {doc.size}
-                              </p>
-                              <p className="text-xs text-gray-400 mt-1">
-                                Updated {doc.updated}
-                              </p>
-                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (doc.url) {
+                                  window.open(doc.url, "_blank");
+                                } else {
+                                  alert("Document URL not available");
+                                }
+                              }}
+                              title="Download document"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
                           </div>
-                          <Button variant="ghost" size="sm">
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
 
                 {/* Upload Area */}
                 <Card className="border-2 border-dashed border-gray-300">
@@ -2175,7 +2592,10 @@ export function OfficiantDashboardDialog({
                           </CardDescription>
                         </div>
                         {isAspirant && (
-                          <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white">
+                          <Button
+                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                            onClick={() => setShowUpgradeDialog(true)}
+                          >
                             <Sparkles className="w-4 h-4 mr-2" />
                             Upgrade Now
                           </Button>
@@ -2252,8 +2672,61 @@ export function OfficiantDashboardDialog({
                         </div>
                       </div>
 
+                      {/* Subscription Status Banners */}
+                      {isCanceled && subscription?.daysRemaining !== undefined && subscription.daysRemaining > 0 && (
+                        <div className="mb-6 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                          <div className="flex items-start space-x-3">
+                            <AlertTriangle className="w-6 h-6 text-yellow-600 mt-0.5" />
+                            <div>
+                              <h4 className="font-semibold text-yellow-800">Subscription Canceled</h4>
+                              <p className="text-yellow-700 text-sm mt-1">
+                                Your subscription has been canceled. You have <strong>{subscription.daysRemaining} days</strong> of access remaining.
+                              </p>
+                              {subscription.dataDeletionScheduledAt && (
+                                <p className="text-yellow-600 text-sm mt-1">
+                                  Data will be deleted on: <strong>{new Date(subscription.dataDeletionScheduledAt).toLocaleDateString()}</strong>
+                                </p>
+                              )}
+                              <Button
+                                className="mt-3 bg-yellow-600 hover:bg-yellow-700 text-white"
+                                size="sm"
+                                onClick={() => setShowUpgradeDialog(true)}
+                              >
+                                <Shield className="w-4 h-4 mr-2" />
+                                Reactivate Subscription
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {isDataRetention && (
+                        <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                          <div className="flex items-start space-x-3">
+                            <Shield className="w-6 h-6 text-blue-600 mt-0.5" />
+                            <div>
+                              <h4 className="font-semibold text-blue-800">Data Retention Plan Active</h4>
+                              <p className="text-blue-700 text-sm mt-1">
+                                Your couple/customer data is being preserved for <strong>$1.00/month</strong>.
+                              </p>
+                              <p className="text-blue-600 text-sm mt-1">
+                                You can upgrade to a full subscription anytime to regain full access.
+                              </p>
+                              <Button
+                                className="mt-3 bg-blue-600 hover:bg-blue-700 text-white"
+                                size="sm"
+                                onClick={() => setShowUpgradeDialog(true)}
+                              >
+                                <Crown className="w-4 h-4 mr-2" />
+                                Upgrade to Full Plan
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Subscription Management Actions */}
-                      {isProfessional && (
+                      {(isProfessional || isAspirant) && !isCanceled && !isDataRetention && (
                         <div className="mt-6 pt-6 border-t">
                           <h3 className="font-semibold text-gray-900 mb-3">
                             Manage Subscription
@@ -2263,8 +2736,7 @@ export function OfficiantDashboardDialog({
                               variant="outline"
                               className="border-blue-500 text-blue-700 hover:bg-blue-50"
                               onClick={() => {
-                                alert("Redirecting to billing portal...");
-                                // Add Stripe billing portal redirect here
+                                alert("Payment method update coming soon via Square!");
                               }}
                             >
                               <CreditCard className="w-4 h-4 mr-2" />
@@ -2273,27 +2745,25 @@ export function OfficiantDashboardDialog({
                             <Button
                               variant="outline"
                               className="border-red-500 text-red-700 hover:bg-red-50"
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    "Are you sure you want to cancel your Professional subscription?\n\nYou will lose access to:\n• Unlimited ceremonies\n• Messages & files\n• Contracts & invoices\n• Marketplace access\n\nYour subscription will remain active until the end of your billing period."
-                                  )
-                                ) {
-                                  alert(
-                                    "Your cancellation request has been processed.\n\nYour Professional features will remain active until the end of your current billing period.\n\nWe're sorry to see you go!"
-                                  );
-                                }
-                              }}
+                              onClick={() => setShowCancelDialog(true)}
                             >
                               <X className="w-4 h-4 mr-2" />
                               Cancel Subscription
                             </Button>
                           </div>
-                          <p className="text-sm text-gray-500 mt-3">
-                            Your subscription will renew on{" "}
-                            <strong>December 27, 2024</strong> for{" "}
-                            <strong>$29.00/month</strong>
-                          </p>
+                          {subscription?.billingCycleEnd && (
+                            <p className="text-sm text-gray-500 mt-3">
+                              Your subscription will renew on{" "}
+                              <strong>{new Date(subscription.billingCycleEnd).toLocaleDateString()}</strong> for{" "}
+                              <strong>${subscription.priceCents ? (subscription.priceCents / 100).toFixed(2) : isProfessional ? "29.00" : "14.95"}/month</strong>
+                            </p>
+                          )}
+                          {!subscription?.billingCycleEnd && (
+                            <p className="text-sm text-gray-500 mt-3">
+                              Your subscription renews monthly at{" "}
+                              <strong>${isProfessional ? "29.00" : "14.95"}/month</strong>
+                            </p>
+                          )}
                         </div>
                       )}
                     </CardContent>
@@ -2436,7 +2906,10 @@ export function OfficiantDashboardDialog({
                                 </span>
                               </div>
                             </div>
-                            <Button className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white">
+                            <Button
+                              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+                              onClick={() => setShowUpgradeDialog(true)}
+                            >
                               <Crown className="w-4 h-4 mr-2" />
                               Upgrade to Professional
                             </Button>
@@ -2965,6 +3438,28 @@ export function OfficiantDashboardDialog({
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Cancellation Dialog */}
+        <CancelSubscriptionDialog
+          open={showCancelDialog}
+          onOpenChange={setShowCancelDialog}
+          userId={user?.id || ""}
+          onCanceled={() => {
+            refreshSubscription();
+          }}
+        />
+
+        {/* Upgrade Subscription Dialog */}
+        <UpgradeSubscriptionDialog
+          open={showUpgradeDialog}
+          onOpenChange={setShowUpgradeDialog}
+          userId={user?.id || ""}
+          userEmail={profile.email || user?.email || ""}
+          userFullName={profile.fullName || user?.user_metadata?.full_name || ""}
+          onUpgraded={() => {
+            refreshSubscription();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

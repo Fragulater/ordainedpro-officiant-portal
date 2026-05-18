@@ -1,0 +1,21 @@
+# Exclude backup files
+.backups/
+
+# Exclude uploads
+uploads/
+
+# Exclude Same.new docs
+.same/
+
+# Exclude build artifacts
+*.map
+tsconfig.tsbuildinfo
+
+# Exclude backup files
+*.backup*
+*.ORIGINAL
+*.WORKING_COPY
+*.bak
+
+# Exclude SQL files
+*.sql

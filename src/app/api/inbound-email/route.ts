@@ -289,6 +289,55 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ Reply saved successfully for officiant:", couple.user_id);
 
+    // ============================================
+    // SEND EMAIL NOTIFICATION TO OFFICIANT
+    // ============================================
+    try {
+      // Get officiant's email from Supabase Auth using admin API
+      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(couple.user_id);
+
+      if (userError || !userData?.user?.email) {
+        console.error("⚠️ Could not get officiant email:", userError?.message || "No email found");
+      } else {
+        const officiantEmail = userData.user.email;
+        const coupleName = `${couple.bride_name} & ${couple.groom_name}`;
+
+        console.log("📤 Sending notification email to officiant:", officiantEmail);
+
+        // Send notification email via Resend
+        const notificationResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${resendApiKey}`,
+          },
+          body: JSON.stringify({
+            from: `OrdainedPro <notifications@ordainedpro.com>`,
+            to: [officiantEmail],
+            subject: `New message from ${senderName || coupleName}`,
+            html: generateOfficiantNotificationEmail(
+              senderName || "Your couple",
+              coupleName,
+              replyText,
+              subject || "Wedding Communication"
+            ),
+            text: `You have a new message from ${senderName || coupleName}:\n\n${replyText}\n\n---\nLog in to OrdainedPro to view and reply: https://portal.ordainedpro.com`,
+          }),
+        });
+
+        if (!notificationResponse.ok) {
+          const notificationError = await notificationResponse.json();
+          console.error("⚠️ Failed to send notification email:", notificationError);
+        } else {
+          const notificationData = await notificationResponse.json();
+          console.log("✅ Notification email sent to officiant:", notificationData.id);
+        }
+      }
+    } catch (notificationError) {
+      // Don't fail the whole request if notification fails
+      console.error("⚠️ Error sending officiant notification:", notificationError);
+    }
+
     return NextResponse.json({
       success: true,
       message: "Reply processed and saved",
@@ -305,6 +354,99 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// Generate HTML email template for officiant notification
+function generateOfficiantNotificationEmail(
+  senderName: string,
+  coupleName: string,
+  messageContent: string,
+  originalSubject: string
+): string {
+  // Truncate message for preview if too long
+  const truncatedMessage = messageContent.length > 500
+    ? messageContent.substring(0, 500) + "..."
+    : messageContent;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Message from ${senderName}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 30px 40px 20px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 600;">
+                New Message Received
+              </h1>
+              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">
+                from ${senderName}
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding: 30px 40px;">
+              <p style="margin: 0 0 15px; color: #374151; font-size: 15px;">
+                You have received a new message regarding the wedding of <strong>${coupleName}</strong>.
+              </p>
+
+              <!-- Original Subject -->
+              <p style="margin: 0 0 15px; color: #6b7280; font-size: 13px;">
+                <strong>Re:</strong> ${originalSubject}
+              </p>
+
+              <!-- Message Content -->
+              <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; border-radius: 0 8px 8px 0; margin: 20px 0;">
+                <p style="margin: 0 0 10px; color: #065f46; font-weight: 600; font-size: 13px;">
+                  Message from ${senderName}:
+                </p>
+                <p style="margin: 0; color: #1f2937; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">
+${truncatedMessage}
+                </p>
+              </div>
+
+              <!-- CTA Button -->
+              <div style="text-align: center; margin: 30px 0 20px;">
+                <a href="https://portal.ordainedpro.com"
+                   style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
+                  View &amp; Reply in Portal
+                </a>
+              </div>
+
+              <p style="margin: 20px 0 0; color: #9ca3af; font-size: 12px; text-align: center;">
+                You can also reply directly to this email to continue the conversation.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f8fafc; border-radius: 0 0 12px 12px; text-align: center;">
+              <p style="margin: 0; color: #9ca3af; font-size: 12px;">
+                This notification was sent from your OrdainedPro Wedding Portal.
+              </p>
+              <p style="margin: 8px 0 0; color: #9ca3af; font-size: 11px;">
+                <a href="https://portal.ordainedpro.com" style="color: #3b82f6; text-decoration: none;">portal.ordainedpro.com</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
 }
 
 // Extract the actual reply text, removing quoted content

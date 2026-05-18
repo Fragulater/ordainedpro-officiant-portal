@@ -1,0 +1,36 @@
+Please create another feature/update for the Wedding Details section.
+
+All information entered into the Wedding Details area must be saved server-side only. Do not store this information locally in the browser, local storage, session storage, or any other client-side storage.
+
+The Wedding Details section should save fields such as:
+- Venue name
+- Venue address
+- Wedding date and time, if applicable
+- Guest count
+- Additional notes
+- Any other wedding-related details entered by the user
+
+The goal is to make sure all wedding details are securely stored and retrievable from the server/database.
+
+Notes Button Behavior:
+
+If the end user adds notes to the Wedding Details section, do not show a note preview on the page.
+
+Instead, only display a Notes button.
+
+The Notes button should visually indicate whether notes exist:
+
+- If notes exist in the notes field, the Notes button should be green.
+- If there are no notes saved, the Notes button should be a dull gray color.
+
+The button should keep the same general design style, spacing, rounded corners, typography, and color theme as the rest of the website/dashboard.
+
+Important requirements:
+- Do not display the notes content as a preview.
+- Only show the Notes button.
+- Clicking the Notes button should allow the user to view, add, or edit the notes.
+- Notes must be saved server-side.
+- Wedding Details data must persist after refresh, logout, and login.
+- Make sure the dashboard always retrieves the most recent Wedding Details data from the server/database.
+
+Please implement this carefully and verify that no Wedding Details data is being stored locally.

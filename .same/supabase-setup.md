@@ -22,8 +22,8 @@ This guide will help you set up Supabase as the backend for your OrdainedPro off
 2. Click on **API** in the sidebar
 3. Copy these values:
    - **Project URL** (looks like: `https://xxxxx.supabase.co`)
-   - **anon/public key** (starts with `eyJ...`)
-   - **service_role key** (starts with `eyJ...`) - Keep this secret!
+   - **anon/public key** (starts with `YOUR_SUPABASE_KEY.`)
+   - **service_role key** (starts with `YOUR_SUPABASE_KEY.`) - Keep this secret!
 
 ## Step 3: Configure Environment Variables
 
@@ -31,8 +31,8 @@ Update your `.env.local` file with the values from Step 2:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...your-service-role-key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_KEY.your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_KEY.your-service-role-key
 ```
 
 ## Step 4: Create Database Schema

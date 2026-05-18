@@ -57,7 +57,7 @@ The marketplace **MUST** use the exact same Supabase credentials as the portal f
 **Check marketplace `.env.local` or environment configuration:**
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://ailrvrxibpizbvyroonp.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpbHJ2cnhpYnBpemJ2eXJvb25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTg3OTQsImV4cCI6MjA3NzU5NDc5NH0.p12BTatmPgMoUCQZMg04YXJsgMbAe87DhB9CNbVTMsk
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
 
 **⚠️ CRITICAL:** Both projects must point to the same Supabase database!

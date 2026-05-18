@@ -29,8 +29,8 @@ I've already set up the Supabase integration for you:
 3. **Update `.env.local`**
    ```env
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...your-anon-key
-   SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...your-service-key
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_KEY.your-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_KEY.your-service-key
    ```
 
 4. **Create Database Tables**

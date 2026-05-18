@@ -33,7 +33,7 @@ NEXT_PUBLIC_MARKETPLACE_URL=https://3000-loeocbplxsodhjfbzatcyyksahayytin.previe
 **Shared Supabase Credentials:**
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://ailrvrxibpizbvyroonp.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_KEY.
 ```
 
 Both projects using same database = Real-time sync! 🔄

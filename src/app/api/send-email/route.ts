@@ -4,6 +4,13 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Attachment type for email
+interface EmailAttachment {
+  filename: string;
+  content: string; // Text content or base64 encoded content
+  contentType?: 'text' | 'base64'; // Type of content
+}
+
 // Email sending API route
 // Uses Resend for reliable email delivery
 // Fallback: Can be configured to use SMTP directly
@@ -11,7 +18,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { to, subject, message, fromName, coupleName, coupleId, officiantId } = body;
+    const { to, subject, message, fromName, coupleName, coupleId, officiantId, attachments } = body;
 
     // Validate required fields
     if (!to || !subject || !message) {
@@ -25,25 +32,43 @@ export async function POST(request: NextRequest) {
     const resendApiKey = process.env.RESEND_API_KEY;
 
     if (resendApiKey) {
+      // Prepare attachments for Resend API
+      const resendAttachments = (attachments || []).map((att: EmailAttachment) => {
+        // If already base64, use directly; otherwise convert text to base64
+        const base64Content = att.contentType === 'base64'
+          ? att.content
+          : Buffer.from(att.content).toString('base64');
+
+        return {
+          filename: att.filename,
+          content: base64Content,
+        };
+      });
+
       // Use Resend for email delivery
+      const emailPayload: Record<string, unknown> = {
+        from: `${fromName || "Wedding Officiant"} <info@ordainedpro.com>`,
+        reply_to: coupleId && officiantId
+          ? `reply+${coupleId}_${officiantId}@ziloesteo.resend.app`
+          : "reply@ziloesteo.resend.app",
+        to: [to],
+        subject: subject,
+        html: generateEmailHtml(fromName, coupleName, message, subject, attachments),
+        text: message,
+      };
+
+      // Only add attachments if there are any
+      if (resendAttachments.length > 0) {
+        emailPayload.attachments = resendAttachments;
+      }
+
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${resendApiKey}`,
         },
-        body: JSON.stringify({
-          from: `${fromName || "Wedding Officiant"} <info@ordainedpro.com>`,
-          // Use plus addressing for unique reply routing: reply+coupleId_officiantId@domain
-          // This ensures replies go to the correct couple/officiant pair
-          reply_to: coupleId && officiantId
-            ? `reply+${coupleId}_${officiantId}@ziloesteo.resend.app`
-            : "reply@ziloesteo.resend.app",
-          to: [to],
-          subject: subject,
-          html: generateEmailHtml(fromName, coupleName, message, subject),
-          text: message,
-        }),
+        body: JSON.stringify(emailPayload),
       });
 
       if (!response.ok) {
@@ -56,20 +81,21 @@ export async function POST(request: NextRequest) {
       }
 
       const data = await response.json();
-      console.log("✅ Email sent via Resend:", data);
+      console.log("[OK] Email sent via Resend:", data);
       return NextResponse.json({ success: true, messageId: data.id });
     }
 
     // Fallback: Log email for development (no email service configured)
-    console.log("📧 Email would be sent (no RESEND_API_KEY configured):");
+    console.log("[EMAIL] Would be sent (no RESEND_API_KEY configured):");
     console.log("To:", to);
     console.log("Subject:", subject);
     console.log("Message:", message);
+    console.log("Attachments:", attachments?.length || 0);
 
     return NextResponse.json({
       success: true,
       note: "Email logged (no email service configured). Add RESEND_API_KEY to enable email delivery.",
-      preview: { to, subject, message }
+      preview: { to, subject, message, attachmentCount: attachments?.length || 0 }
     });
 
   } catch (error) {
@@ -86,8 +112,28 @@ function generateEmailHtml(
   fromName: string,
   coupleName: string,
   message: string,
-  subject: string
+  subject: string,
+  attachments?: EmailAttachment[]
 ): string {
+  // Build attachments section if there are any
+  let attachmentsHtml = '';
+  if (attachments && attachments.length > 0) {
+    attachmentsHtml = `
+      <tr>
+        <td style="padding: 0 40px 20px;">
+          <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px;">
+            <p style="margin: 0 0 10px; color: #1e40af; font-weight: 600; font-size: 14px;">
+              Attachments (${attachments.length}):
+            </p>
+            <ul style="margin: 0; padding-left: 20px; color: #1e40af;">
+              ${attachments.map(att => `<li style="margin: 4px 0;">${att.filename}</li>`).join('')}
+            </ul>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
   return `
 <!DOCTYPE html>
 <html>
@@ -105,7 +151,7 @@ function generateEmailHtml(
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 12px 12px 0 0;">
               <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
-                💍 Wedding Message
+                Wedding Documents
               </h1>
               <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">
                 From your wedding officiant
@@ -132,6 +178,9 @@ function generateEmailHtml(
               </p>
             </td>
           </tr>
+
+          <!-- Attachments Section -->
+          ${attachmentsHtml}
 
           <!-- Footer -->
           <tr>

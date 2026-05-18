@@ -185,7 +185,7 @@ const generateRecommendation = (responses: Record<string, string>): string => {
   let recommendation = "Based on your preferences, here's what I recommend for your ceremony script:\n\n"
 
   if (ceremonyType) {
-    recommendation += `ðŸ“ **Ceremony Style**: Since you've chosen a ${ceremonyType.toLowerCase()} ceremony, `
+    recommendation += `[SCRIPT] **Ceremony Style**: Since you've chosen a ${ceremonyType.toLowerCase()} ceremony, `
     if (ceremonyType === 'Traditional') {
       recommendation += "I'll include classic elements like traditional vows, ring exchange, and formal language.\n\n"
     } else if (ceremonyType === 'Modern') {
@@ -200,7 +200,7 @@ const generateRecommendation = (responses: Record<string, string>): string => {
   }
 
   if (tone) {
-    recommendation += `ðŸŽ­ **Tone**: The ${tone.toLowerCase()} approach will be reflected in the language and style throughout.\n\n`
+    recommendation += `[STYLE] **Tone**: The ${tone.toLowerCase()} approach will be reflected in the language and style throughout.\n\n`
   }
 
   recommendation += "Would you like me to start generating your personalized ceremony script now? I can always adjust it based on any additional preferences you have!"
@@ -542,7 +542,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   // Log saved ceremonies for debugging
   useEffect(() => {
     if (savedCeremonies.length > 0) {
-      console.log("ðŸ“‹ Saved Ceremonies:", savedCeremonies)
+      console.log("[SCRIPT]‹ Saved Ceremonies:", savedCeremonies)
     }
   }, [savedCeremonies])
 
@@ -630,7 +630,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         setActiveCoupleIndex(0)
         console.log("âœ… Loaded", transformedCouples.length, "couples from database")
       } else {
-        console.log("ðŸ“­ No couples found in database")
+        console.log("[SCRIPT]­ No couples found in database")
         setAllCouples([])
       }
 
@@ -645,7 +645,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser || !editCoupleInfo?.id) return
 
     try {
-      console.log("ðŸ“¨ Loading messages for couple:", editCoupleInfo.id)
+      console.log("[SCRIPT]¨ Loading messages for couple:", editCoupleInfo.id)
 
       const { data: messagesData, error } = await supabase
         .from("messages")
@@ -674,7 +674,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
         setMessages(formattedMessages)
       } else {
-        console.log("ðŸ“­ No messages found for this couple")
+        console.log("[SCRIPT]­ No messages found for this couple")
         setMessages([])
       }
     } catch (err) {
@@ -708,7 +708,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id || !editCoupleInfo?.id) return
 
     setIsLoadingTasks(true)
-    console.log("ðŸ“‹ Loading tasks for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]‹ Loading tasks for couple:", editCoupleInfo.id)
 
     const result = await loadTasksFromDB(currentUser.id, editCoupleInfo.id)
 
@@ -730,7 +730,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       setTasks(transformedTasks)
       console.log("âœ… Loaded", transformedTasks.length, "tasks for couple", editCoupleInfo.id)
     } else {
-      console.log("ðŸ“­ No tasks found or error for couple", editCoupleInfo.id)
+      console.log("[SCRIPT]­ No tasks found or error for couple", editCoupleInfo.id)
       setTasks([])
     }
 
@@ -746,7 +746,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id || !editCoupleInfo?.id) return
 
     setIsLoadingFiles(true)
-    console.log("ðŸ“ Loading files for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT] Loading files for couple:", editCoupleInfo.id)
 
     const result = await loadFilesFromDB(currentUser.id, editCoupleInfo.id)
 
@@ -765,7 +765,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       setFiles(transformedFiles)
       console.log("âœ… Loaded", transformedFiles.length, "files for couple", editCoupleInfo.id)
     } else {
-      console.log("ðŸ“­ No files found or error for couple", editCoupleInfo.id)
+      console.log("[SCRIPT]­ No files found or error for couple", editCoupleInfo.id)
       setFiles([])
     }
 
@@ -781,7 +781,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id || !editCoupleInfo?.id) return
 
     setIsLoadingMeetings(true)
-    console.log("ðŸ“… Loading meetings for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]… Loading meetings for couple:", editCoupleInfo.id)
 
     const result = await loadMeetingsFromDB(currentUser.id, editCoupleInfo.id)
 
@@ -806,7 +806,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       setMeetings(transformedMeetings)
       console.log("âœ… Loaded", transformedMeetings.length, "meetings for couple", editCoupleInfo.id)
     } else {
-      console.log("ðŸ“­ No meetings found or error for couple", editCoupleInfo.id)
+      console.log("[SCRIPT]­ No meetings found or error for couple", editCoupleInfo.id)
       setMeetings([])
     }
 
@@ -822,7 +822,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id || !editCoupleInfo?.id) return
 
     setIsLoadingContracts(true)
-    console.log("ðŸ“œ Loading contracts for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]œ Loading contracts for couple:", editCoupleInfo.id)
 
     const result = await loadContractsFromDB(currentUser.id, editCoupleInfo.id)
 
@@ -841,7 +841,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       setContracts(transformedContracts)
       console.log("âœ… Loaded", transformedContracts.length, "contracts for couple", editCoupleInfo.id)
     } else {
-      console.log("ðŸ“­ No contracts found or error for couple", editCoupleInfo.id)
+      console.log("[SCRIPT]­ No contracts found or error for couple", editCoupleInfo.id)
       setContracts([])
     }
 
@@ -892,7 +892,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
       console.log("âœ… Loaded", transformedPayments.length, "payments for couple", editCoupleInfo.id)
     } else {
-      console.log("ðŸ“­ No payments found or error for couple", editCoupleInfo.id)
+      console.log("[SCRIPT]­ No payments found or error for couple", editCoupleInfo.id)
       setPaymentHistory([])
       setPaymentInfo({
         totalAmount: 0,
@@ -918,7 +918,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id) return
 
     setIsLoadingScripts(true)
-    console.log("ðŸ“œ Loading scripts for user:", currentUser.id)
+    console.log("[SCRIPT]œ Loading scripts for user:", currentUser.id)
 
     const result = await loadScriptsFromDB(currentUser.id, editCoupleInfo?.id)
 
@@ -941,7 +941,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       setCoupleScripts(transformedScripts)
       console.log("âœ… Loaded", transformedScripts.length, "scripts from database")
     } else {
-      console.log("ðŸ“­ No scripts found or error")
+      console.log("[SCRIPT]­ No scripts found or error")
       // Keep default demo scripts if no database scripts
     }
 
@@ -1044,11 +1044,11 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     switch (type) {
       case 'meeting': return 'ðŸ¤'
       case 'task': return 'âœ…'
-      case 'rehearsal': return 'ðŸŽ­'
+      case 'rehearsal': return '[STYLE]'
       case 'ceremony': return 'ðŸ’’'
-      case 'preparation': return 'âš™ï¸'
-      case 'follow-up': return 'ðŸ“ž'
-      default: return 'ðŸ“…'
+      case 'preparation': return '[WARNING]™ï¸'
+      case 'follow-up': return '[SCRIPT]ž'
+      default: return '[SCRIPT]…'
     }
   }
 
@@ -1109,14 +1109,14 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     }
 
     if (lowerInput.includes('generate') || lowerInput.includes('create') || lowerInput.includes('yes')) {
-      return "Excellent! I'm generating a personalized ceremony script for Sarah Johnson & David Chen. This will include:\n\nâ€¢ Processional guidance\nâ€¢ Opening words\nâ€¢ Exchange of vows section\nâ€¢ Ring ceremony\nâ€¢ Unity ceremony (optional)\nâ€¢ Pronouncement and kiss\nâ€¢ Recessional\n\nThe script is being created and will be saved to your files. Would you like me to customize any specific sections?"
+      return "Excellent! I'm generating a personalized ceremony script for Sarah Johnson & David Chen. This will include:\n\n* Processional guidance\n* Opening words\n* Exchange of vows section\n* Ring ceremony\n* Unity ceremony (optional)\n* Pronouncement and kiss\n* Recessional\n\nThe script is being created and will be saved to your files. Would you like me to customize any specific sections?"
     }
 
     if (lowerInput.includes('vows') || lowerInput.includes('rings')) {
-      return "For the vow exchange, I can provide:\n\nâ€¢ Traditional vows template\nâ€¢ Guide for personal vow writing\nâ€¢ Sample vow examples\nâ€¢ Ring exchange wording\n\nWould you like me to create a complete vows section for their ceremony?"
+      return "For the vow exchange, I can provide:\n\n* Traditional vows template\n* Guide for personal vow writing\n* Sample vow examples\n* Ring exchange wording\n\nWould you like me to create a complete vows section for their ceremony?"
     }
 
-    return "I understand! Let me help you with that. I can assist with:\n\nâ€¢ Creating ceremony scripts from scratch\nâ€¢ Customizing existing templates\nâ€¢ Adding personal touches and stories\nâ€¢ Incorporating special readings or music\nâ€¢ Adjusting tone and style\n\nWhat specific aspect of the ceremony script would you like to work on first?"
+    return "I understand! Let me help you with that. I can assist with:\n\n* Creating ceremony scripts from scratch\n* Customizing existing templates\n* Adding personal touches and stories\n* Incorporating special readings or music\n* Adjusting tone and style\n\nWhat specific aspect of the ceremony script would you like to work on first?"
   }
 
   const handleGenerateScript = (scriptType: string) => {
@@ -1679,7 +1679,7 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
             alert(`ðŸ’¾ Auto-saved "${editingScript.title}" to server at ${timestamp}`)
           } else {
             console.error("Failed to auto-save to database:", result.error)
-            alert(`âš ï¸ Failed to auto-save to server. Please try again.`)
+            alert(`[WARNING] ï¸ Failed to auto-save to server. Please try again.`)
           }
         } else {
           // New script - need to save first
@@ -2027,9 +2027,9 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
 The script has been added to your Generated Scripts. I've automatically replaced all placeholder names with the couple's actual names.
 
 You can now:
-â€¢ View and edit the script
-â€¢ Ask me to make specific changes
-â€¢ Refine any section you'd like
+* View and edit the script
+* Ask me to make specific changes
+* Refine any section you'd like
 
 What would you like me to help you with in this script?`,
         timestamp: new Date().toLocaleTimeString()
@@ -2228,7 +2228,7 @@ Pastor Michael Adams`,
       setEditorFontSize(16)
     } catch (err: any) {
       console.error('âŒ Error saving script:', err)
-      alert(`âš ï¸ Failed to save script to server.\n\nError: ${err.message}\n\nPlease try again.`)
+      alert(`[WARNING] ï¸ Failed to save script to server.\n\nError: ${err.message}\n\nPlease try again.`)
     }
   }
 
@@ -2301,24 +2301,24 @@ Pastor Michael Adams`,
     const allAttachments = [...scriptAttachments, ...fileAttachments]
 
     // Build message details
-    const scriptsList = selectedScripts.map(s => `â€¢ ${s.title} (${s.type})`).join('\n')
-    const filesList = selectedFiles.map(f => `â€¢ ${f.name} (${f.size})`).join('\n')
+    const scriptsList = selectedScripts.map(s => `* ${s.title} (${s.type})`).join('\n')
+    const filesList = selectedFiles.map(f => `* ${f.name} (${f.size})`).join('\n')
 
     let itemsDescription = ''
     if (selectedScripts.length > 0) {
-      itemsDescription += `ðŸ“œ Scripts (${selectedScripts.length}):\n${scriptsList}\n\n`
+      itemsDescription += `[SCRIPTS] (${selectedScripts.length}):\n${scriptsList}\n\n`
     }
     if (selectedFiles.length > 0) {
-      itemsDescription += `ðŸ“Ž Files (${selectedFiles.length}):\n${filesList}\n\n`
+      itemsDescription += `[FILES] (${selectedFiles.length}):\n${filesList}\n\n`
     }
 
     // Add to messaging platform
     setMessageAttachments(allAttachments)
-    setNewMessage(`ðŸ“¦ Wedding Documents Shared
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+    setNewMessage(`[SHARED] Wedding Documents
+========================================
 
-ðŸ‘°ðŸ¤µ For: ${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}
-ðŸ“§ Sent to: ${recipient}
+For: ${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}
+Sent to: ${recipient}
 
 ${itemsDescription}
 ${shareScriptForm.body}`)
@@ -2411,7 +2411,7 @@ ${shareScriptForm.body}`)
 
     // Add to messaging platform
     setMessageAttachments([contractAttachment])
-    setNewMessage(`ðŸ“§ Email sent to: ${recipient}\nðŸ“„ Subject: ${emailForm.subject}\n\n${emailForm.body}`)
+    setNewMessage(`[SCRIPT]§ Email sent to: ${recipient}\n[SCRIPT]„ Subject: ${emailForm.subject}\n\n${emailForm.body}`)
     setShowAttachments(true)
 
     // Auto-send the message
@@ -2452,10 +2452,10 @@ I hope this message finds you well and that your wedding planning is going smoot
 This is a friendly reminder regarding your upcoming payment for our wedding ceremony services.
 
 Payment Details:
-â€¢ Total Amount: $${paymentInfo.totalAmount}
-â€¢ Deposit Paid: $${paymentInfo.depositPaid}
-â€¢ Balance Due: $${paymentInfo.balance}
-â€¢ Due Date: ${paymentInfo.finalPaymentDue}
+* Total Amount: $${paymentInfo.totalAmount}
+* Deposit Paid: $${paymentInfo.depositPaid}
+* Balance Due: $${paymentInfo.balance}
+* Due Date: ${paymentInfo.finalPaymentDue}
 
 Please ensure your final payment is submitted by the due date to confirm all arrangements for your special day.
 
@@ -2494,7 +2494,7 @@ pastor.michael@ordainedpro.com`
     }
 
     // Add to messaging platform
-    setNewMessage(`ðŸ’° Payment Reminder sent to: ${recipient}\nðŸ“„ Subject: ${paymentReminderForm.subject}\n\n${paymentReminderForm.body}`)
+    setNewMessage(`ðŸ’° Payment Reminder sent to: ${recipient}\n[SCRIPT]„ Subject: ${paymentReminderForm.subject}\n\n${paymentReminderForm.body}`)
 
     // Auto-send the message
     setTimeout(() => {
@@ -2520,7 +2520,7 @@ pastor.michael@ordainedpro.com`
       return
     }
 
-    console.log("ðŸ“œ Uploading contract for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]œ Uploading contract for couple:", editCoupleInfo.id)
 
     // Save to database
     const result = await addContractToDB(currentUser.id, editCoupleInfo.id, {
@@ -3043,7 +3043,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
       return
     }
 
-    console.log("ðŸ“‹ Adding task for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]‹ Adding task for couple:", editCoupleInfo.id)
 
     // Save to database
     const result = await addTaskToDB(currentUser.id, editCoupleInfo.id, {
@@ -3081,7 +3081,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
     const reminderDate = new Date(task.dueDate)
     reminderDate.setDate(reminderDate.getDate() - task.reminderDays)
 
-    console.log(`ðŸ“§ Scheduling email notification:`)
+    console.log(`[SCRIPT]§ Scheduling email notification:`)
     console.log(`Task: ${task.task}`)
     console.log(`Reminder Date: ${reminderDate.toDateString()}`)
     console.log(`Due: ${task.dueDate} at ${task.dueTime}`)
@@ -3125,7 +3125,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
 
     // Store reminder in database for future sending
     // TODO: Create task_reminders table and Supabase Edge Function for scheduled sends
-    console.log(`ðŸ“… Reminder scheduled for ${reminderDate.toDateString()} - Recipients: ${recipients.join(', ')}`)
+    console.log(`[SCRIPT]… Reminder scheduled for ${reminderDate.toDateString()} - Recipients: ${recipients.join(', ')}`)
   }
 
   const generateTaskReminderEmail = (task: Task, isOfficiant: boolean, coupleName: string, officiantName: string) => {
@@ -3133,7 +3133,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
       low: 'ðŸŸ¢',
       medium: 'ðŸŸ¡',
       high: 'ðŸŸ ',
-      urgent: 'ðŸ”´'
+      urgent: '[DOC]´'
     }
 
     const greeting = isOfficiant ? `Dear ${officiantName}` : `Dear ${coupleName}`
@@ -3142,20 +3142,20 @@ Note: This is an initial draft. Further development needed to incorporate specif
       : `Your officiant ${officiantName} has created this task for your wedding planning. Please review and complete as needed.`
 
     return {
-      subject: `ðŸ“‹ Wedding Task: ${task.task}`,
+      subject: `[SCRIPT]‹ Wedding Task: ${task.task}`,
       body: `${greeting},
 
 A new task has been created for your wedding ceremony:
 
 â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
-ðŸ“‹ Task: ${task.task}
-ðŸ“… Due Date: ${new Date(task.dueDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+[SCRIPT]‹ Task: ${task.task}
+[SCRIPT]… Due Date: ${new Date(task.dueDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
 â° Due Time: ${task.dueTime}
-${priorityEmoji[task.priority] || 'ðŸ“Œ'} Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-ðŸ“ Category: ${task.category}
+${priorityEmoji[task.priority] || '[SCRIPT]Œ'} Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+[SCRIPT] Category: ${task.category}
 
-${task.details ? `ðŸ“ Details:\n${task.details}` : ''}
+${task.details ? `[SCRIPT] Details:\n${task.details}` : ''}
 
 â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
@@ -3228,7 +3228,7 @@ OrdainedPro Wedding Portal
       return
     }
 
-    console.log("ðŸ“… Scheduling meeting for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]… Scheduling meeting for couple:", editCoupleInfo.id)
 
     // Save to database
     const result = await addMeetingToDB(currentUser.id, editCoupleInfo.id, {
@@ -3269,7 +3269,7 @@ OrdainedPro Wedding Portal
     // 2. Send email notification
     // 3. Set up response tracking
 
-    console.log(`ðŸ“§ MEETING INVITATION SENT:`)
+    console.log(`[SCRIPT]§ MEETING INVITATION SENT:`)
     console.log(`Meeting: ${meeting.subject}`)
     console.log(`Date: ${meeting.date} at ${meeting.time}`)
     console.log(`Attendees: ${meeting.attendees.join(', ')}`)
@@ -3289,7 +3289,7 @@ OrdainedPro Wedding Portal
 
       updateMeetingStatus(meeting.id, randomResponse)
 
-      console.log(`ðŸ“¬ EMAIL RESPONSE RECEIVED:`)
+      console.log(`[SCRIPT]¬ EMAIL RESPONSE RECEIVED:`)
       console.log(`Meeting: ${meeting.subject}`)
       console.log(`Response: ${randomResponse.toUpperCase()}`)
       console.log(`Updated meeting status in portal calendar`)
@@ -3313,7 +3313,7 @@ OrdainedPro Wedding Portal
 
       // In a real app, this would be a toast notification
       setTimeout(() => {
-        alert(`ðŸ“… Meeting Update: ${meeting.subject}\n\n${statusMessages[status]}`)
+        alert(`[SCRIPT]… Meeting Update: ${meeting.subject}\n\n${statusMessages[status]}`)
       }, 100)
     }
   }
@@ -3342,7 +3342,7 @@ OrdainedPro Wedding Portal
       case 'declined':
         return 'âŒ'
       default:
-        return 'ðŸ“…'
+        return '[SCRIPT]…'
     }
   }
 
@@ -3351,11 +3351,11 @@ OrdainedPro Wedding Portal
       case 'video':
         return 'ðŸ’»'
       case 'phone':
-        return 'ðŸ“ž'
+        return '[SCRIPT]ž'
       case 'in-person':
         return 'ðŸ‘¥'
       default:
-        return 'ðŸ“…'
+        return '[SCRIPT]…'
     }
   }
 
@@ -3384,7 +3384,7 @@ OrdainedPro Wedding Portal
       } else if (fileType.includes('pdf')) {
         return (
           <div className="text-center space-y-4">
-            <div className="text-6xl">ðŸ“„</div>
+            <div className="text-6xl">[SCRIPT]„</div>
             <p className="text-gray-600">PDF Contract</p>
             <p className="font-medium">{contract.name}</p>
             <p className="text-sm text-gray-500">File type: {contract.file.type}</p>
@@ -3400,7 +3400,7 @@ OrdainedPro Wedding Portal
       } else {
         return (
           <div className="text-center space-y-4">
-            <div className="text-6xl">ðŸ“</div>
+            <div className="text-6xl">[SCRIPT]</div>
             <p className="text-gray-600">Contract Document</p>
             <p className="font-medium">{contract.name}</p>
             <p className="text-sm text-gray-500">File type: {contract.file.type}</p>
@@ -3418,7 +3418,7 @@ OrdainedPro Wedding Portal
       // If no file, show contract details
       return (
         <div className="text-center space-y-6">
-          <div className="text-6xl">ðŸ“‹</div>
+          <div className="text-6xl">[SCRIPT]‹</div>
           <div>
             <p className="text-gray-600 mb-2">Contract Information</p>
             <p className="font-medium text-xl">{contract.name}</p>
@@ -3493,7 +3493,7 @@ OrdainedPro Wedding Portal
     } else if (fileType.includes('pdf')) {
       return (
         <div className="text-center space-y-4">
-          <div className="text-6xl">ðŸ“„</div>
+          <div className="text-6xl">[SCRIPT]„</div>
           <p className="text-gray-600">PDF Preview</p>
           <p className="font-medium">{file.name}</p>
           <p className="text-sm text-gray-500">Size: {file.size}</p>
@@ -3509,7 +3509,7 @@ OrdainedPro Wedding Portal
     } else if (fileType.includes('text/') || fileType.includes('txt')) {
       return (
         <div className="text-center space-y-4">
-          <div className="text-6xl">ðŸ“</div>
+          <div className="text-6xl">[SCRIPT]</div>
           <p className="text-gray-600">Text Document</p>
           <p className="font-medium">{file.name}</p>
           <p className="text-sm text-gray-500">Size: {file.size}</p>
@@ -3521,7 +3521,7 @@ OrdainedPro Wedding Portal
     } else if (fileType.includes('document') || fileType.includes('word') || fileType.includes('doc')) {
       return (
         <div className="text-center space-y-4">
-          <div className="text-6xl">ðŸ“</div>
+          <div className="text-6xl">[SCRIPT]</div>
           <p className="text-gray-600">Word Document</p>
           <p className="font-medium">{file.name}</p>
           <p className="text-sm text-gray-500">Size: {file.size}</p>
@@ -3560,7 +3560,7 @@ OrdainedPro Wedding Portal
       return
     }
 
-    console.log("ðŸ“ Uploading", uploadedFiles.length, "files for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT] Uploading", uploadedFiles.length, "files for couple:", editCoupleInfo.id)
 
     for (const file of uploadedFiles) {
       // Check if file already exists
@@ -3704,7 +3704,7 @@ OrdainedPro Wedding Portal
       // Determine recipient emails
       const recipientEmails = [brideEmail, groomEmail].filter(Boolean)
 
-      console.log("ðŸ“§ Sending message to:", { coupleId, coupleName, recipientEmails, message: newMessage })
+      console.log("[SCRIPT]§ Sending message to:", { coupleId, coupleName, recipientEmails, message: newMessage })
 
       // 1. Save message to Supabase
       if (currentUser) {
@@ -3748,7 +3748,7 @@ OrdainedPro Wedding Portal
         if (!email) continue
 
         try {
-          console.log(`ðŸ“§ Attempting to send email to: ${email}`)
+          console.log(`[SCRIPT]§ Attempting to send email to: ${email}`)
 
           const response = await fetch("/api/send-email", {
             method: "POST",
@@ -3765,7 +3765,7 @@ OrdainedPro Wedding Portal
           })
 
           const result = await response.json()
-          console.log(`ðŸ“§ API Response for ${email}:`, result)
+          console.log(`[SCRIPT]§ API Response for ${email}:`, result)
 
           if (response.ok && result.success) {
             console.log(`âœ… Email sent to ${email}:`, result)
@@ -3791,7 +3791,7 @@ OrdainedPro Wedding Portal
         console.log(`âœ… Emails sent to: ${recipientEmails.join(", ")}`)
       }
       if (emailErrors.length > 0) {
-        console.warn(`âš ï¸ Some emails failed:`, emailErrors)
+        console.warn(`[WARNING] ï¸ Some emails failed:`, emailErrors)
       }
 
     } catch (error) {
@@ -3856,24 +3856,24 @@ WEDDING DATE: ${new Date(invoiceForm.weddingDate).toLocaleDateString('en-US', {
 VENUE: ${invoiceForm.venue}
 
 INVOICE DETAILS:
-â€¢ Invoice #: ${invoiceForm.invoiceNumber}
-â€¢ Invoice Date: ${new Date(invoiceForm.invoiceDate).toLocaleDateString()}
-â€¢ Due Date: ${new Date(invoiceForm.dueDate).toLocaleDateString()}
+* Invoice #: ${invoiceForm.invoiceNumber}
+* Invoice Date: ${new Date(invoiceForm.invoiceDate).toLocaleDateString()}
+* Due Date: ${new Date(invoiceForm.dueDate).toLocaleDateString()}
 
 SERVICES PROVIDED:
 ${invoiceForm.items.map(item =>
-  `â€¢ ${item.service}
+  `* ${item.service}
   Description: ${item.description}
   Category: ${item.category || 'Wedding Services'}
   Rate: ${item.quantity}x ${item.rate} = ${item.quantity * item.rate}`
 ).join('\n\n')}
 
 PAYMENT SUMMARY:
-â€¢ Subtotal: ${invoiceForm.subtotal}
-${invoiceForm.taxRate > 0 ? `â€¢ Tax (${invoiceForm.taxRate}%): ${invoiceForm.taxAmount}` : ''}
-â€¢ Deposit Previously Paid: -${invoiceForm.depositPaid}
-â€¢ Balance Due: ${invoiceForm.balanceDue}
-â€¢ TOTAL INVOICE AMOUNT: ${invoiceForm.total}
+* Subtotal: ${invoiceForm.subtotal}
+${invoiceForm.taxRate > 0 ? `* Tax (${invoiceForm.taxRate}%): ${invoiceForm.taxAmount}` : ''}
+* Deposit Previously Paid: -${invoiceForm.depositPaid}
+* Balance Due: ${invoiceForm.balanceDue}
+* TOTAL INVOICE AMOUNT: ${invoiceForm.total}
 
 PAYMENT METHODS ACCEPTED:
 ${invoiceForm.paymentMethods}
@@ -3891,8 +3891,8 @@ We're honored to be part of your special day and look forward to creating a beau
 Blessings,
 Pastor Michael Adams
 Licensed Wedding Officiant
-ðŸ“ž (555) 987-6543
-ðŸ“§ pastor.michael@ordainedpro.com
+[SCRIPT]ž (555) 987-6543
+[SCRIPT]§ pastor.michael@ordainedpro.com
 ðŸŒ www.ordainedpro.com
 
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•`
@@ -3949,23 +3949,23 @@ Licensed Wedding Officiant
 
     // Add to messaging platform with detailed tracking
     setMessageAttachments([invoiceAttachment])
-    setNewMessage(`ðŸ“§ Wedding Invoice Sent
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+    setNewMessage(`[SCRIPT]§ Wedding Invoice Sent
+========================================
 
-ðŸ‘°ðŸ¤µ Couple: ${invoiceForm.coupleName}
-ðŸ“§ Sent to: ${recipients}
+Couple: ${invoiceForm.coupleName}
+Sent to: ${recipients}
 ðŸ§¾ Invoice #: ${invoiceForm.invoiceNumber}
 ðŸ’’ Wedding Date: ${new Date(invoiceForm.weddingDate).toLocaleDateString()}
 ðŸ›ï¸ Venue: ${invoiceForm.venue}
 
 ðŸ’° FINANCIAL SUMMARY:
-â€¢ Total Services: ${invoiceForm.total}
-â€¢ Deposit Paid: ${invoiceForm.depositPaid}
-â€¢ Balance Due: ${invoiceForm.balanceDue}
-ðŸ“… Payment Due: ${new Date(invoiceForm.dueDate).toLocaleDateString()}
+* Total Services: ${invoiceForm.total}
+* Deposit Paid: ${invoiceForm.depositPaid}
+* Balance Due: ${invoiceForm.balanceDue}
+[SCRIPT]… Payment Due: ${new Date(invoiceForm.dueDate).toLocaleDateString()}
 
-ðŸ“‹ SERVICES INCLUDED:
-${invoiceForm.items.map(item => `â€¢ ${item.service} - ${item.quantity * item.rate}`).join('\n')}
+[SCRIPT]‹ SERVICES INCLUDED:
+${invoiceForm.items.map(item => `* ${item.service} - ${item.quantity * item.rate}`).join('\n')}
 
 ðŸ’³ Payment Methods: ${invoiceForm.paymentMethods}
 
@@ -4428,43 +4428,41 @@ ${invoiceContent}`)
   }
 
 
-  // Render content based on loading/data state
-  const renderContent = () => {
-    // Show loading state while couples are loading
-    if (isLoadingCouples) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-blue-900 font-medium">Loading your ceremonies...</p>
-          </div>
-        </div>
-      )
-    }
-
-    // Show message if no couples exist
-    if (!editCoupleInfo || allCouples.length === 0) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-          <div className="text-center max-w-md mx-auto p-8">
-            <div className="text-6xl mb-4">💒</div>
-            <h2 className="text-2xl font-bold text-blue-900 mb-2">No Ceremonies Yet</h2>
-            <p className="text-gray-600 mb-6">
-              You haven&apos;t added any couples/ceremonies yet. Add your first ceremony to get started!
-            </p>
-            <Button
-              onClick={() => setShowAddCeremonyDialog(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Add Your First Ceremony
-            </Button>
-          </div>
-        </div>
-      )
-    }
-
-    // Main portal content
+  // Show loading state while couples are loading
+  if (isLoadingCouples) {
     return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-blue-900 font-medium">Loading your ceremonies...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show message if no couples exist
+  if (!editCoupleInfo || allCouples.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-8">
+          <div className="text-6xl mb-4">ðŸ’’</div>
+          <h2 className="text-2xl font-bold text-blue-900 mb-2">No Ceremonies Yet</h2>
+          <p className="text-gray-600 mb-6">
+            You haven't added any couples/ceremonies yet. Add your first ceremony to get started!
+          </p>
+          <Button
+            onClick={() => setShowAddCeremonyDialog(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Add Your First Ceremony
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <CommunicationPortalProvider value={portalContextValue}>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
         <PortalHeader />
         <div className="max-w-7xl mx-auto px-6 py-8">
@@ -4473,13 +4471,6 @@ ${invoiceContent}`)
         </div>
         <PortalDialogs />
       </div>
-    )
-  }
-
-  // Always wrap in provider to avoid bundling issues with production builds
-  return (
-    <CommunicationPortalProvider value={portalContextValue}>
-      {renderContent()}
     </CommunicationPortalProvider>
   )
 }

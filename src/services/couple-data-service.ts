@@ -150,14 +150,14 @@ export async function addCeremony(userId: string, ceremonyData: {
       .single()
 
     if (error) {
-      console.error("âŒ Error adding ceremony:", error)
+      console.error("[ERROR] Error adding ceremony:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Ceremony added:", data)
+    console.log("[OK] Ceremony added:", data)
     return { ok: true, data }
   } catch (err: any) {
-    console.error("âŒ Exception adding ceremony:", err)
+    console.error("[ERROR] Exception adding ceremony:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -171,14 +171,14 @@ export async function loadCouples(userId: string): Promise<{ ok: boolean; data?:
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("âŒ Error loading couples:", error)
+      console.error("[ERROR] Error loading couples:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Loaded", data?.length || 0, "couples")
+    console.log("[OK] Loaded", data?.length || 0, "couples")
     return { ok: true, data: data || [] }
   } catch (err: any) {
-    console.error("âŒ Exception loading couples:", err)
+    console.error("[ERROR] Exception loading couples:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -191,14 +191,95 @@ export async function updateCouple(coupleId: number, updates: Partial<Couple>): 
       .eq("id", coupleId)
 
     if (error) {
-      console.error("âŒ Error updating couple:", error)
+      console.error("[ERROR] Error updating couple:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Couple updated:", coupleId)
+    console.log("[OK] Couple updated:", coupleId)
     return { ok: true }
   } catch (err: any) {
-    console.error("âŒ Exception updating couple:", err)
+    console.error("[ERROR] Exception updating couple:", err)
+    return { ok: false, error: err.message }
+  }
+}
+
+// ============================================
+// WEDDING DETAILS (server-side only)
+// ============================================
+
+export interface WeddingDetails {
+  venueName: string
+  venueAddress: string
+  weddingDate: string
+  startTime: string
+  endTime: string
+  expectedGuests: string
+  officiantNotes: string
+}
+
+export async function saveWeddingDetails(
+  coupleId: number,
+  details: WeddingDetails
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    console.log("[WEDDING] Saving wedding details for couple:", coupleId, details)
+
+    const { error } = await supabase
+      .from("couples")
+      .update({
+        venue_name: details.venueName || null,
+        venue_address: details.venueAddress || null,
+        wedding_date: details.weddingDate || null,
+        start_time: details.startTime || null,
+        end_time: details.endTime || null,
+        expected_guests: details.expectedGuests ? parseInt(details.expectedGuests) : null,
+        notes: details.officiantNotes || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", coupleId)
+
+    if (error) {
+      console.error("[ERROR] Error saving wedding details:", error)
+      return { ok: false, error: error.message }
+    }
+
+    console.log("[OK] Wedding details saved for couple:", coupleId)
+    return { ok: true }
+  } catch (err: any) {
+    console.error("[ERROR] Exception saving wedding details:", err)
+    return { ok: false, error: err.message }
+  }
+}
+
+export async function loadWeddingDetails(
+  coupleId: number
+): Promise<{ ok: boolean; data?: WeddingDetails; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("couples")
+      .select("venue_name, venue_address, wedding_date, start_time, end_time, expected_guests, notes")
+      .eq("id", coupleId)
+      .single()
+
+    if (error) {
+      console.error("[ERROR] Error loading wedding details:", error)
+      return { ok: false, error: error.message }
+    }
+
+    const weddingDetails: WeddingDetails = {
+      venueName: data.venue_name || "",
+      venueAddress: data.venue_address || "",
+      weddingDate: data.wedding_date || "",
+      startTime: data.start_time || "",
+      endTime: data.end_time || "",
+      expectedGuests: data.expected_guests?.toString() || "",
+      officiantNotes: data.notes || ""
+    }
+
+    console.log("[OK] Loaded wedding details for couple:", coupleId)
+    return { ok: true, data: weddingDetails }
+  } catch (err: any) {
+    console.error("[ERROR] Exception loading wedding details:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -217,14 +298,14 @@ export async function loadTasks(userId: string, coupleId: number): Promise<{ ok:
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("âŒ Error loading tasks:", error)
+      console.error("[ERROR] Error loading tasks:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Loaded", data?.length || 0, "tasks for couple", coupleId)
+    console.log("[OK] Loaded", data?.length || 0, "tasks for couple", coupleId)
     return { ok: true, data: data || [] }
   } catch (err: any) {
-    console.error("âŒ Exception loading tasks:", err)
+    console.error("[ERROR] Exception loading tasks:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -255,14 +336,14 @@ export async function addTask(userId: string, coupleId: number, taskData: {
       .single()
 
     if (error) {
-      console.error("âŒ Error adding task:", error)
+      console.error("[ERROR] Error adding task:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Task added:", data)
+    console.log("[OK] Task added:", data)
     return { ok: true, data }
   } catch (err: any) {
-    console.error("âŒ Exception adding task:", err)
+    console.error("[ERROR] Exception adding task:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -275,14 +356,14 @@ export async function updateTask(taskId: number, updates: Partial<Task>): Promis
       .eq("id", taskId)
 
     if (error) {
-      console.error("âŒ Error updating task:", error)
+      console.error("[ERROR] Error updating task:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Task updated:", taskId)
+    console.log("[OK] Task updated:", taskId)
     return { ok: true }
   } catch (err: any) {
-    console.error("âŒ Exception updating task:", err)
+    console.error("[ERROR] Exception updating task:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -295,14 +376,14 @@ export async function deleteTask(taskId: number): Promise<{ ok: boolean; error?:
       .eq("id", taskId)
 
     if (error) {
-      console.error("âŒ Error deleting task:", error)
+      console.error("[ERROR] Error deleting task:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Task deleted:", taskId)
+    console.log("[OK] Task deleted:", taskId)
     return { ok: true }
   } catch (err: any) {
-    console.error("âŒ Exception deleting task:", err)
+    console.error("[ERROR] Exception deleting task:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -321,14 +402,14 @@ export async function loadMeetings(userId: string, coupleId: number): Promise<{ 
       .order("date", { ascending: true })
 
     if (error) {
-      console.error("âŒ Error loading meetings:", error)
+      console.error("[ERROR] Error loading meetings:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Loaded", data?.length || 0, "meetings for couple", coupleId)
+    console.log("[OK] Loaded", data?.length || 0, "meetings for couple", coupleId)
     return { ok: true, data: data || [] }
   } catch (err: any) {
-    console.error("âŒ Exception loading meetings:", err)
+    console.error("[ERROR] Exception loading meetings:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -361,14 +442,14 @@ export async function addMeeting(userId: string, coupleId: number, meetingData: 
       .single()
 
     if (error) {
-      console.error("âŒ Error adding meeting:", error)
+      console.error("[ERROR] Error adding meeting:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Meeting added:", data)
+    console.log("[OK] Meeting added:", data)
     return { ok: true, data }
   } catch (err: any) {
-    console.error("âŒ Exception adding meeting:", err)
+    console.error("[ERROR] Exception adding meeting:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -381,14 +462,14 @@ export async function updateMeeting(meetingId: number, updates: Partial<Meeting>
       .eq("id", meetingId)
 
     if (error) {
-      console.error("âŒ Error updating meeting:", error)
+      console.error("[ERROR] Error updating meeting:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Meeting updated:", meetingId)
+    console.log("[OK] Meeting updated:", meetingId)
     return { ok: true }
   } catch (err: any) {
-    console.error("âŒ Exception updating meeting:", err)
+    console.error("[ERROR] Exception updating meeting:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -401,14 +482,14 @@ export async function deleteMeeting(meetingId: number): Promise<{ ok: boolean; e
       .eq("id", meetingId)
 
     if (error) {
-      console.error("âŒ Error deleting meeting:", error)
+      console.error("[ERROR] Error deleting meeting:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Meeting deleted:", meetingId)
+    console.log("[OK] Meeting deleted:", meetingId)
     return { ok: true }
   } catch (err: any) {
-    console.error("âŒ Exception deleting meeting:", err)
+    console.error("[ERROR] Exception deleting meeting:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -427,14 +508,14 @@ export async function loadFiles(userId: string, coupleId: number): Promise<{ ok:
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("âŒ Error loading files:", error)
+      console.error("[ERROR] Error loading files:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Loaded", data?.length || 0, "files for couple", coupleId)
+    console.log("[OK] Loaded", data?.length || 0, "files for couple", coupleId)
     return { ok: true, data: data || [] }
   } catch (err: any) {
-    console.error("âŒ Exception loading files:", err)
+    console.error("[ERROR] Exception loading files:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -462,14 +543,14 @@ export async function addFile(userId: string, coupleId: number, fileData: {
       .single()
 
     if (error) {
-      console.error("âŒ Error adding file:", error)
+      console.error("[ERROR] Error adding file:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… File added:", data)
+    console.log("[OK] File added:", data)
     return { ok: true, data }
   } catch (err: any) {
-    console.error("âŒ Exception adding file:", err)
+    console.error("[ERROR] Exception adding file:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -482,14 +563,14 @@ export async function deleteFile(fileId: number): Promise<{ ok: boolean; error?:
       .eq("id", fileId)
 
     if (error) {
-      console.error("âŒ Error deleting file:", error)
+      console.error("[ERROR] Error deleting file:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… File deleted:", fileId)
+    console.log("[OK] File deleted:", fileId)
     return { ok: true }
   } catch (err: any) {
-    console.error("âŒ Exception deleting file:", err)
+    console.error("[ERROR] Exception deleting file:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -508,14 +589,14 @@ export async function loadContracts(userId: string, coupleId: number): Promise<{
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("âŒ Error loading contracts:", error)
+      console.error("[ERROR] Error loading contracts:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Loaded", data?.length || 0, "contracts for couple", coupleId)
+    console.log("[OK] Loaded", data?.length || 0, "contracts for couple", coupleId)
     return { ok: true, data: data || [] }
   } catch (err: any) {
-    console.error("âŒ Exception loading contracts:", err)
+    console.error("[ERROR] Exception loading contracts:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -539,14 +620,14 @@ export async function addContract(userId: string, coupleId: number, contractData
       .single()
 
     if (error) {
-      console.error("âŒ Error adding contract:", error)
+      console.error("[ERROR] Error adding contract:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Contract added:", data)
+    console.log("[OK] Contract added:", data)
     return { ok: true, data }
   } catch (err: any) {
-    console.error("âŒ Exception adding contract:", err)
+    console.error("[ERROR] Exception adding contract:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -559,14 +640,14 @@ export async function updateContract(contractId: number, updates: Partial<Contra
       .eq("id", contractId)
 
     if (error) {
-      console.error("âŒ Error updating contract:", error)
+      console.error("[ERROR] Error updating contract:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Contract updated:", contractId)
+    console.log("[OK] Contract updated:", contractId)
     return { ok: true }
   } catch (err: any) {
-    console.error("âŒ Exception updating contract:", err)
+    console.error("[ERROR] Exception updating contract:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -585,14 +666,14 @@ export async function loadPayments(userId: string, coupleId: number): Promise<{ 
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("âŒ Error loading payments:", error)
+      console.error("[ERROR] Error loading payments:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Loaded", data?.length || 0, "payments for couple", coupleId)
+    console.log("[OK] Loaded", data?.length || 0, "payments for couple", coupleId)
     return { ok: true, data: data || [] }
   } catch (err: any) {
-    console.error("âŒ Exception loading payments:", err)
+    console.error("[ERROR] Exception loading payments:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -620,14 +701,14 @@ export async function addPayment(userId: string, coupleId: number, paymentData: 
       .single()
 
     if (error) {
-      console.error("âŒ Error adding payment:", error)
+      console.error("[ERROR] Error adding payment:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Payment added:", data)
+    console.log("[OK] Payment added:", data)
     return { ok: true, data }
   } catch (err: any) {
-    console.error("âŒ Exception adding payment:", err)
+    console.error("[ERROR] Exception adding payment:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -640,14 +721,14 @@ export async function updatePayment(paymentId: number, updates: Partial<Payment>
       .eq("id", paymentId)
 
     if (error) {
-      console.error("âŒ Error updating payment:", error)
+      console.error("[ERROR] Error updating payment:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("âœ… Payment updated:", paymentId)
+    console.log("[OK] Payment updated:", paymentId)
     return { ok: true }
   } catch (err: any) {
-    console.error("âŒ Exception updating payment:", err)
+    console.error("[ERROR] Exception updating payment:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -685,14 +766,14 @@ export async function loadScripts(userId: string, coupleId?: number): Promise<{ 
     const { data, error } = await query
 
     if (error) {
-      console.error("❌ Error loading scripts:", error)
+      console.error("[ERROR] Error loading scripts:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("✅ Loaded", data?.length || 0, "scripts")
+    console.log("[OK] Loaded", data?.length || 0, "scripts")
     return { ok: true, data: data || [] }
   } catch (err: any) {
-    console.error("❌ Exception loading scripts:", err)
+    console.error("[ERROR] Exception loading scripts:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -721,14 +802,14 @@ export async function addScript(userId: string, scriptData: {
       .single()
 
     if (error) {
-      console.error("❌ Error adding script:", error)
+      console.error("[ERROR] Error adding script:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("✅ Script added:", data)
+    console.log("[OK] Script added:", data)
     return { ok: true, data }
   } catch (err: any) {
-    console.error("❌ Exception adding script:", err)
+    console.error("[ERROR] Exception adding script:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -746,14 +827,14 @@ export async function updateScript(scriptId: number, updates: Partial<Script>): 
       .single()
 
     if (error) {
-      console.error("❌ Error updating script:", error)
+      console.error("[ERROR] Error updating script:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("✅ Script updated:", scriptId)
+    console.log("[OK] Script updated:", scriptId)
     return { ok: true, data }
   } catch (err: any) {
-    console.error("❌ Exception updating script:", err)
+    console.error("[ERROR] Exception updating script:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -766,14 +847,14 @@ export async function deleteScript(scriptId: number): Promise<{ ok: boolean; err
       .eq("id", scriptId)
 
     if (error) {
-      console.error("❌ Error deleting script:", error)
+      console.error("[ERROR] Error deleting script:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("✅ Script deleted:", scriptId)
+    console.log("[OK] Script deleted:", scriptId)
     return { ok: true }
   } catch (err: any) {
-    console.error("❌ Exception deleting script:", err)
+    console.error("[ERROR] Exception deleting script:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -790,14 +871,14 @@ export async function autoSaveScript(scriptId: number, content: string): Promise
       .eq("id", scriptId)
 
     if (error) {
-      console.error("❌ Error auto-saving script:", error)
+      console.error("[ERROR] Error auto-saving script:", error)
       return { ok: false, error: error.message }
     }
 
-    console.log("✅ Script auto-saved:", scriptId)
+    console.log("[OK] Script auto-saved:", scriptId)
     return { ok: true }
   } catch (err: any) {
-    console.error("❌ Exception auto-saving script:", err)
+    console.error("[ERROR] Exception auto-saving script:", err)
     return { ok: false, error: err.message }
   }
 }

@@ -33,7 +33,7 @@ In the marketplace project, verify `.env.local` has:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://ailrvrxibpizbvyroonp.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpbHJ2cnhpYnBpemJ2eXJvb25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTg3OTQsImV4cCI6MjA3NzU5NDc5NH0.p12BTatmPgMoUCQZMg04YXJsgMbAe87DhB9CNbVTMsk
+NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```
 
 ✅ **Same credentials = Real-time sync works!**

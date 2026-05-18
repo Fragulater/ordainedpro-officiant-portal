@@ -170,10 +170,24 @@ export function PortalShareScriptDialog() {
               </div>
 
               {/* Selection Summary */}
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                <p className="text-sm font-medium text-gray-700">
+              <div className={`p-3 rounded-lg border ${
+                (selectedItemsToShare.scripts.length + selectedItemsToShare.files.length) > 5
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-gray-50 border-gray-200'
+              }`}>
+                <p className={`text-sm font-medium ${
+                  (selectedItemsToShare.scripts.length + selectedItemsToShare.files.length) > 5
+                    ? 'text-red-700'
+                    : 'text-gray-700'
+                }`}>
                   Selected: {selectedItemsToShare.scripts.length} script(s), {selectedItemsToShare.files.length} file(s)
+                  <span className="text-gray-500 ml-2">(max 5 items)</span>
                 </p>
+                {(selectedItemsToShare.scripts.length + selectedItemsToShare.files.length) > 5 && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Please deselect some items. Maximum 5 items allowed per share.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -326,7 +340,8 @@ export function PortalShareScriptDialog() {
                 (!shareScriptForm.to && !shareScriptForm.customEmail) ||
                 !shareScriptForm.subject.trim() ||
                 !shareScriptForm.body.trim() ||
-                (selectedItemsToShare.scripts.length === 0 && selectedItemsToShare.files.length === 0)
+                (selectedItemsToShare.scripts.length === 0 && selectedItemsToShare.files.length === 0) ||
+                (selectedItemsToShare.scripts.length + selectedItemsToShare.files.length) > 5
               }
             >
               <Send className="w-4 h-4 mr-2" />

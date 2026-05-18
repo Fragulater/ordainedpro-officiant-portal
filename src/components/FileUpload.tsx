@@ -28,6 +28,8 @@ export interface UploadedFile {
   uploadProgress: number
   status: 'pending' | 'uploading' | 'completed' | 'error'
   error?: string
+  textContent?: string  // For script files, stores the content directly
+  base64Content?: string  // For binary files (PDFs, images), stores base64 encoded content
 }
 
 interface FileUploadProps {
