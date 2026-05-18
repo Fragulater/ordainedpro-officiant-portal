@@ -39,6 +39,7 @@ export function PortalHeader() {
     toggleCeremonyStatus,
     handleUnarchiveCouple,
     editCoupleInfo,
+    officiantProfile,
   } = useCommunicationPortal()
 
   // State for officiant menu popover
@@ -51,7 +52,7 @@ export function PortalHeader() {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut()
-      window.location.href = "/login"
+      window.location.href = "/auth"
     } catch (error) {
       console.error("Logout error:", error)
     }
@@ -615,12 +616,14 @@ export function PortalHeader() {
               <PopoverTrigger asChild>
                 <button className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 rounded-lg p-2 transition-colors">
                   <Avatar className="ring-2 ring-blue-100">
-                    <AvatarImage src="/api/placeholder/32/32" />
-                    <AvatarFallback className="bg-blue-500 text-white">PM</AvatarFallback>
+                    <AvatarImage src={officiantProfile?.headshot_url || "/api/placeholder/32/32"} />
+                    <AvatarFallback className="bg-blue-500 text-white">
+                      {getInitials(officiantProfile?.full_name)}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">Pastor Michael</p>
-                    <p className="text-xs text-gray-500">Licensed Officiant</p>
+                    <p className="text-sm font-medium text-gray-900">{officiantProfile?.full_name || 'Your Name'}</p>
+                    <p className="text-xs text-gray-500">{officiantProfile?.business_name || 'Licensed Officiant'}</p>
                   </div>
                 </button>
               </PopoverTrigger>

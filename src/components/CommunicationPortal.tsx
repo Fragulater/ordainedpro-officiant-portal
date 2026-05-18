@@ -216,10 +216,10 @@ const generateCompleteScript = (responses: Record<string, string>, coupleInfo: a
   const unityCeremony = responses['special-elements'] || 'None'
   const vowsType = responses['vows-type'] || 'Traditional Vows'
 
-  const brideName = coupleInfo.brideName || 'Sarah'
-  const groomName = coupleInfo.groomName || 'David'
-  const venue = weddingDetails.venueName || 'Sunset Gardens'
-  const date = new Date(weddingDetails.weddingDate || '2024-08-25').toLocaleDateString('en-US', {
+  const brideName = coupleInfo.brideName || 'Partner 1'
+  const groomName = coupleInfo.groomName || 'Partner 2'
+  const venue = weddingDetails.venueName || '[Venue]'
+  const date = new Date(weddingDetails.weddingDate || new Date().toISOString()).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -317,14 +317,15 @@ This script has been customized for your ceremony by Mr. Script. Feel free to mo
   return script
 }
 
-// Props interface
+// Props interface - user is now passed from PortalClient (already authenticated)
 interface CommunicationPortalProps {
   onScriptUploaded?: (content: string, fileName: string) => void;
+  user?: { id: string; email: string } | null;
 }
 
-export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalProps = {}) {
-  // Auth and profile state
-  const [currentUser, setCurrentUser] = useState<any>(null)
+export function CommunicationPortal({ onScriptUploaded, user: initialUser }: CommunicationPortalProps = {}) {
+  // Auth and profile state - initialize from prop to skip redundant auth check
+  const [currentUser, setCurrentUser] = useState<any>(initialUser || null)
   const [officiantProfile, setOfficiantProfile] = useState<any>(null)
   const [messages, setMessages] = useState<any[]>([])
   const [isSendingMessage, setIsSendingMessage] = useState(false)
@@ -362,9 +363,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     invoiceNumber: '',
     invoiceDate: '',
     dueDate: '',
-    weddingDate: '2024-08-25',
-    coupleName: 'Sarah Johnson & David Chen',
-    venue: 'Sunset Gardens',
+    weddingDate: '',
+    coupleName: '',
+    venue: '',
     items: [
       {
         id: 1,
@@ -451,17 +452,8 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   // Form states for Edit Couple Info - loaded from active couple (set when couples load)
   const [editCoupleInfo, setEditCoupleInfo] = useState<any>(null)
 
-  // Persistent storage for wedding details per couple
-  const [savedWeddingDetails, setSavedWeddingDetails] = useState<Record<string, any>>({
-    "Sarah Johnson & David Chen": {
-      venueName: "Sunset Gardens",
-      venueAddress: "123 Rose Avenue, Garden City, CA 90210",
-      weddingDate: "2024-08-25",
-      startTime: "16:00",
-      endTime: "18:00",
-      expectedGuests: "75"
-    }
-  })
+  // Persistent storage for wedding details per couple - loaded from database
+  const [savedWeddingDetails, setSavedWeddingDetails] = useState<Record<string, any>>({})
 
   // Get current couple identifier
   // Get current couple identifier (with null safety)
@@ -481,26 +473,12 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   })
 
   // AI Script Builder states
-  const [aiChatMessages, setAiChatMessages] = useState([
-    {
-      id: 1,
-      role: "assistant",
-      content: "Hello! I'm Mr. Script, your personal wedding ceremony script creator. I specialize in crafting beautiful, meaningful ceremonies tailored to Sarah Johnson & David Chen. What type of ceremony are you looking to create today?",
-      timestamp: new Date(Date.now() - 300000).toLocaleTimeString()
-    }
-  ])
+  // AI chat - initialized dynamically when couple is selected
+  const [aiChatMessages, setAiChatMessages] = useState<any[]>([])
   const [aiInput, setAiInput] = useState("")
   const [isGeneratingScript, setIsGeneratingScript] = useState(false)
-  const [generatedScripts, setGeneratedScripts] = useState([
-    {
-      id: 1,
-      title: "Traditional Ceremony Script - Sarah & David",
-      content: "SAMPLE GENERATED SCRIPT:\n\nDearly beloved, we are gathered here today to witness and celebrate the union of Sarah Johnson and David Chen in marriage...",
-      createdDate: "Aug 10, 2024",
-      type: "Traditional",
-      status: "completed"
-    }
-  ])
+  // Scripts loaded from database - no demo data
+  const [generatedScripts, setGeneratedScripts] = useState<any[]>([])
   const [scriptBuilderTab, setScriptBuilderTab] = useState("mr-script")
   const [scriptMode, setScriptMode] = useState<"guided" | "expert" | null>(null)
 
@@ -546,99 +524,158 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     }
   }, [savedCeremonies])
 
-  // Load current user and officiant profile
+  // Load officiant profile (user is already passed from PortalClient)
   useEffect(() => {
-    const loadUserAndProfile = async () => {
-      try {
-        // Get current user session
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-        if (userError || !user) {
-          console.log("No user session found")
+    const loadProfile = async () => {
+      // Use initialUser if available (passed from PortalClient), otherwise check auth
+      const userToUse = initialUser || currentUser
+
+      if (!userToUse?.id) {
+        console.log("🔄 No user provided, checking auth...")
+        try {
+          const { data: { user }, error } = await supabase.auth.getUser()
+          if (error || !user) {
+            console.log("❌ No authenticated user found")
+            setIsLoadingCouples(false)
+            return
+          }
+          console.log("✅ User from auth:", user.id, user.email)
+          setCurrentUser(user)
+          // Profile will load in next effect run
+          return
+        } catch (err) {
+          console.error("❌ Auth check failed:", err)
+          setIsLoadingCouples(false)
           return
         }
-        console.log("âœ… Loaded user:", user.id)
-        setCurrentUser(user)
+      }
 
-        // Load officiant profile
+      console.log("👤 Loading profile for user:", userToUse.id)
+
+      try {
+        // Load officiant profile (table is "profiles")
         const { data: profile, error: profileError } = await supabase
-          .from("officiant_profiles")
+          .from("profiles")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("user_id", userToUse.id)
           .single()
 
-        if (profile) {
-          console.log("âœ… Loaded profile:", profile.business_name)
+        if (profileError) {
+          console.log("⚠️ Profile not found (this is OK for new users):", profileError.message)
+        } else if (profile) {
+          console.log("✅ Loaded profile:", profile.business_name || profile.full_name)
           setOfficiantProfile(profile)
         }
       } catch (err) {
-        console.error("Error loading user/profile:", err)
+        console.error("❌ Error loading profile:", err)
       }
     }
 
-    loadUserAndProfile()
-  }, [])
+    loadProfile()
+  }, [initialUser, currentUser])
 
   // Load couples from database
   useEffect(() => {
+    let isMounted = true
+    let timeoutId: NodeJS.Timeout | null = null
+
     const loadCouples = async () => {
-      if (!currentUser?.id) return
+      // Use initialUser or currentUser
+      const userToUse = initialUser || currentUser
 
-      setIsLoadingCouples(true)
-      console.log("ðŸ‘¥ Loading couples for user:", currentUser.id)
-
-      const result = await loadCouplesFromDB(currentUser.id)
-
-      if (result.ok && result.data && result.data.length > 0) {
-        // Transform database format to component format
-        const transformedCouples = result.data.map((c: any, index: number) => ({
-          id: c.id, // This is the REAL database ID
-          brideName: c.bride_name || "",
-          brideEmail: c.bride_email || "",
-          bridePhone: c.bride_phone || "",
-          brideAddress: "",
-          groomName: c.groom_name || "",
-          groomEmail: c.groom_email || "",
-          groomPhone: c.groom_phone || "",
-          groomAddress: "",
-          address: c.venue_address || "",
-          emergencyContact: "",
-          specialRequests: c.notes || "",
-          isActive: c.is_active !== false,
-          colors: getCoupleColors(index + 1),
-          weddingDetails: {
-            venueName: c.venue_name || "",
-            venueAddress: c.venue_address || "",
-            weddingDate: c.wedding_date || "",
-            startTime: c.start_time || "",
-            endTime: c.end_time || "",
-            expectedGuests: c.expected_guests?.toString() || "",
-            officiantNotes: c.notes || ""
+      if (!userToUse?.id) {
+        console.log("⏳ Waiting for user to be available...")
+        // Don't block forever - set a short timeout for empty state
+        timeoutId = setTimeout(() => {
+          if (isMounted) {
+            console.log("⚠️ No user after 3 seconds, showing empty state")
+            setIsLoadingCouples(false)
           }
-        }))
-
-        setAllCouples(transformedCouples)
-        setEditCoupleInfo(transformedCouples[0])
-        setEditWeddingDetails(transformedCouples[0].weddingDetails || {
-          venueName: "",
-          venueAddress: "",
-          weddingDate: "",
-          startTime: "",
-          endTime: "",
-          expectedGuests: "",
-          officiantNotes: ""
-        })
-        setActiveCoupleIndex(0)
-        console.log("âœ… Loaded", transformedCouples.length, "couples from database")
-      } else {
-        console.log("ðŸ“­ No couples found in database")
-        setAllCouples([])
+        }, 3000)
+        return
       }
 
-      setIsLoadingCouples(false)
+      if (!isMounted) return
+      setIsLoadingCouples(true)
+      console.log("👥 Loading couples for user:", userToUse.id)
+
+      // Safety timeout - stop loading after 5 seconds no matter what
+      timeoutId = setTimeout(() => {
+        if (isMounted) {
+          console.log("⚠️ Couples loading timed out after 5 seconds")
+          setIsLoadingCouples(false)
+          setAllCouples([])
+        }
+      }, 5000)
+
+      try {
+        const result = await loadCouplesFromDB(userToUse.id)
+
+        if (!isMounted) return
+
+        if (result.ok && result.data && result.data.length > 0) {
+          // Transform database format to component format
+          const transformedCouples = result.data.map((c: any, index: number) => ({
+            id: c.id, // This is the REAL database ID
+            brideName: c.bride_name || "",
+            brideEmail: c.bride_email || "",
+            bridePhone: c.bride_phone || "",
+            brideAddress: "",
+            groomName: c.groom_name || "",
+            groomEmail: c.groom_email || "",
+            groomPhone: c.groom_phone || "",
+            groomAddress: "",
+            address: c.venue_address || "",
+            emergencyContact: "",
+            specialRequests: c.notes || "",
+            isActive: c.is_active !== false,
+            colors: getCoupleColors(index + 1),
+            weddingDetails: {
+              venueName: c.venue_name || "",
+              venueAddress: c.venue_address || "",
+              weddingDate: c.wedding_date || "",
+              startTime: c.start_time || "",
+              endTime: c.end_time || "",
+              expectedGuests: c.expected_guests?.toString() || "",
+              officiantNotes: c.notes || ""
+            }
+          }))
+
+          setAllCouples(transformedCouples)
+          setEditCoupleInfo(transformedCouples[0])
+          setEditWeddingDetails(transformedCouples[0].weddingDetails || {
+            venueName: "",
+            venueAddress: "",
+            weddingDate: "",
+            startTime: "",
+            endTime: "",
+            expectedGuests: "",
+            officiantNotes: ""
+          })
+          setActiveCoupleIndex(0)
+          console.log("✅ Loaded", transformedCouples.length, "couples from database")
+        } else {
+          console.log("📭 No couples found in database, error:", result.error || "none")
+          setAllCouples([])
+        }
+      } catch (error) {
+        console.error("❌ Error loading couples:", error)
+        if (isMounted) setAllCouples([])
+      } finally {
+        // Always stop loading, even on error
+        if (timeoutId) clearTimeout(timeoutId)
+        if (isMounted) setIsLoadingCouples(false)
+      }
     }
 
     loadCouples()
-  }, [currentUser?.id])
+
+    return () => {
+      isMounted = false
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [initialUser?.id, currentUser?.id])
+
 
   // Load messages from Supabase for the current couple
   const loadMessages = useCallback(async () => {
@@ -789,7 +826,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       // Transform database format to component format
       const transformedMeetings: Meeting[] = result.data.map((m: any) => ({
         id: m.id,
-        subject: m.subject,
+        subject: m.title || m.subject,
         body: m.notes || "",
         date: m.date || "",
         time: m.time || "",
@@ -993,10 +1030,8 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [isLoadingMeetings, setIsLoadingMeetings] = useState(false)
 
-  const [upcomingEvents, setUpcomingEvents] = useState([
-    { id: 1, title: "Rehearsal", date: "2024-08-24", time: "6:00 PM", location: "Sunset Gardens", type: "rehearsal", details: "Final walkthrough of ceremony proceedings with all wedding party members" },
-    { id: 2, title: "Wedding Ceremony", date: "2024-08-25", time: "4:00 PM", location: "Sunset Gardens", type: "ceremony", details: "The main wedding ceremony with family and friends" }
-  ])
+  // Events loaded per couple - no demo data
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
 
   // Calendar events data
   const calendarEvents = {
@@ -3232,7 +3267,7 @@ OrdainedPro Wedding Portal
 
     // Save to database
     const result = await addMeetingToDB(currentUser.id, editCoupleInfo.id, {
-      subject: meetingData.subject,
+      title: meetingData.subject,
       date: meetingData.date,
       time: meetingData.time || "",
       duration: meetingData.duration,
@@ -4233,6 +4268,7 @@ ${invoiceContent}`)
     setSavedCeremonies,
     allCouples,
     setAllCouples,
+    isLoadingCouples,
     activeCoupleIndex,
     setActiveCoupleIndex,
     showSwitchCeremonyDialog,
@@ -4428,46 +4464,15 @@ ${invoiceContent}`)
   }
 
 
-  // Render content based on loading/data state
+  // Render main dashboard content - ALWAYS shows full dashboard shell
   const renderContent = () => {
-    // Show loading state while couples are loading
-    if (isLoadingCouples) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-blue-900 font-medium">Loading your ceremonies...</p>
-          </div>
-        </div>
-      )
-    }
-
-    // Show message if no couples exist
-    if (!editCoupleInfo || allCouples.length === 0) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-          <div className="text-center max-w-md mx-auto p-8">
-            <div className="text-6xl mb-4">💒</div>
-            <h2 className="text-2xl font-bold text-blue-900 mb-2">No Ceremonies Yet</h2>
-            <p className="text-gray-600 mb-6">
-              You haven&apos;t added any couples/ceremonies yet. Add your first ceremony to get started!
-            </p>
-            <Button
-              onClick={() => setShowAddCeremonyDialog(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Add Your First Ceremony
-            </Button>
-          </div>
-        </div>
-      )
-    }
-
-    // Main portal content
+    // ALWAYS show the complete dashboard structure
+    // Loading and empty states are handled INSIDE PortalOverview, not here
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
         <PortalHeader />
         <div className="max-w-7xl mx-auto px-6 py-8">
+          {/* Always render full dashboard - PortalOverview handles loading/empty states */}
           <PortalOverview />
           <PortalTabs />
         </div>

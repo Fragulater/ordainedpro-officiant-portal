@@ -1,9 +1,11 @@
--- Supabase schema for OrdainedPro Officiant Portal
--- This file mirrors .same/CANONICAL-SCHEMA.sql and is kept in-sync intentionally.
--- Last synchronized: May 18, 2026
+-- CANONICAL SCHEMA FOR ORDAINEDPRO OFFICIANT PORTAL
+-- This schema matches the LIVE Supabase database exactly.
+-- Last verified: May 18, 2026
+-- Project ID: ailrvrxibpizbvyroonp
 
 -- ============================================
 -- PROFILES TABLE
+-- Stores officiant and couple user profiles
 -- ============================================
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -39,6 +41,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 -- ============================================
 -- COUPLES TABLE
+-- Contains couple info AND wedding details in one table
 -- ============================================
 CREATE TABLE IF NOT EXISTS couples (
   id SERIAL PRIMARY KEY,
@@ -58,6 +61,7 @@ CREATE TABLE IF NOT EXISTS couples (
   colors JSONB,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
+  -- Wedding details stored directly on couples table (not separate ceremonies table)
   venue_name TEXT,
   venue_address TEXT,
   wedding_date DATE,
@@ -69,6 +73,7 @@ CREATE TABLE IF NOT EXISTS couples (
 
 -- ============================================
 -- MESSAGES TABLE
+-- Communication between officiant and couples
 -- ============================================
 CREATE TABLE IF NOT EXISTS messages (
   id SERIAL PRIMARY KEY,
@@ -87,6 +92,7 @@ CREATE TABLE IF NOT EXISTS messages (
 
 -- ============================================
 -- TASKS TABLE
+-- Per-couple task management
 -- ============================================
 CREATE TABLE IF NOT EXISTS tasks (
   id SERIAL PRIMARY KEY,
@@ -109,19 +115,20 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 -- ============================================
 -- MEETINGS TABLE
+-- Note: Uses 'title' column, NOT 'subject'
 -- ============================================
 CREATE TABLE IF NOT EXISTS meetings (
   id SERIAL PRIMARY KEY,
   couple_id INTEGER NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
+  title TEXT NOT NULL,  -- Database uses 'title', code maps to 'subject'
   date DATE NOT NULL,
   time TIME NOT NULL,
   location TEXT,
   notes TEXT,
-  duration INTEGER DEFAULT 60,
-  meeting_type TEXT DEFAULT 'in-person',
-  status TEXT DEFAULT 'scheduled',
+  duration INTEGER DEFAULT 60,           -- Meeting duration in minutes
+  meeting_type TEXT DEFAULT 'in-person', -- 'in-person', 'video', 'phone'
+  status TEXT DEFAULT 'scheduled',       -- 'scheduled', 'confirmed', 'cancelled'
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -167,6 +174,7 @@ CREATE TABLE IF NOT EXISTS contracts (
 
 -- ============================================
 -- SCRIPTS TABLE
+-- Ceremony scripts (per officiant, optionally per couple)
 -- ============================================
 CREATE TABLE IF NOT EXISTS scripts (
   id SERIAL PRIMARY KEY,
@@ -183,6 +191,7 @@ CREATE TABLE IF NOT EXISTS scripts (
 
 -- ============================================
 -- COUPLE_FILES TABLE
+-- Files uploaded for couples
 -- ============================================
 CREATE TABLE IF NOT EXISTS couple_files (
   id BIGSERIAL PRIMARY KEY,
@@ -197,8 +206,11 @@ CREATE TABLE IF NOT EXISTS couple_files (
 );
 
 -- ============================================
--- RLS
+-- ROW LEVEL SECURITY POLICIES
+-- All tables filter by user_id = auth.uid()
 -- ============================================
+
+-- Enable RLS on all tables
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE couples ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
@@ -209,46 +221,61 @@ ALTER TABLE contracts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scripts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE couple_files ENABLE ROW LEVEL SECURITY;
 
+-- Profiles policies
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (user_id = auth.uid());
 
+-- Couples policies
 CREATE POLICY "Users can view own couples" ON couples FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "Users can insert own couples" ON couples FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "Users can update own couples" ON couples FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "Users can delete own couples" ON couples FOR DELETE USING (user_id = auth.uid());
 
+-- Messages policies
 CREATE POLICY "Users can view own messages" ON messages FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "Users can insert own messages" ON messages FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "Users can update own messages" ON messages FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "Users can delete own messages" ON messages FOR DELETE USING (user_id = auth.uid());
 
+-- Tasks policies
 CREATE POLICY "Users can view own tasks" ON tasks FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "Users can insert own tasks" ON tasks FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "Users can update own tasks" ON tasks FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "Users can delete own tasks" ON tasks FOR DELETE USING (user_id = auth.uid());
 
+-- Meetings policies
 CREATE POLICY "Users can view own meetings" ON meetings FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "Users can insert own meetings" ON meetings FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "Users can update own meetings" ON meetings FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "Users can delete own meetings" ON meetings FOR DELETE USING (user_id = auth.uid());
 
+-- Payments policies
 CREATE POLICY "Users can view own payments" ON payments FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "Users can insert own payments" ON payments FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "Users can update own payments" ON payments FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "Users can delete own payments" ON payments FOR DELETE USING (user_id = auth.uid());
 
+-- Contracts policies
 CREATE POLICY "Users can view own contracts" ON contracts FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "Users can insert own contracts" ON contracts FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "Users can update own contracts" ON contracts FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "Users can delete own contracts" ON contracts FOR DELETE USING (user_id = auth.uid());
 
+-- Scripts policies
 CREATE POLICY "Users can view own scripts" ON scripts FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "Users can insert own scripts" ON scripts FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "Users can update own scripts" ON scripts FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "Users can delete own scripts" ON scripts FOR DELETE USING (user_id = auth.uid());
 
+-- Couple_files policies
 CREATE POLICY "Users can view own files" ON couple_files FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "Users can insert own files" ON couple_files FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "Users can update own files" ON couple_files FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "Users can delete own files" ON couple_files FOR DELETE USING (user_id = auth.uid());
+
+-- ============================================
+-- STORAGE BUCKET
+-- ============================================
+-- Storage bucket 'couple-files' exists and is public
+-- Other buckets: contracts, documents, gallery, headshots, invoices, scripts, user-documents, videos

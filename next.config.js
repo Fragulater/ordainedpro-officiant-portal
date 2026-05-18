@@ -33,12 +33,12 @@ const nextConfig = {
     ],
   },
   eslint: {
-    // Allow production builds to complete even with ESLint errors
-    ignoreDuringBuilds: true,
+    // Enforce ESLint during builds
+    ignoreDuringBuilds: false,
   },
   typescript: {
-    // Allow production builds to complete even with TypeScript errors
-    ignoreBuildErrors: true,
+    // Enforce TypeScript checks during builds
+    ignoreBuildErrors: false,
   },
 };
 

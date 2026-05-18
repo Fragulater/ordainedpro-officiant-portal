@@ -68,87 +68,7 @@ export function OfficiantPublicProfile() {
   useEffect(() => {
     // For demo, load from localStorage and create sample data
     const storedProfile = localStorage.getItem("officiantProfile")
-    const mockOfficiants: OfficiantProfile[] = [
-      // Sample officiants for demonstration
-      {
-        id: "1",
-        fullName: "Pastor Michael Adams",
-        headshot: "",
-        city: "Garden City",
-        state: "CA",
-        yearsExperience: 5,
-        rating: 4.9,
-        totalReviews: 127,
-        phone: "(555) 987-6543",
-        email: "pastor.michael@ordainedpro.com",
-        website: "https://pastoradams.com",
-        socialMedia: {
-          facebook: "https://facebook.com/pastoradams",
-          instagram: "@pastoradams",
-          linkedin: "",
-          youtube: "",
-        },
-        priceRange: {
-          min: 300,
-          max: 800,
-        },
-        bio: "With over 5 years of experience officiating weddings, I specialize in creating personalized, heartfelt ceremonies that truly reflect each couple's unique love story. Whether you envision a traditional religious ceremony or a modern secular celebration, I work closely with you to craft a meaningful experience that you and your guests will cherish forever.",
-        photoGallery: [],
-        videoUrl: "",
-      },
-      {
-        id: "2",
-        fullName: "Reverend Sarah Martinez",
-        headshot: "",
-        city: "Los Angeles",
-        state: "CA",
-        yearsExperience: 8,
-        rating: 5.0,
-        totalReviews: 203,
-        phone: "(555) 234-5678",
-        email: "rev.sarah@weddingsoflove.com",
-        website: "https://weddingsoflove.com",
-        socialMedia: {
-          facebook: "",
-          instagram: "@revsarahweddings",
-          linkedin: "",
-          youtube: "",
-        },
-        priceRange: {
-          min: 400,
-          max: 1200,
-        },
-        bio: "I believe every love story deserves to be celebrated in a way that's authentic and meaningful. As a licensed officiant with 8 years of experience, I've had the honor of uniting couples from all walks of life. I offer bilingual services (English/Spanish) and specialize in interfaith and LGBTQ+ ceremonies.",
-        photoGallery: [],
-        videoUrl: "",
-      },
-      {
-        id: "3",
-        fullName: "Minister James Wilson",
-        headshot: "",
-        city: "San Francisco",
-        state: "CA",
-        yearsExperience: 12,
-        rating: 4.8,
-        totalReviews: 315,
-        phone: "(555) 345-6789",
-        email: "james@wilsonweddings.com",
-        website: "https://wilsonweddings.com",
-        socialMedia: {
-          facebook: "",
-          instagram: "@ministerjames",
-          linkedin: "",
-          youtube: "https://youtube.com/ministerjames",
-        },
-        priceRange: {
-          min: 500,
-          max: 1500,
-        },
-        bio: "For over a decade, I've dedicated myself to making wedding ceremonies unforgettable. My approach combines warmth, professionalism, and a touch of humor to create ceremonies that feel both significant and joyful. I'm experienced in all ceremony styles from intimate elopements to grand celebrations.",
-        photoGallery: [],
-        videoUrl: "",
-      },
-    ]
+    const mockOfficiants: OfficiantProfile[] = []
 
     if (storedProfile) {
       try {
@@ -160,8 +80,8 @@ export function OfficiantPublicProfile() {
             ...profile,
           })
         }
-      } catch (error) {
-        console.error("Error loading profile:", error)
+      } catch (e) {
+        // ignore
       }
     }
 

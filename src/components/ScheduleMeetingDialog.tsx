@@ -1,6 +1,5 @@
 "use client"
 
-
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -56,6 +55,8 @@ export interface ScheduleMeetingDialogProps {
   onOpenChange: (open: boolean) => void
   coupleEmails?: string[]
   coupleName?: string
+  organizerName?: string
+  organizerEmail?: string
 }
 
 export function ScheduleMeetingDialog({
@@ -63,7 +64,9 @@ export function ScheduleMeetingDialog({
   isOpen,
   onOpenChange,
   coupleEmails = ["ganuactivate@gmail.com", "ganuactivate@gmail.com"],
-  coupleName = "Sarah & David"
+  coupleName = "Sarah & David",
+  organizerName = "Pastor Michael Adams",
+  organizerEmail = "pastor.michael@ordainedpro.com"
 }: ScheduleMeetingDialogProps) {
   const [formData, setFormData] = useState({
     subject: "",
@@ -84,6 +87,7 @@ export function ScheduleMeetingDialog({
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false)
   const [user, setUser] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -93,21 +97,52 @@ export function ScheduleMeetingDialog({
     };
     fetchUser();
   }, []);
+
+  // Try to generate initials and names for attendees
+  function getAttendeeInitials(email: string, index: number) {
+    // If coupleName is provided and has two names, try to split and assign
+    if (coupleName && coupleName.includes("&")) {
+      const names = coupleName.split("&").map(n => n.trim());
+      if (names[index]) {
+        const parts = names[index].split(" ");
+        if (parts.length === 1) return parts[0][0].toUpperCase();
+        return (parts[0][0] + (parts[1][0] || "")).toUpperCase();
+      }
+    }
+    // fallback: use first two letters of email
+    return email.slice(0, 2).toUpperCase();
+  }
+
+  function getAttendeeName(email: string, index: number) {
+    if (coupleName && coupleName.includes("&")) {
+      const names = coupleName.split("&").map(n => n.trim());
+      if (names[index]) return names[index];
+    }
+    // fallback: email username
+    return email.split("@")[0];
+  }
+
+  function getOrganizerInitials() {
+    const parts = organizerName.split(" ");
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + (parts[1][0] || "")).toUpperCase();
+  }
+
   const meetingTemplates = [
     {
       name: "Initial Consultation",
       subject: "Wedding Ceremony Consultation - {couple}",
-      body: "Dear {couple},\n\nI'm excited to meet with you to discuss your upcoming wedding ceremony! During our consultation, we'll cover:\n\n• Your vision for the ceremony\n• Personal vows and readings\n• Unity ceremonies and traditions\n• Timeline and logistics\n• Any special requests or requirements\n\nPlease come prepared with any questions you may have. I look forward to helping make your special day perfect!\n\nWarm regards,\nPastor Michael"
+      body: `Dear {couple},\n\nI'm excited to meet with you to discuss your upcoming wedding ceremony! During our consultation, we'll cover:\n\n• Your vision for the ceremony\n• Personal vows and readings\n• Unity ceremonies and traditions\n• Timeline and logistics\n• Any special requests or requirements\n\nPlease come prepared with any questions you may have.\n\nWarm regards,\n{officiant}`
     },
     {
       name: "Ceremony Planning",
       subject: "Wedding Ceremony Planning Meeting - {couple}",
-      body: "Hello {couple},\n\nLet's meet to finalize the details of your wedding ceremony. We'll review:\n\n• Final ceremony script\n• Music selections\n• Processional order\n• Rehearsal arrangements\n• Day-of logistics\n\nPlease bring any final changes or special requests you'd like to discuss.\n\nBlessings,\nPastor Michael"
+      body: `Hello {couple},\n\nLet's meet to finalize the details of your wedding ceremony. We'll review:\n\n• Final ceremony script\n• Music selections\n• Processional order\n• Rehearsal arrangements\n• Day-of logistics\n\nPlease bring any final changes or special requests you'd like to discuss.\n\nBlessings,\n{officiant}`
     },
     {
       name: "Pre-Wedding Check-in",
       subject: "Pre-Wedding Check-in - {couple}",
-      body: "Dear {couple},\n\nAs your wedding day approaches, I'd love to connect and ensure everything is ready. We'll discuss:\n\n• Final ceremony details\n• Last-minute questions\n• Wedding day timeline\n• Emotional preparation\n• Any concerns or excitement you'd like to share\n\nLooking forward to celebrating with you soon!\n\nWith joy,\nPastor Michael"
+      body: `Dear {couple},\n\nAs your wedding day approaches, I'd love to connect and ensure everything is ready. We'll discuss:\n\n• Final ceremony details\n• Last-minute questions\n• Wedding day timeline\n• Emotional preparation\n• Any concerns or excitement you'd like to share\n\nLooking forward to celebrating with you soon!\n\nWith joy,\n{officiant}`
     }
   ]
 
@@ -157,7 +192,9 @@ export function ScheduleMeetingDialog({
 
   const handleTemplateSelect = (template: typeof meetingTemplates[0]) => {
     const processedSubject = template.subject.replace('{couple}', coupleName)
-    const processedBody = template.body.replace(/{couple}/g, coupleName)
+    const processedBody = template.body
+      .replace(/{couple}/g, coupleName)
+      .replace(/{officiant}/g, organizerName);
 
     setFormData(prev => ({
       ...prev,
@@ -177,7 +214,7 @@ export function ScheduleMeetingDialog({
       description: meetingData.body,
       location: meetingData.location,
       attendees: meetingData.attendees,
-      organizer: "pastor.michael@ordainedpro.com"
+      organizer: organizerEmail
     }
 
     return calendarEvent
@@ -192,7 +229,7 @@ export function ScheduleMeetingDialog({
 
     return {
       to: meetingData.attendees,
-      cc: ["pastor.michael@ordainedpro.com"],
+      cc: [organizerEmail],
       subject: `📅 Meeting Request: ${meetingData.subject}`,
       body: `
 Dear ${coupleName},
@@ -234,9 +271,9 @@ Join URL: https://zoom.us/j/1234567890
 Looking forward to meeting with you!
 
 Warm regards,
-Pastor Michael Adams
+${organizerName}
 Licensed Wedding Officiant
-📧 pastor.michael@ordainedpro.com
+📧 ${organizerEmail}
 📱 (555) 987-6543
 
 ───────────────────────────────
@@ -270,98 +307,6 @@ SEQUENCE:0
 END:VEVENT
 END:VCALENDAR`
   }
-
-
-  // const handleSendInvite = async () => {
-  //   if (!validateForm()) return;
-  //   if (!user?.id) {
-  //     alert("⚠️ Please sign in to schedule a meeting.");
-  //     return;
-  //   }
-
-  //   setIsGeneratingInvite(true);
-
-  //   try {
-  //     await new Promise(resolve => setTimeout(resolve, 2000));
-  //     const coupleId = 1
-  //     const meetingData = {
-  //       couple_id: coupleId, // passed as prop
-  //       user_id: user.id,
-  //       title: formData.subject,
-  //       date: formData.date,
-  //       time: formData.time || null,
-  //       location: formData.location || null,
-  //       notes: formData.body || null,
-  //       created_at: new Date().toISOString(),
-  //       updated_at: new Date().toISOString(),
-  //     };
-
-  //     const { data: meetingInsert, error: meetingError } = await supabase
-  //       .from("meetings")
-  //       .insert(meetingData)
-  //       .select()
-  //       .single();
-
-  //     if (meetingError) throw meetingError;
-
-  //     console.log("✅ Meeting saved in Supabase:", meetingInsert);
-
-  //     // Generate calendar & email
-  //     const calendarEvent = generateCalendarInvite(formData);
-  //     const emailContent = generateEmailContent(formData, calendarEvent);
-
-  //     console.log("📧 Calendar invite email generated:", emailContent);
-
-  //     const newMeeting: Meeting = {
-  //       id: meetingInsert?.id || Date.now(),
-  //       couple_id: meetingInsert?.couple_id || coupleId,
-  //       user_id: meetingInsert?.user_id || user.id,
-  //       title: meetingInsert?.title || formData.subject,
-  //       date: meetingInsert?.date || formData.date,
-  //       time: meetingInsert?.time || formData.time || null,
-  //       location: meetingInsert?.location || formData.location || null,
-  //       notes: meetingInsert?.notes || formData.body || null,
-  //       createdDate: meetingInsert?.created_at || new Date().toISOString(),
-  //       updated_at: meetingInsert?.updated_at || new Date().toISOString(),
-  //       subject: formData.subject,
-  //       body: formData.body,
-  //       duration: formData.duration,
-  //       meetingType: formData.meetingType,
-  //       attendees: formData.attendees,
-  //       responseDeadline: formData.responseDeadline,
-  //       status: "pending",               // default status
-  //       reminderSent: false,             // default
-  //       calendarInviteSent: false        // default
-  //     };
-
-  //     onScheduleMeeting(newMeeting);
-
-  //     // Reset form
-  //     setFormData({
-  //       subject: "",
-  //       body: "",
-  //       date: "",
-  //       time: "",
-  //       duration: 60,
-  //       location: "",
-  //       meetingType: "video",
-  //       attendees: coupleEmails,
-  //       responseDeadline: "",
-  //       sendCalendarInvite: true,
-  //       sendEmailNotification: true,
-  //       includeZoomLink: true,
-  //     });
-  //     setErrors({});
-  //     onOpenChange(false);
-
-  //     alert("📅 Meeting invitation sent successfully!");
-  //   } catch (err) {
-  //     console.error("❌ Error saving meeting:", err);
-  //     alert("⚠️ Failed to schedule meeting. Please try again.");
-  //   } finally {
-  //     setIsGeneratingInvite(false);
-  //   }
-  // };
 
   const handleSendInvite = async () => {
     if (!validateForm()) return;
@@ -444,7 +389,7 @@ Please reply to this email to confirm your attendance.
               to: email,
               subject: `📅 Meeting Invitation: ${formData.subject}`,
               message: meetingEmailBody,
-              fromName: "Pastor Michael",
+              fromName: organizerName,
               coupleName: coupleName
             }),
           });
@@ -517,7 +462,6 @@ Please reply to this email to confirm your attendance.
       setIsGeneratingInvite(false);
     }
   };
-
 
   const handleInputChange = (field: string, value: string | boolean | number | string[]) => {
     setFormData(prev => ({
@@ -812,24 +756,28 @@ Please reply to this email to confirm your attendance.
               <div className="space-y-2">
                 <div className="flex items-center text-sm">
                   <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mr-2">
-                    <span className="text-white text-xs">PM</span>
+                    <span className="text-white text-xs">{getOrganizerInitials()}</span>
                   </div>
                   <div>
-                    <p className="font-medium">Pastor Michael (Organizer)</p>
-                    <p className="text-xs text-gray-600">ganuactivate@gmail.com</p>
+                    <p className="font-medium">{organizerName} (Organizer)</p>
+                    <p className="text-xs text-gray-600">{organizerEmail}</p>
                   </div>
                 </div>
-                {formData.attendees.map((email, index) => (
-                  <div key={index} className="flex items-center text-sm">
-                    <div className="w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center mr-2">
-                      <span className="text-white text-xs">{index === 0 ? 'SJ' : 'DC'}</span>
+                {formData.attendees.map((email, index) => {
+                  const attendeeName = getAttendeeName(email, index);
+                  const initials = getAttendeeInitials(email, index);
+                  return (
+                    <div key={index} className="flex items-center text-sm">
+                      <div className="w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center mr-2">
+                        <span className="text-white text-xs">{initials}</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">{attendeeName}</p>
+                        <p className="text-xs text-gray-600">{email}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{index === 0 ? 'Sarah Johnson' : 'David Chen'}</p>
-                      <p className="text-xs text-gray-600">{email}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

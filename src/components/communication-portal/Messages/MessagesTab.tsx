@@ -36,6 +36,7 @@ export function MessagesTab() {
     formatFileSize,
     getFileIcon,
     handleSendMessage,
+    officiantProfile,
   } = useCommunicationPortal()
 
   return (
@@ -166,7 +167,7 @@ export function MessagesTab() {
                           to: 'both',
                           customEmail: '',
                           subject: 'Wedding Documents for Review',
-                          body: `Dear ${brideFirst} and ${groomFirst},\n\nI'm sharing some documents for your review. Please take a look and let me know if you have any questions or feedback.\n\nBest regards,\nPastor Michael Adams`,
+                          body: `Dear ${brideFirst} and ${groomFirst},\n\nI'm sharing some documents for your review. Please take a look and let me know if you have any questions or feedback.\n\nBest regards,\n${officiantProfile?.full_name || 'Your Officiant'}`,
                           includeNotes: true
                         })
                         setShowShareScriptDialog(true)

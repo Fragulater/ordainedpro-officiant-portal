@@ -61,7 +61,7 @@ export interface Meeting {
   id: number
   couple_id: number
   user_id: string
-  subject: string
+  title: string  // Database column is 'title' not 'subject'
   date: string
   time: string
   duration?: number
@@ -100,7 +100,8 @@ export interface Payment {
   id: number
   couple_id: number
   user_id: string
-  description: string
+  invoice_number?: string
+  description?: string
   amount: number
   payment_type?: string
   status?: string
@@ -415,7 +416,7 @@ export async function loadMeetings(userId: string, coupleId: number): Promise<{ 
 }
 
 export async function addMeeting(userId: string, coupleId: number, meetingData: {
-  subject: string
+  title: string
   date: string
   time: string
   duration?: number
@@ -429,7 +430,7 @@ export async function addMeeting(userId: string, coupleId: number, meetingData: 
       .insert({
         user_id: userId,
         couple_id: coupleId,
-        subject: meetingData.subject,
+        title: meetingData.title,
         date: meetingData.date,
         time: meetingData.time,
         duration: meetingData.duration || 60,
@@ -684,13 +685,18 @@ export async function addPayment(userId: string, coupleId: number, paymentData: 
   paymentType?: string
   status?: string
   dueDate?: string
+  invoiceNumber?: string
 }): Promise<{ ok: boolean; data?: Payment; error?: string }> {
   try {
+    const invoiceNumber = paymentData.invoiceNumber ||
+      `INV-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
+
     const { data, error } = await supabase
       .from("payments")
       .insert({
         user_id: userId,
         couple_id: coupleId,
+        invoice_number: invoiceNumber,
         description: paymentData.description,
         amount: paymentData.amount,
         payment_type: paymentData.paymentType || "service",
