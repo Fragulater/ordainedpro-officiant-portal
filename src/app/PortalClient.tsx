@@ -80,8 +80,8 @@ export default function PortalClient({ user }: PortalClientProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-      {/* Communication Portal - pass authenticated user to skip redundant auth check */}
-      <CommunicationPortal onScriptUploaded={handleScriptUploaded} user={user} />
+      {/* Communication Portal */}
+      <CommunicationPortal onScriptUploaded={handleScriptUploaded} />
 
       {/* Script Editor */}
       <ScriptEditorDialog

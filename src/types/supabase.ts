@@ -35,11 +35,6 @@ export interface Database {
           video_url: string | null
           created_at: string
           updated_at: string
-          user_type?: string | null
-          wedding_date?: string | null
-          partner_name?: string | null
-          location?: string | null
-          square_customer_id?: string | null
         }
         Insert: {
           id?: string
@@ -66,11 +61,6 @@ export interface Database {
           video_url?: string | null
           created_at?: string
           updated_at?: string
-          user_type?: string | null
-          wedding_date?: string | null
-          partner_name?: string | null
-          location?: string | null
-          square_customer_id?: string | null
         }
         Update: {
           id?: string
@@ -97,11 +87,6 @@ export interface Database {
           video_url?: string | null
           created_at?: string
           updated_at?: string
-          user_type?: string | null
-          wedding_date?: string | null
-          partner_name?: string | null
-          location?: string | null
-          square_customer_id?: string | null
         }
       }
       couples: {
@@ -123,13 +108,6 @@ export interface Database {
           colors: Json | null
           created_at: string
           updated_at: string
-          venue_name?: string | null
-          venue_address?: string | null
-          wedding_date?: string | null
-          start_time?: string | null
-          end_time?: string | null
-          expected_guests?: number | null
-          notes?: string | null
         }
         Insert: {
           id?: number
@@ -149,13 +127,6 @@ export interface Database {
           colors?: Json | null
           created_at?: string
           updated_at?: string
-          venue_name?: string | null
-          venue_address?: string | null
-          wedding_date?: string | null
-          start_time?: string | null
-          end_time?: string | null
-          expected_guests?: number | null
-          notes?: string | null
         }
         Update: {
           id?: number
@@ -175,13 +146,6 @@ export interface Database {
           colors?: Json | null
           created_at?: string
           updated_at?: string
-          venue_name?: string | null
-          venue_address?: string | null
-          wedding_date?: string | null
-          start_time?: string | null
-          end_time?: string | null
-          expected_guests?: number | null
-          notes?: string | null
         }
       }
       ceremonies: {
@@ -272,42 +236,30 @@ export interface Database {
           couple_id: number
           user_id: string
           sender: string
-          sender_name: string | null
           content: string
-          body: string | null
-          recipient_email: string | null
           timestamp: string
           read: boolean
           created_at: string
-          attachments: Json | null
         }
         Insert: {
           id?: number
           couple_id: number
           user_id: string
           sender: string
-          sender_name?: string | null
           content: string
-          body?: string | null
-          recipient_email?: string | null
           timestamp?: string
           read?: boolean
           created_at?: string
-          attachments?: Json | null
         }
         Update: {
           id?: number
           couple_id?: number
           user_id?: string
           sender?: string
-          sender_name?: string | null
           content?: string
-          body?: string | null
-          recipient_email?: string | null
           timestamp?: string
           read?: boolean
           created_at?: string
-          attachments?: Json | null
         }
       }
       payments: {
@@ -317,13 +269,11 @@ export interface Database {
           user_id: string
           invoice_number: string
           amount: number
-          status: string
+          status: 'pending' | 'paid' | 'overdue'
           due_date: string | null
           paid_date: string | null
           payment_method: string | null
           notes: string | null
-          description: string | null
-          payment_type: string | null
           created_at: string
           updated_at: string
         }
@@ -333,13 +283,11 @@ export interface Database {
           user_id: string
           invoice_number: string
           amount: number
-          status?: string
+          status?: 'pending' | 'paid' | 'overdue'
           due_date?: string | null
           paid_date?: string | null
           payment_method?: string | null
           notes?: string | null
-          description?: string | null
-          payment_type?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -349,13 +297,11 @@ export interface Database {
           user_id?: string
           invoice_number?: string
           amount?: number
-          status?: string
+          status?: 'pending' | 'paid' | 'overdue'
           due_date?: string | null
           paid_date?: string | null
           payment_method?: string | null
           notes?: string | null
-          description?: string | null
-          payment_type?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -364,36 +310,33 @@ export interface Database {
         Row: {
           id: number
           user_id: string
-          couple_id: number | null
           title: string
-          type: string
-          status: string
           content: string
-          description: string | null
+          category: string | null
+          is_published: boolean
+          price: number | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: number
           user_id: string
-          couple_id?: number | null
           title: string
-          type?: string
-          status?: string
           content: string
-          description?: string | null
+          category?: string | null
+          is_published?: boolean
+          price?: number | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: number
           user_id?: string
-          couple_id?: number | null
           title?: string
-          type?: string
-          status?: string
           content?: string
-          description?: string | null
+          category?: string | null
+          is_published?: boolean
+          price?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -434,68 +377,62 @@ export interface Database {
         }
       }
       contracts: {
-        Row: {
-          id: number
-          user_id: string
-          couple_id: number | null
-          name: string
-          description: string | null
-          type: string
-          status: 'draft' | 'sent' | 'signed' | 'expired'
-          expiry_date: string | null
-          file_url: string
-          file_type: string | null
-          file_size: number | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: number
-          user_id: string
-          couple_id?: number | null
-          name: string
-          description?: string | null
-          type: string
-          status?: 'draft' | 'sent' | 'signed' | 'expired'
-          expiry_date?: string | null
-          file_url: string
-          file_type?: string | null
-          file_size?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: number
-          user_id?: string
-          couple_id?: number | null
-          name?: string
-          description?: string | null
-          type?: string
-          status?: 'draft' | 'sent' | 'signed' | 'expired'
-          expiry_date?: string | null
-          file_url?: string
-          file_type?: string | null
-          file_size?: number | null
-          created_at?: string
-          updated_at?: string
-        }
-      }
+  Row: {
+    id: number
+    user_id: string
+    couple_id: number | null
+    name: string
+    description: string | null
+    type: string
+    status: 'draft' | 'sent' | 'signed' | 'expired'
+    expiry_date: string | null
+    file_url: string
+    file_type: string | null
+    file_size: number | null
+    created_at: string
+    updated_at: string
+  }
+  Insert: {
+    id?: number
+    user_id: string
+    couple_id?: number | null
+    name: string
+    description?: string | null
+    type: string
+    status?: 'draft' | 'sent' | 'signed' | 'expired'
+    expiry_date?: string | null
+    file_url: string
+    file_type?: string | null
+    file_size?: number | null
+    created_at?: string
+    updated_at?: string
+  }
+  Update: {
+    id?: number
+    user_id?: string
+    couple_id?: number | null
+    name?: string
+    description?: string | null
+    type?: string
+    status?: 'draft' | 'sent' | 'signed' | 'expired'
+    expiry_date?: string | null
+    file_url?: string
+    file_type?: string | null
+    file_size?: number | null
+    created_at?: string
+    updated_at?: string
+  }
+}
+
       tasks: {
         Row: {
           id: number
           couple_id: number
           user_id: string
-          task: string
-          details: string | null
+          title: string
+          description: string | null
           due_date: string | null
-          due_time: string | null
-          priority: string | null
-          category: string | null
           completed: boolean
-          email_reminder: boolean | null
-          reminder_days: number | null
-          reminder_sent: boolean | null
-          reminder_sent_at: string | null
           created_at: string
           updated_at: string
         }
@@ -503,17 +440,10 @@ export interface Database {
           id?: number
           couple_id: number
           user_id: string
-          task: string
-          details?: string | null
+          title: string
+          description?: string | null
           due_date?: string | null
-          due_time?: string | null
-          priority?: string | null
-          category?: string | null
           completed?: boolean
-          email_reminder?: boolean | null
-          reminder_days?: number | null
-          reminder_sent?: boolean | null
-          reminder_sent_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -521,17 +451,10 @@ export interface Database {
           id?: number
           couple_id?: number
           user_id?: string
-          task?: string
-          details?: string | null
+          title?: string
+          description?: string | null
           due_date?: string | null
-          due_time?: string | null
-          priority?: string | null
-          category?: string | null
           completed?: boolean
-          email_reminder?: boolean | null
-          reminder_days?: number | null
-          reminder_sent?: boolean | null
-          reminder_sent_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -546,9 +469,6 @@ export interface Database {
           time: string
           location: string | null
           notes: string | null
-          duration: number | null
-          meeting_type: string | null
-          status: string | null
           created_at: string
           updated_at: string
         }
@@ -561,9 +481,6 @@ export interface Database {
           time: string
           location?: string | null
           notes?: string | null
-          duration?: number | null
-          meeting_type?: string | null
-          status?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -576,46 +493,8 @@ export interface Database {
           time?: string
           location?: string | null
           notes?: string | null
-          duration?: number | null
-          meeting_type?: string | null
-          status?: string | null
           created_at?: string
           updated_at?: string
-        }
-      }
-      couple_files: {
-        Row: {
-          id: number
-          user_id: string
-          couple_id: number
-          file_name: string
-          file_url: string
-          file_type: string | null
-          file_size: number | null
-          category: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: number
-          user_id: string
-          couple_id: number
-          file_name: string
-          file_url: string
-          file_type?: string | null
-          file_size?: number | null
-          category?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: number
-          user_id?: string
-          couple_id?: number
-          file_name?: string
-          file_url?: string
-          file_type?: string | null
-          file_size?: number | null
-          category?: string | null
-          created_at?: string
         }
       }
     }

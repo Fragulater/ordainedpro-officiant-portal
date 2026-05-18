@@ -1,0 +1,293 @@
+12:00:43 AM: build-image version: ac6eb13fbf000e5c09ad677efd8b7c3c2d0142b6 (noble-new-builds)
+12:00:43 AM: buildbot version: de14d13d022c18f089944497bd804e269fc4f82f
+12:00:43 AM: Building without cache
+12:00:43 AM: Starting to prepare the repo for build
+12:00:43 AM: No cached dependencies found. Cloning fresh repo
+12:00:43 AM: git clone --filter=blob:none https://github.com/danieljosephsalerno-ai/ordainedpro-wedding-portal
+12:00:44 AM: Preparing Git Reference refs/heads/main
+12:00:45 AM: Custom build command detected. Proceeding with the specified command: 'bun install && bun run build'
+12:00:45 AM: Installing dependencies
+12:00:45 AM: mise ~/.config/mise/config.toml tools: python@3.14.3
+12:00:45 AM: mise ~/.config/mise/config.toml tools: ruby@3.4.8
+12:00:46 AM: mise ~/.config/mise/config.toml tools: go@1.26.2
+12:00:46 AM: v20.20.2 is already installed.
+12:00:46 AM: Now using node v20.20.2 (npm v10.8.2)
+12:00:46 AM: Enabling Node.js Corepack
+12:00:46 AM: mise ~/.config/mise/config.toml tools: bun@1.3.12
+12:00:46 AM: Installing npm packages using bun version 1.3.12
+12:00:47 AM: bun install v1.3.12 (700fc117)
+12:00:48 AM: Saved lockfile
+12:00:48 AM: + @biomejs/biome@1.9.4
+12:00:48 AM: + @eslint/eslintrc@3.3.5
+12:00:48 AM: + @netlify/plugin-nextjs@5.15.11
+12:00:48 AM: + @types/canvas-confetti@1.9.0
+12:00:48 AM: + @types/node@20.19.41
+12:00:48 AM: + @types/react@18.3.28
+12:00:48 AM: + @types/react-dom@18.3.7
+12:00:48 AM: + eslint@9.39.4
+12:00:48 AM: + eslint-config-next@15.1.7
+12:00:48 AM: + typescript@5.9.3
+12:00:48 AM: + @radix-ui/react-avatar@1.1.11
+12:00:48 AM: + @radix-ui/react-dialog@1.1.15
+12:00:48 AM: + @radix-ui/react-label@2.1.8
+12:00:48 AM: + @radix-ui/react-popover@1.1.15
+12:00:48 AM: + @radix-ui/react-separator@1.1.8
+12:00:48 AM: + @radix-ui/react-slot@1.2.4
+12:00:48 AM: + @radix-ui/react-tabs@1.1.13
+12:00:48 AM: + @radix-ui/react-visually-hidden@1.2.4
+12:00:48 AM: + @supabase/auth-helpers-nextjs@0.10.0
+12:00:48 AM: + @supabase/ssr@0.7.0
+12:00:48 AM: + @supabase/supabase-js@2.105.4
+12:00:48 AM: + autoprefixer@10.5.0
+12:00:48 AM: + canvas-confetti@1.9.4
+12:00:48 AM: + class-variance-authority@0.7.1
+12:00:48 AM: + clsx@2.1.1
+12:00:48 AM: + date-fns@4.1.0
+12:00:48 AM: + lucide-react@0.475.0
+12:00:48 AM: + mammoth@1.12.0
+12:00:48 AM: + next@15.3.6
+12:00:48 AM: + postcss@8.5.14
+12:00:48 AM: + react@18.3.1
+12:00:48 AM: + react-day-picker@9.14.0
+12:00:48 AM: + react-dom@18.3.1
+12:00:48 AM: + react-grab@0.1.33
+12:00:48 AM: + same-runtime@0.0.1
+12:00:48 AM: + tailwind-merge@3.6.0
+12:00:48 AM: + tailwindcss@3.4.19
+12:00:48 AM: + tailwindcss-animate@1.0.7
+12:00:48 AM: 492 packages installed [1.70s]
+12:00:48 AM: npm packages installed using bun
+12:00:48 AM: Successfully installed dependencies
+12:00:48 AM: Detected 1 framework(s)
+12:00:48 AM: "next" at version "15.3.6"
+12:00:49 AM: Starting build script
+12:00:49 AM: Section completed: initializing
+12:00:51 AM: ​
+12:00:51 AM: Netlify Build                                                 
+12:00:51 AM: ────────────────────────────────────────────────────────────────
+12:00:51 AM: ​
+12:00:51 AM: ❯ Version
+12:00:51 AM:   @netlify/build 35.13.4
+12:00:51 AM: ​
+12:00:51 AM: ❯ Flags
+12:00:51 AM:   accountId: 6918ef8eedf05d0c521392a8
+12:00:51 AM:   baseRelDir: true
+12:00:51 AM:   buildId: 6a02d01a157e6918403b5121
+12:00:51 AM:   deployId: 6a02d01a157e6918403b5123
+12:00:51 AM: ​
+12:00:51 AM: ❯ Current directory
+12:00:51 AM:   /opt/build/repo
+12:00:51 AM: ​
+12:00:51 AM: ❯ Config file
+12:00:51 AM:   /opt/build/repo/netlify.toml
+12:00:51 AM: ​
+12:00:51 AM: ❯ Context
+12:00:51 AM:   production
+12:00:51 AM: ​
+12:00:51 AM: ❯ Using Next.js Runtime - v5.15.11
+12:00:53 AM: No Next.js cache to restore
+12:00:53 AM: ​
+12:00:53 AM: build.command from netlify.toml                               
+12:00:53 AM: ────────────────────────────────────────────────────────────────
+12:00:53 AM: ​
+12:00:53 AM: $ bun install && bun run build
+12:00:53 AM: bun install v1.3.12 (700fc117)
+12:00:53 AM: Checked 525 installs across 548 packages (no changes) [16.00ms]
+12:00:53 AM: $ next build
+12:00:53 AM: ⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+12:00:53 AM:    ▲ Next.js 15.3.6
+12:00:53 AM:    Creating an optimized production build ...
+12:01:09 AM:  ✓ Compiled successfully in 12.0s
+12:01:09 AM:    Skipping validation of types
+12:01:09 AM:    Skipping linting
+12:01:09 AM:    Collecting page data ...
+12:01:11 AM:    Generating static pages (0/7) ...
+12:01:11 AM:    Generating static pages (1/7)
+12:01:11 AM:    Generating static pages (3/7)
+12:01:11 AM:    Generating static pages (5/7)
+12:01:11 AM:  ✓ Generating static pages (7/7)
+12:01:12 AM:    Finalizing page optimization ...
+12:01:12 AM:    Collecting build traces ...
+12:01:20 AM: Route (app)                                 Size  First Load JS    
+12:01:20 AM: ┌ ○ /                                     242 kB         429 kB
+12:01:20 AM: ├ ○ /_not-found                            986 B         103 kB
+12:01:20 AM: ├ ƒ /api/check-reminders                   145 B         102 kB
+12:01:20 AM: ├ ƒ /api/generate-script                   145 B         102 kB
+12:01:20 AM: ├ ƒ /api/inbound-email                     145 B         102 kB
+12:01:20 AM: ├ ƒ /api/send-email                        145 B         102 kB
+12:01:20 AM: ├ ○ /auth                                1.54 kB         105 kB
+12:01:20 AM: ├ ○ /ceremony-details                    5.03 kB         178 kB
+12:01:20 AM: └ ○ /find-officiant                      6.77 kB         134 kB
+12:01:20 AM: + First Load JS shared by all             102 kB
+12:01:20 AM:   ├ chunks/4bd1b696-d86ebd643badf995.js  53.2 kB
+12:01:20 AM:   ├ chunks/684-c637c8aa61e6d0ba.js       46.6 kB
+12:01:20 AM:   └ other shared chunks (total)          2.09 kB
+12:01:20 AM: ƒ Middleware                             33.2 kB
+12:01:20 AM: ○  (Static)   prerendered as static content
+12:01:20 AM: ƒ  (Dynamic)  server-rendered on demand
+12:01:20 AM: ​
+12:01:20 AM: (build.command completed in 27.6s)
+12:01:20 AM: Next.js cache saved
+12:01:21 AM: ​
+12:01:21 AM: Functions bundling                                            
+12:01:21 AM: ────────────────────────────────────────────────────────────────
+12:01:21 AM: ​
+12:01:21 AM: Packaging Functions from .netlify/functions-internal directory:
+12:01:21 AM:  - ___netlify-server-handler/___netlify-server-handler.mjs
+12:01:21 AM: ​
+12:01:23 AM: ​
+12:01:23 AM: (Functions bundling completed in 1.5s)
+12:01:23 AM: ​
+12:01:23 AM: Edge Functions bundling                                       
+12:01:23 AM: ────────────────────────────────────────────────────────────────
+12:01:23 AM: ​
+12:01:23 AM: Packaging Edge Functions from .netlify/edge-functions directory:
+12:01:23 AM:  - ___netlify-edge-handler-src-middleware
+12:01:24 AM: ​
+12:01:24 AM: (Edge Functions bundling completed in 1.4s)
+12:01:27 AM: Failed during stage 'building site': Build script returned non-zero exit code: 2 (https://ntl.fyi/exit-code-2)
+12:01:27 AM: ​
+12:01:27 AM: Scanning for secrets in code and build output.                
+12:01:27 AM: ────────────────────────────────────────────────────────────────
+12:01:27 AM: ​
+12:01:27 AM: ​
+12:01:27 AM: ❯ Scanning complete. 4688 file(s) scanned. Secrets scanning found 1 instance(s) of secrets in build output or repo code.
+12:01:27 AM: ​
+12:01:27 AM: Secret env var "NEXT_PUBLIC_SUPABASE_ANON_KEY"'s value detected:
+  found value at line 43524 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 270723 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 270732 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 270815 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 636455 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 636464 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 636633 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 636648 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 636819 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 642999 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 803613 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 803622 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 803791 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 803806 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 803977 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 828752 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 830256 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 830265 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 830434 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 830448 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 830619 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 830651 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 831824 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 831833 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 832002 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 832016 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 832187 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 832602 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 1487838 in .netlify/.next/cache/webpack/client-production/0.pack
+12:01:27 AM:   found value at line 14541 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 235537 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 235546 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 235637 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 665333 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 665340 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 665953 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 666089 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 666458 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 693004 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 693011 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 693624 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 693760 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 694439 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 694518 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 695202 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 695365 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 717295 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 717304 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 717481 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 717496 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 717675 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 719423 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1121583 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1121592 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1121769 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1121784 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1121963 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1225326 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1234212 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1234221 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1234398 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1234412 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1234591 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1234626 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1802174 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1802554 in .netlify/.next/cache/webpack/server-production/0.pack
+12:01:27 AM:   found value at line 1 in .netlify/.next/server/app/api/inbound-email/route.js
+12:01:27 AM:   found value at line 1 in .netlify/.next/server/app/ceremony-details/page.js
+12:01:27 AM:   found value at line 381 in .netlify/.next/server/app/page.js
+12:01:27 AM:   found value at line 1 in .netlify/.next/server/chunks/391.js
+12:01:27 AM:   found value at line 1 in .netlify/.next/standalone/.next/server/app/api/inbound-email/route.js
+12:01:27 AM:   found value at line 1 in .netlify/.next/standalone/.next/server/app/ceremony-details/page.js
+12:01:27 AM:   found value at line 381 in .netlify/.next/standalone/.next/server/app/page.js
+12:01:27 AM:   found value at line 1 in .netlify/.next/standalone/.next/server/chunks/391.js
+12:01:27 AM:   found value at line 1 in .netlify/.next/static/chunks/460.3ee51d6dad67defc.js
+12:01:27 AM:   found value at line 1 in .netlify/.next/static/chunks/99.1ab4fae57b608585.js
+12:01:27 AM:   found value at line 1 in .netlify/.next/static/chunks/app/ceremony-details/page-bde5d7a0b2c86977.js
+12:01:27 AM:   found value at line 1 in .netlify/.next/static/chunks/app/page-31b2dc3d20db49dd.js
+12:01:27 AM:   found value at line 1 in .netlify/functions-internal/___netlify-server-handler/.next/server/app/api/inbound-email/route.js
+12:01:27 AM:   found value at line 1 in .netlify/functions-internal/___netlify-server-handler/.next/server/app/ceremony-details/page.js
+12:01:27 AM:   found value at line 381 in .netlify/functions-internal/___netlify-server-handler/.next/server/app/page.js
+12:01:27 AM:   found value at line 1 in .netlify/functions-internal/___netlify-server-handler/.next/server/chunks/391.js
+12:01:27 AM: ​
+12:01:27 AM: To prevent exposing secrets, the build will fail until these secret values are not found in build output or repo files.
+12:01:27 AM: ​
+12:01:27 AM: If these are expected, use SECRETS_SCAN_OMIT_PATHS, SECRETS_SCAN_OMIT_KEYS, or SECRETS_SCAN_ENABLED to prevent detecting.
+12:01:27 AM: ​
+12:01:27 AM: For more information on secrets scanning, see the Netlify Docs: https://ntl.fyi/configure-secrets-scanning
+12:01:27 AM: ​
+12:01:27 AM: Secrets scanning detected secrets in files during build.      
+12:01:27 AM: ────────────────────────────────────────────────────────────────
+12:01:27 AM: ​
+12:01:27 AM:   Error message
+12:01:27 AM:   Secrets scanning found secrets in build.
+12:01:27 AM: ​
+12:01:27 AM:   Resolved config
+12:01:27 AM:   build:
+12:01:27 AM:     command: bun install && bun run build
+12:01:27 AM:     commandOrigin: config
+12:01:27 AM:     environment:
+12:01:27 AM:       - NEXT_PUBLIC_SUPABASE_ANON_KEY
+12:01:27 AM:       - NEXT_PUBLIC_SUPABASE_URL
+12:01:27 AM:       - RESEND_API_KEY
+12:01:27 AM:       - SUPABASE_SERVICE_ROLE_KEY
+12:01:27 AM:       - NODE_VERSION
+12:01:27 AM:       - NPM_FLAGS
+12:01:27 AM:       - CI
+12:01:27 AM:     publish: /opt/build/repo/.next
+12:01:27 AM:     publishOrigin: config
+12:01:27 AM:   headers:
+12:01:27 AM:     - for: /_next/static/*
+      values:
+        Cache-Control: public, max-age=31536000, immutable
+  headersOrigin: inline
+  plugins:
+    - inputs: {}
+      origin: config
+      package: "@netlify/plugin-nextjs"
+  redirects:
+    - from: /_next/image
+      query:
+        q: :quality
+        url: :url
+        w: :width
+      status: 200
+      to: /.netlify/images?url=:url&w=:width&q=:quality
+    - from: /_ipx/*
+      query:
+        q: :quality
+        url: :url
+        w: :width
+      status: 200
+      to: /.netlify/images?url=:url&w=:width&q=:quality
+  redirectsOrigin: inline
+12:01:27 AM: Build failed due to a user error: Build script returned non-zero exit code: 2
+12:01:27 AM: Failing build: Failed to build site
+12:01:27 AM: Finished processing build request in 44.259s

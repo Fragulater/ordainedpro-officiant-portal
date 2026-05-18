@@ -61,7 +61,7 @@ export interface Meeting {
   id: number
   couple_id: number
   user_id: string
-  title: string  // Database column is 'title' not 'subject'
+  subject: string
   date: string
   time: string
   duration?: number
@@ -100,8 +100,7 @@ export interface Payment {
   id: number
   couple_id: number
   user_id: string
-  invoice_number?: string
-  description?: string
+  description: string
   amount: number
   payment_type?: string
   status?: string
@@ -200,87 +199,6 @@ export async function updateCouple(coupleId: number, updates: Partial<Couple>): 
     return { ok: true }
   } catch (err: any) {
     console.error("[ERROR] Exception updating couple:", err)
-    return { ok: false, error: err.message }
-  }
-}
-
-// ============================================
-// WEDDING DETAILS (server-side only)
-// ============================================
-
-export interface WeddingDetails {
-  venueName: string
-  venueAddress: string
-  weddingDate: string
-  startTime: string
-  endTime: string
-  expectedGuests: string
-  officiantNotes: string
-}
-
-export async function saveWeddingDetails(
-  coupleId: number,
-  details: WeddingDetails
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    console.log("[WEDDING] Saving wedding details for couple:", coupleId, details)
-
-    const { error } = await supabase
-      .from("couples")
-      .update({
-        venue_name: details.venueName || null,
-        venue_address: details.venueAddress || null,
-        wedding_date: details.weddingDate || null,
-        start_time: details.startTime || null,
-        end_time: details.endTime || null,
-        expected_guests: details.expectedGuests ? parseInt(details.expectedGuests) : null,
-        notes: details.officiantNotes || null,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", coupleId)
-
-    if (error) {
-      console.error("[ERROR] Error saving wedding details:", error)
-      return { ok: false, error: error.message }
-    }
-
-    console.log("[OK] Wedding details saved for couple:", coupleId)
-    return { ok: true }
-  } catch (err: any) {
-    console.error("[ERROR] Exception saving wedding details:", err)
-    return { ok: false, error: err.message }
-  }
-}
-
-export async function loadWeddingDetails(
-  coupleId: number
-): Promise<{ ok: boolean; data?: WeddingDetails; error?: string }> {
-  try {
-    const { data, error } = await supabase
-      .from("couples")
-      .select("venue_name, venue_address, wedding_date, start_time, end_time, expected_guests, notes")
-      .eq("id", coupleId)
-      .single()
-
-    if (error) {
-      console.error("[ERROR] Error loading wedding details:", error)
-      return { ok: false, error: error.message }
-    }
-
-    const weddingDetails: WeddingDetails = {
-      venueName: data.venue_name || "",
-      venueAddress: data.venue_address || "",
-      weddingDate: data.wedding_date || "",
-      startTime: data.start_time || "",
-      endTime: data.end_time || "",
-      expectedGuests: data.expected_guests?.toString() || "",
-      officiantNotes: data.notes || ""
-    }
-
-    console.log("[OK] Loaded wedding details for couple:", coupleId)
-    return { ok: true, data: weddingDetails }
-  } catch (err: any) {
-    console.error("[ERROR] Exception loading wedding details:", err)
     return { ok: false, error: err.message }
   }
 }
@@ -416,7 +334,7 @@ export async function loadMeetings(userId: string, coupleId: number): Promise<{ 
 }
 
 export async function addMeeting(userId: string, coupleId: number, meetingData: {
-  title: string
+  subject: string
   date: string
   time: string
   duration?: number
@@ -430,7 +348,7 @@ export async function addMeeting(userId: string, coupleId: number, meetingData: 
       .insert({
         user_id: userId,
         couple_id: coupleId,
-        title: meetingData.title,
+        subject: meetingData.subject,
         date: meetingData.date,
         time: meetingData.time,
         duration: meetingData.duration || 60,
@@ -685,18 +603,13 @@ export async function addPayment(userId: string, coupleId: number, paymentData: 
   paymentType?: string
   status?: string
   dueDate?: string
-  invoiceNumber?: string
 }): Promise<{ ok: boolean; data?: Payment; error?: string }> {
   try {
-    const invoiceNumber = paymentData.invoiceNumber ||
-      `INV-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
-
     const { data, error } = await supabase
       .from("payments")
       .insert({
         user_id: userId,
         couple_id: coupleId,
-        invoice_number: invoiceNumber,
         description: paymentData.description,
         amount: paymentData.amount,
         payment_type: paymentData.paymentType || "service",

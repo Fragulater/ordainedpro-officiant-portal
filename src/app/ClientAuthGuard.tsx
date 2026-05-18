@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/supabase/utils/client"
 import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js"
@@ -12,47 +12,25 @@ export default function ClientAuthGuard() {
   const [loading, setLoading] = useState(true)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
-  const authResolvedRef = useRef(false)
+
+  // Supabase client is a singleton - no need for useMemo
 
   useEffect(() => {
-    let isMounted = true
-    let authTimeoutId: NodeJS.Timeout | null = null
-
-    const redirectToLogin = (message?: string) => {
-      if (!isMounted) return
-      if (message) setAuthError(message)
-      setUser(null)
-      setIsRedirecting(true)
-      setLoading(false)
-      authResolvedRef.current = true
-      router.replace("/auth")
-    }
-
-    const resolveAuthenticatedUser = (authenticatedUser: User) => {
-      if (!isMounted) return
-      setUser(authenticatedUser)
-      setAuthError(null)
-      setIsRedirecting(false)
-      setLoading(false)
-      authResolvedRef.current = true
-    }
-
+    // Check current session
     const checkAuth = async () => {
       try {
         console.log("🔍 Checking authentication...")
 
-        if (!supabase?.auth) {
+        // Safety check - make sure supabase is available
+        if (!supabase || !supabase.auth) {
           console.error("❌ Supabase client not available")
-          redirectToLogin("Authentication service unavailable")
+          setAuthError("Authentication service unavailable")
+          setLoading(false)
           return
         }
 
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession()
-
-        if (!isMounted) return
+        // First try getSession for faster initial check
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
         if (sessionError) {
           console.error("❌ Session error:", sessionError.message)
@@ -60,64 +38,63 @@ export default function ClientAuthGuard() {
 
         if (session?.user) {
           console.log("✅ User authenticated via session:", session.user.email)
-          resolveAuthenticatedUser(session.user)
+          setUser(session.user)
+          setLoading(false)
           return
         }
 
-        const {
-          data: { user: validatedUser },
-          error: userError,
-        } = await supabase.auth.getUser()
-
-        if (!isMounted) return
+        // Fallback to getUser() which validates with server
+        const { data: { user }, error } = await supabase.auth.getUser()
 
         console.log("🔍 Auth check result:", {
-          hasUser: !!validatedUser,
-          email: validatedUser?.email,
-          error: userError?.message,
+          hasUser: !!user,
+          email: user?.email,
+          error: error?.message
         })
 
-        if (userError || !validatedUser) {
+        if (error || !user) {
           console.log("❌ No user found, redirecting to /auth")
-          redirectToLogin()
+          setIsRedirecting(true)
+          setLoading(false)
+          router.replace("/auth")
           return
         }
 
-        console.log("✅ User authenticated:", validatedUser.email)
-        resolveAuthenticatedUser(validatedUser)
+        console.log("✅ User authenticated:", user.email)
+        setUser(user)
+        setLoading(false)
       } catch (error) {
         console.error("Auth check error:", error)
-        redirectToLogin("Authentication check failed")
+        setAuthError("Authentication check failed")
+        setIsRedirecting(true)
+        setLoading(false)
+        router.replace("/auth")
       }
     }
 
-    authTimeoutId = setTimeout(() => {
-      if (!isMounted || authResolvedRef.current) return
-      console.warn("⚠️ Auth check timed out after 10 seconds, redirecting to login")
-      redirectToLogin("Authentication timed out")
-    }, 10000)
-
     checkAuth()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       console.log("🔄 Auth state changed:", { event, hasUser: !!session?.user })
 
-      if (event === "SIGNED_OUT" || !session?.user) {
-        redirectToLogin()
-      } else if (session.user) {
-        resolveAuthenticatedUser(session.user)
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        setUser(null)
+        setIsRedirecting(true)
+        router.replace("/auth")
+      } else if (session?.user) {
+        setUser(session.user)
+        setIsRedirecting(false)
+        setLoading(false)
       }
     })
 
     return () => {
-      isMounted = false
-      if (authTimeoutId) clearTimeout(authTimeoutId)
       subscription.unsubscribe()
     }
-  }, [router])
+  }, [router, supabase])
 
+  // Show loading state
   if (loading || isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -126,12 +103,15 @@ export default function ClientAuthGuard() {
           <p className="text-gray-600">
             {isRedirecting ? "Redirecting to login..." : "Loading..."}
           </p>
-          {authError && <p className="text-red-500 text-sm mt-2">{authError}</p>}
+          {authError && (
+            <p className="text-red-500 text-sm mt-2">{authError}</p>
+          )}
         </div>
       </div>
     )
   }
 
+  // This shouldn't happen if redirecting works, but keep as fallback
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">

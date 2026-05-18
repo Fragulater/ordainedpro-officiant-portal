@@ -8,10 +8,9 @@ export default function PortalButton() {
     const handleClick = async () => {
         const { data } = await supabase.auth.getSession()
         if (data?.session) {
-            // Protected dashboard is at root "/"
-            router.push("/")
+            router.push("/officiant-portal")
         } else {
-            router.push("/auth")
+            router.push(`/auth?next=/officiant-portal`)
         }
     }
 

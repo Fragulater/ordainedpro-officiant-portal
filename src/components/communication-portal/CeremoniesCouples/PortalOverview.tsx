@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { FileText, Users, Clock, MapPin, Phone, Mail, User, Star, Edit, Save, StickyNote } from "lucide-react"
+import { FileText, Users, Clock, MapPin, Phone, Mail, User, Star, Edit, Save } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 // Helper to safely get initials from a name
@@ -24,7 +23,6 @@ export function PortalOverview() {
     showEditCoupleDialog,
     setShowEditCoupleDialog,
     setShowSwitchCeremonyDialog,
-    setShowAddCeremonyDialog,
     allCouples,
     activeCoupleIndex,
     editCoupleInfo,
@@ -32,72 +30,15 @@ export function PortalOverview() {
     editWeddingDetails,
     handleEditCoupleInfo,
     handleOpenEditWeddingDialog,
-    isLoadingCouples,
-    officiantProfile,
   } = useCommunicationPortal()
 
-  // State for notes dialog
-  const [showNotesDialog, setShowNotesDialog] = useState(false)
-  const hasNotes = !!(editWeddingDetails?.officiantNotes && editWeddingDetails.officiantNotes.trim().length > 0)
-
-  // Show loading skeleton while couples are being fetched
-  if (isLoadingCouples) {
+  // Guard against null/undefined editCoupleInfo
+  if (!editCoupleInfo || !editCoupleInfo.brideName) {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <Card className="border-blue-100 shadow-md">
-          <CardHeader className="pb-4 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <CardTitle className="text-lg flex items-center text-blue-900">
-              <Users className="w-5 h-5 mr-2 text-blue-600" />
-              Loading...
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="animate-pulse space-y-3">
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-blue-100 shadow-md">
-          <CardContent className="pt-6">
-            <div className="animate-pulse space-y-3">
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-blue-100 shadow-md">
-          <CardContent className="pt-6">
-            <div className="animate-pulse space-y-3">
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // Show empty state when no couples exist - but still show full dashboard
-  if (!editCoupleInfo || !editCoupleInfo.brideName || allCouples.length === 0) {
-    return (
-      <div className="mb-8">
-        <Card className="border-blue-100 shadow-md bg-gradient-to-r from-blue-50 to-indigo-50">
-          <CardContent className="py-12 text-center">
-            <div className="text-6xl mb-4">💒</div>
-            <h2 className="text-2xl font-bold text-blue-900 mb-2">Welcome to Your Portal</h2>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              You haven't added any ceremonies yet. Add your first couple to start managing their wedding.
-            </p>
-            <Button
-              onClick={() => setShowAddCeremonyDialog(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
-            >
-              <Users className="w-4 h-4 mr-2" />
-              Add Your First Ceremony
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="animate-pulse bg-gray-100 rounded-lg h-64"></div>
+        <div className="animate-pulse bg-gray-100 rounded-lg h-64"></div>
+        <div className="animate-pulse bg-gray-100 rounded-lg h-64"></div>
       </div>
     )
   }
@@ -325,33 +266,29 @@ export function PortalOverview() {
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
                   <Avatar className="w-12 h-12 ring-2 ring-blue-100">
-                    <AvatarImage src={officiantProfile?.headshot_url || "/api/placeholder/48/48"} />
-                    <AvatarFallback className="bg-blue-500 text-white">
-                      {getInitials(officiantProfile?.full_name)}
-                    </AvatarFallback>
+                    <AvatarImage src="/api/placeholder/48/48" />
+                    <AvatarFallback className="bg-blue-500 text-white">PM</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold text-gray-900">{officiantProfile?.full_name || 'Your Name'}</p>
-                    <p className="text-sm text-blue-600 font-medium">{officiantProfile?.business_name || 'Licensed Officiant'}</p>
-                    {officiantProfile?.years_experience && (
-                      <div className="flex items-center mt-1">
-                        <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                        <Badge variant="secondary" className="text-xs ml-1 bg-yellow-50 text-yellow-700">
-                          {officiantProfile.years_experience} Years Experience
-                        </Badge>
-                      </div>
-                    )}
+                    <p className="font-semibold text-gray-900">Pastor Michael Adams</p>
+                    <p className="text-sm text-blue-600 font-medium">Licensed Officiant</p>
+                    <div className="flex items-center mt-1">
+                      <Star className="w-3 h-3 text-yellow-400 fill-current" />
+                      <Badge variant="secondary" className="text-xs ml-1 bg-yellow-50 text-yellow-700">
+                        5 Years Experience
+                      </Badge>
+                    </div>
                   </div>
                 </div>
                 <Separator />
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center text-gray-600 hover:text-blue-600 transition-colors">
                     <Phone className="w-4 h-4 mr-2" />
-                    {officiantProfile?.phone || 'No phone'}
+                    (555) 987-6543
                   </div>
                   <div className="flex items-center text-gray-600 hover:text-blue-600 transition-colors">
                     <Mail className="w-4 h-4 mr-2" />
-                    {officiantProfile?.email || 'No email'}
+                    pastor.michael@ordainedpro.com
                   </div>
                 </div>
               </div>
@@ -425,71 +362,17 @@ export function PortalOverview() {
                   <p className="font-semibold text-gray-900">Expected Guests</p>
                   <p className="text-gray-600">{editWeddingDetails?.expectedGuests || '0'} people</p>
                 </div>
-                {/* Notes Button - Green if notes exist, Gray if not */}
-                <div className="pt-3 border-t border-gray-200">
-                  <Dialog open={showNotesDialog} onOpenChange={setShowNotesDialog}>
-                    <DialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        className={`w-full flex items-center justify-center gap-2 ${
-                          hasNotes
-                            ? "bg-green-500 hover:bg-green-600 text-white"
-                            : "bg-gray-300 hover:bg-gray-400 text-gray-700"
-                        }`}
-                      >
-                        <StickyNote className="w-4 h-4" />
-                        Notes
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[80vh]">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center text-blue-900">
-                          <StickyNote className="w-5 h-5 mr-2 text-green-600" />
-                          Officiant Notes
-                        </DialogTitle>
-                        <DialogDescription>
-                          Private notes for {editCoupleInfo?.brideName?.split(' ')[0]} & {editCoupleInfo?.groomName?.split(' ')[0]}'s wedding.
-                          These notes are stored on the server and will persist across sessions.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="mt-4 max-h-[60vh] overflow-y-auto">
-                        {hasNotes ? (
-                          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                            <p className="text-gray-700 whitespace-pre-wrap text-sm leading-relaxed">
-                              {editWeddingDetails.officiantNotes}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-center">
-                            <StickyNote className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                            <p className="text-gray-500 text-sm">No notes added yet.</p>
-                            <p className="text-gray-400 text-xs mt-1">
-                              Click "Edit" to add notes for this wedding.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      <div className="mt-4 flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowNotesDialog(false)}
-                        >
-                          Close
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setShowNotesDialog(false)
-                            handleOpenEditWeddingDialog()
-                          }}
-                          className="bg-blue-500 hover:bg-blue-600"
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit Notes
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
+                {editWeddingDetails?.officiantNotes && (
+                  <div className="pt-3 border-t border-gray-200">
+                    <p className="font-semibold text-gray-900 mb-2 flex items-center">
+                      <FileText className="w-4 h-4 mr-1" />
+                      Officiant Notes
+                    </p>
+                    <p className="text-gray-600 whitespace-pre-wrap text-xs bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                      {editWeddingDetails.officiantNotes}
+                    </p>
+                  </div>
+                )}
                 <Badge className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 w-fit shadow-md">
                   <Clock className="w-3 h-3 mr-1" />
                   {editWeddingDetails?.weddingDate
