@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +10,8 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Calendar as CalendarIcon, Users, Plus, Check, Clock, MapPin, Phone, Mail, Heart, Save } from "lucide-react"
+import { Calendar as CalendarIcon, Users, Plus, Check, Clock, MapPin, Phone, Mail, Heart, Save, LayoutDashboard, LogOut } from "lucide-react"
+import { supabase } from "@/supabase/utils/client"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 // Helper to safely get initials from a name
@@ -19,6 +21,8 @@ const getInitials = (name: string | null | undefined): string => {
 }
 
 export function PortalHeader() {
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const profileMenuRef = useRef<HTMLDivElement | null>(null)
   const {
     showAddCeremonyDialog,
     setShowAddCeremonyDialog,
@@ -53,6 +57,22 @@ export function PortalHeader() {
       .find((name) => name && !name.includes("@")) || "Officiant"
   const officiantFirstName = officiantName === "Officiant" ? "Officiant" : officiantName.split(/\s+/)[0]
   const officiantLabel = officiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
+
+  useEffect(() => {
+    const closeProfileMenu = (event: MouseEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setShowProfileMenu(false)
+      }
+    }
+
+    document.addEventListener("mousedown", closeProfileMenu)
+    return () => document.removeEventListener("mousedown", closeProfileMenu)
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    window.location.href = "/auth"
+  }
 
   return (
     <header className="bg-white shadow-sm border-b border-blue-100">
@@ -614,15 +634,65 @@ export function PortalHeader() {
                 {allCouples[activeCoupleIndex]?.isActive ? 'Active Ceremony' : 'Archived Ceremony'}
               </Button>
 
-              <div className="flex items-center space-x-2">
-                <Avatar className="ring-2 ring-blue-100">
-                  <AvatarImage src={officiantProfile?.headshot_url || ""} />
-                  <AvatarFallback className="bg-blue-500 text-white">{getInitials(officiantName)}</AvatarFallback>
-                </Avatar>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">{officiantLabel}</p>
-                  <p className="text-xs text-gray-500">Officiant</p>
-                </div>
+              <div ref={profileMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowProfileMenu((open) => !open)}
+                  className="flex items-center space-x-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  aria-haspopup="menu"
+                  aria-expanded={showProfileMenu}
+                >
+                  <Avatar className="ring-2 ring-blue-100">
+                    <AvatarImage src={officiantProfile?.headshot_url || ""} />
+                    <AvatarFallback className="bg-blue-500 text-white">{getInitials(officiantName)}</AvatarFallback>
+                  </Avatar>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-gray-900">{officiantLabel}</p>
+                    <p className="text-xs text-gray-500">Officiant</p>
+                  </div>
+                </button>
+
+                {showProfileMenu && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-lg border border-gray-200 bg-white py-2 shadow-xl"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setShowProfileMenu(false)
+                        setShowDashboardDialog(true)
+                      }}
+                      className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      <LayoutDashboard className="mr-3 h-4 w-4" />
+                      Officiant Dashboard
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setShowProfileMenu(false)
+                        setShowAddCeremonyDialog(true)
+                      }}
+                      className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      <Plus className="mr-3 h-4 w-4" />
+                      Add New Ceremony
+                    </button>
+                    <div className="my-1 border-t border-gray-100" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={handleSignOut}
+                      className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut className="mr-3 h-4 w-4" />
+                      Sign out
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
