@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { FileText, Users, Clock, MapPin, Phone, Mail, User, Star, Edit, Save } from "lucide-react"
+import { FileText, Users, Clock, MapPin, Phone, Mail, User, Star, Edit, Save, LayoutDashboard, Plus } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 // Helper to safely get initials from a name
@@ -34,6 +34,8 @@ export function PortalOverview() {
     handleOpenEditWeddingDialog,
     officiantProfile,
     currentUser,
+    setShowDashboardDialog,
+    setShowAddCeremonyDialog,
   } = useCommunicationPortal()
 
   // Guard against null/undefined editCoupleInfo
@@ -309,6 +311,25 @@ export function PortalOverview() {
                     <Mail className="w-4 h-4 mr-2" />
                     {officiantEmail}
                   </div>
+                </div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => setShowDashboardDialog(true)}
+                    className="h-10 bg-black px-3 text-xs text-white hover:bg-gray-800"
+                  >
+                    <LayoutDashboard className="w-4 h-4 mr-2" />
+                    Dashboard
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setShowAddCeremonyDialog(true)}
+                    className="h-10 bg-blue-500 px-3 text-xs text-white hover:bg-blue-600"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Ceremony
+                  </Button>
                 </div>
               </div>
             </CardContent>

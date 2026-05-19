@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Calendar as CalendarIcon, Users, Plus, Check, Clock, MapPin, Phone, Mail, Heart, Save, LayoutDashboard, LogOut } from "lucide-react"
 import { supabase } from "@/supabase/utils/client"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
@@ -86,25 +86,12 @@ export function PortalHeader() {
                 <h1 className="text-2xl font-bold text-gray-900">OrdainedPro</h1>
                 <p className="text-blue-600 font-medium">Communication Portal</p>
               </div>
-              <Button
-                onClick={() => setShowDashboardDialog(true)}
-                size="default"
-                className="ml-4 bg-black hover:bg-gray-800 text-white px-4 py-2 h-10"
-              >
-                Officiant Dashboard
-              </Button>
             </div>
 
             {/* Action Buttons */}
             <div className="flex items-center space-x-3">
-              {/* Add New Ceremony Button */}
+              {/* Add New Ceremony Dialog */}
               <Dialog open={showAddCeremonyDialog} onOpenChange={setShowAddCeremonyDialog}>
-                <DialogTrigger asChild>
-                  <Button size="default" className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 h-10">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add New Ceremony
-                  </Button>
-                </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Create New Wedding Ceremony</DialogTitle>
