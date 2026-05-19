@@ -389,15 +389,25 @@ export function PortalOverview() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setShowPrivateNotesDialog(true)}
+                    onClick={() => {
+                      if (hasPrivateNotes) {
+                        setShowPrivateNotesDialog(true)
+                      } else {
+                        handleOpenEditWeddingDialog()
+                      }
+                    }}
                     className={`w-full justify-start h-10 ${
                       hasPrivateNotes
                         ? "border-green-300 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800"
                         : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-600"
                     }`}
                   >
-                    <FileText className="w-4 h-4 mr-2" />
-                    {hasPrivateNotes ? "View Private Notes" : "No Private Notes"}
+                    {hasPrivateNotes ? (
+                      <FileText className="w-4 h-4 mr-2" />
+                    ) : (
+                      <Edit className="w-4 h-4 mr-2" />
+                    )}
+                    {hasPrivateNotes ? "View Private Notes" : "Add Private Notes"}
                   </Button>
                 </div>
                 <Badge className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 w-fit shadow-md">
