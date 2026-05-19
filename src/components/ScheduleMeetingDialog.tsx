@@ -97,6 +97,29 @@ export function ScheduleMeetingDialog({
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false)
   const [user, setUser] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [googleCalendarConfigured, setGoogleCalendarConfigured] = useState(false)
+  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false)
+  const [isCheckingGoogleCalendar, setIsCheckingGoogleCalendar] = useState(false)
+
+  const loadGoogleCalendarStatus = async () => {
+    setIsCheckingGoogleCalendar(true)
+
+    try {
+      const response = await fetch("/api/google/status", { cache: "no-store" })
+      if (!response.ok) {
+        return
+      }
+
+      const data = await response.json()
+      setGoogleCalendarConfigured(Boolean(data.configured))
+      setGoogleCalendarConnected(Boolean(data.connected))
+    } catch (error) {
+      console.error("Failed to load Google Calendar status:", error)
+    } finally {
+      setIsCheckingGoogleCalendar(false)
+    }
+  }
+
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -106,6 +129,27 @@ export function ScheduleMeetingDialog({
     };
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return
+    loadGoogleCalendarStatus()
+
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("google_calendar_connected") === "1") {
+      setGoogleCalendarConnected(true)
+      params.delete("google_calendar_connected")
+      const nextUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`
+      window.history.replaceState({}, "", nextUrl)
+    }
+
+    if (params.get("google_calendar_error")) {
+      const error = params.get("google_calendar_error")
+      params.delete("google_calendar_error")
+      const nextUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`
+      window.history.replaceState({}, "", nextUrl)
+      alert(`Google Calendar connection failed: ${error}`)
+    }
+  }, [isOpen])
   const meetingTemplates = [
     {
       name: "Initial Consultation",
@@ -390,6 +434,40 @@ END:VCALENDAR`
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       const coupleId = 1;
+      let meetingLocation = formData.location
+
+      if (formData.meetingType === "video" && formData.includeMeetingLink && !meetingLocation) {
+        if (!googleCalendarConfigured) {
+          throw new Error("Google Calendar is not configured on the server yet.")
+        }
+
+        if (!googleCalendarConnected) {
+          throw new Error("Connect Google Calendar first so OrdainedPro can create a Google Meet link.")
+        }
+
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Phoenix"
+        const meetResponse = await fetch("/api/google/create-meet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject: formData.subject,
+            body: formData.body,
+            date: formData.date,
+            time: formData.time,
+            duration: formData.duration,
+            attendees: formData.attendees,
+            timeZone,
+          }),
+        })
+
+        const meetData = await meetResponse.json()
+
+        if (!meetResponse.ok || !meetData.meetLink) {
+          throw new Error(meetData.error || "Failed to create a Google Meet link.")
+        }
+
+        meetingLocation = meetData.meetLink
+      }
 
       // 1️⃣ Save meeting to Supabase
       const meetingData = {
@@ -398,7 +476,7 @@ END:VCALENDAR`
         title: formData.subject,
         date: formData.date,
         time: formData.time || null,
-        location: formData.location || null,
+        location: meetingLocation || null,
         notes: formData.body || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -438,7 +516,7 @@ END:VCALENDAR`
 ⏰ Time: ${formData.time}
 ⏱️ Duration: ${formData.duration} minutes
 📍 Type: ${meetingTypeLabels[formData.meetingType]}
-${formData.location ? `${formData.meetingType === 'video' ? '🔗 Google Meet' : '📌 Location'}: ${formData.location}` : ''}
+${meetingLocation ? `${formData.meetingType === 'video' ? '🔗 Google Meet' : '📌 Location'}: ${meetingLocation}` : ''}
 ${formData.responseDeadline ? `📩 Please respond by: ${new Date(formData.responseDeadline).toLocaleDateString()}` : ''}
 
 Please reply to this email to confirm your attendance.
@@ -481,7 +559,7 @@ Please reply to this email to confirm your attendance.
         title: meetingInsert?.title || formData.subject,
         date: meetingInsert?.date || formData.date,
         time: meetingInsert?.time || formData.time || null,
-        location: meetingInsert?.location || formData.location || null,
+        location: meetingInsert?.location || meetingLocation || null,
         notes: meetingInsert?.notes || formData.body || null,
         createdDate: meetingInsert?.created_at || new Date().toISOString(),
         updated_at: meetingInsert?.updated_at || new Date().toISOString(),
@@ -898,15 +976,42 @@ Please reply to this email to confirm your attendance.
                   </Label>
                 </div>
                 {formData.meetingType === 'video' && (
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="includeMeetingLink"
-                      checked={formData.includeMeetingLink}
-                      onCheckedChange={(checked: boolean) => handleInputChange('includeMeetingLink', checked)}
-                    />
-                    <Label htmlFor="includeMeetingLink" className="text-sm">
-                      Include Google Meet link
-                    </Label>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="includeMeetingLink"
+                        checked={formData.includeMeetingLink}
+                        onCheckedChange={(checked: boolean) => handleInputChange('includeMeetingLink', checked)}
+                      />
+                      <Label htmlFor="includeMeetingLink" className="text-sm">
+                        Include Google Meet link
+                      </Label>
+                    </div>
+                    <div className="rounded-md border border-green-200 bg-white p-3 text-xs text-gray-600">
+                      {!googleCalendarConfigured && (
+                        <p>Automatic Meet generation is not configured yet. Add Google API credentials on the server first.</p>
+                      )}
+                      {googleCalendarConfigured && googleCalendarConnected && (
+                        <p>Google Calendar is connected. If the field is blank, OrdainedPro will generate a Google Meet link automatically when you send the invitation.</p>
+                      )}
+                      {googleCalendarConfigured && !googleCalendarConnected && (
+                        <div className="space-y-2">
+                          <p>Connect Google Calendar once, then OrdainedPro can create a fresh Google Meet link automatically for video meetings.</p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={isCheckingGoogleCalendar}
+                            onClick={() => {
+                              const next = encodeURIComponent(window.location.pathname)
+                              window.location.href = `/api/google/connect?next=${next}`
+                            }}
+                          >
+                            Connect Google Calendar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
