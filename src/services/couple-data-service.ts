@@ -183,12 +183,17 @@ export async function loadCouples(userId: string): Promise<{ ok: boolean; data?:
   }
 }
 
-export async function updateCouple(coupleId: number, updates: Partial<Couple>): Promise<{ ok: boolean; error?: string }> {
+export async function updateCouple(coupleId: number, updates: Partial<Couple>): Promise<{ ok: boolean; data?: Couple; error?: string }> {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("couples")
-      .update(updates)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
       .eq("id", coupleId)
+      .select()
+      .single()
 
     if (error) {
       console.error("[ERROR] Error updating couple:", error)
@@ -196,7 +201,7 @@ export async function updateCouple(coupleId: number, updates: Partial<Couple>): 
     }
 
     console.log("[OK] Couple updated:", coupleId)
-    return { ok: true }
+    return { ok: true, data }
   } catch (err: any) {
     console.error("[ERROR] Exception updating couple:", err)
     return { ok: false, error: err.message }

@@ -12,6 +12,7 @@ import { Contract } from "@/components/ContractUploadDialog"
 import { CommunicationPortalProvider } from "./communication-portal/CommunicationPortalContext"
 import {
   loadCouples as loadCouplesFromDB,
+  updateCouple as updateCoupleInDB,
   loadTasks as loadTasksFromDB,
   addTask as addTaskToDB,
   updateTask as updateTaskInDB,
@@ -637,9 +638,12 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
           }
         }))
 
+        const selectedCouple = transformedCouples.find((couple: any) => couple.isActive) || transformedCouples[0]
+        const selectedCoupleIndex = transformedCouples.findIndex((couple: any) => couple.id === selectedCouple.id)
+
         setAllCouples(transformedCouples)
-        setEditCoupleInfo(transformedCouples[0])
-        setEditWeddingDetails(transformedCouples[0].weddingDetails || {
+        setEditCoupleInfo(selectedCouple)
+        setEditWeddingDetails(selectedCouple.weddingDetails || {
           venueName: "",
           venueAddress: "",
           weddingDate: "",
@@ -648,7 +652,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
           expectedGuests: "",
           officiantNotes: ""
         })
-        setActiveCoupleIndex(0)
+        setActiveCoupleIndex(selectedCoupleIndex >= 0 ? selectedCoupleIndex : 0)
         console.log("âœ… Loaded", transformedCouples.length, "couples from database")
       } else {
         console.log("[SCRIPT]­ No couples found in database")
@@ -3086,30 +3090,68 @@ Note: This is an initial draft. Further development needed to incorporate specif
     })
   }
 
-  const toggleCeremonyStatus = () => {
-    const updatedCouples = [...allCouples]
-    updatedCouples[activeCoupleIndex] = {
-      ...updatedCouples[activeCoupleIndex],
-      isActive: !updatedCouples[activeCoupleIndex].isActive
+  const toggleCeremonyStatus = async () => {
+    const currentCouple = allCouples[activeCoupleIndex]
+    if (!currentCouple?.id) return
+
+    const nextIsActive = !currentCouple.isActive
+    const result = await updateCoupleInDB(currentCouple.id, { is_active: nextIsActive })
+
+    if (!result.ok) {
+      alert(`Failed to ${nextIsActive ? "restore" : "archive"} ceremony on the server. Please try again.`)
+      return
     }
+
+    const updatedCouples = allCouples.map((couple, index) =>
+      index === activeCoupleIndex
+        ? { ...couple, isActive: nextIsActive }
+        : couple
+    )
     setAllCouples(updatedCouples)
 
-    const newStatus = !updatedCouples[activeCoupleIndex].isActive
-    console.log(`Ceremony status changed to: ${newStatus ? 'Active' : 'Deactivated (Archived)'}`)
+    if (!nextIsActive) {
+      const nextActiveIndex = updatedCouples.findIndex((couple, index) => index !== activeCoupleIndex && couple.isActive)
 
-    // If deactivating, show message about archived section
-    if (!newStatus) {
-      alert(`This ceremony has been deactivated and moved to the Archived section.\n\nYou can view archived ceremonies from the Scripts tab or by clicking "View Archived Ceremonies".`)
+      if (nextActiveIndex !== -1) {
+        const nextActiveCouple = updatedCouples[nextActiveIndex]
+        setActiveCoupleIndex(nextActiveIndex)
+        setEditCoupleInfo(nextActiveCouple)
+        setEditWeddingDetails(nextActiveCouple.weddingDetails || {
+          venueName: "",
+          venueAddress: "",
+          weddingDate: "",
+          startTime: "",
+          endTime: "",
+          expectedGuests: "",
+          officiantNotes: ""
+        })
+      } else {
+        setEditCoupleInfo({ ...currentCouple, isActive: false })
+      }
+
+      console.log(`Ceremony archived on server: ID ${currentCouple.id}`)
+      alert(`This ceremony has been archived on the server.\n\nYou can view and restore it from "View Archived Ceremonies" or the Archived filter in My Ceremonies.`)
+    } else {
+      setEditCoupleInfo({ ...currentCouple, isActive: true })
+      console.log(`Ceremony restored on server: ID ${currentCouple.id}`)
+      alert("Ceremony has been restored on the server and is now active!")
     }
   }
 
-  const handleUnarchiveCouple = (coupleId: number) => {
+  const handleUnarchiveCouple = async (coupleId: number) => {
+    const result = await updateCoupleInDB(coupleId, { is_active: true })
+
+    if (!result.ok) {
+      alert("Failed to restore ceremony on the server. Please try again.")
+      return
+    }
+
     const updatedCouples = allCouples.map(couple =>
       couple.id === coupleId ? { ...couple, isActive: true } : couple
     )
     setAllCouples(updatedCouples)
-    console.log(`Ceremony unarchived: ID ${coupleId}`)
-    alert("Ceremony has been restored and is now active!")
+    console.log(`Ceremony restored on server: ID ${coupleId}`)
+    alert("Ceremony has been restored on the server and is now active!")
   }
 
   const handleAddTask = async (newTaskData: Omit<Task, 'id' | 'createdDate'>) => {
