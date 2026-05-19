@@ -2373,7 +2373,6 @@ Pastor Michael Adams`,
     // Add to messaging platform
     setMessageAttachments(allAttachments)
     setNewMessage(`[SHARED] Wedding Documents
-========================================
 
 For: ${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}
 Sent to: ${recipient}
@@ -4033,7 +4032,6 @@ Licensed Wedding Officiant
     // Add to messaging platform with detailed tracking
     setMessageAttachments([invoiceAttachment])
     setNewMessage(`[SCRIPT]§ Wedding Invoice Sent
-========================================
 
 Couple: ${invoiceForm.coupleName}
 Sent to: ${recipients}
