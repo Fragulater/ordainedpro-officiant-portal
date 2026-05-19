@@ -132,6 +132,22 @@ export function ScheduleMeetingDialog({
 
   useEffect(() => {
     if (!isOpen) return
+
+    setFormData({
+      subject: "",
+      body: "",
+      date: "",
+      time: "",
+      duration: 60,
+      location: "",
+      meetingType: "video",
+      attendees: coupleEmails,
+      responseDeadline: "",
+      sendCalendarInvite: true,
+      sendEmailNotification: true,
+      includeMeetingLink: true,
+    })
+    setErrors({})
     loadGoogleCalendarStatus()
 
     const params = new URLSearchParams(window.location.search)
@@ -149,7 +165,7 @@ export function ScheduleMeetingDialog({
       window.history.replaceState({}, "", nextUrl)
       alert(`Google Calendar connection failed: ${error}`)
     }
-  }, [isOpen])
+  }, [isOpen, coupleEmails])
   const meetingTemplates = [
     {
       name: "Initial Consultation",
