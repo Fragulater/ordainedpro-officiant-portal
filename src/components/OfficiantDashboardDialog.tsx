@@ -108,6 +108,17 @@ interface OfficiantDashboardDialogProps {
   onSelectCouple: (ceremonyId: string) => void;
   couples?: Couple[];
   onAddCeremony?: (newCouple: Partial<Couple>) => void;
+  documentsData?: Array<{
+    id: string;
+    name: string;
+    size: string;
+    type: string;
+    updated: string;
+    status?: string;
+  }>;
+  onDocumentView?: (documentId: string) => void;
+  onDocumentDownload?: (documentId: string) => void;
+  onDocumentDelete?: (documentId: string) => void;
   initialView?:
     | "dashboard"
     | "ceremonies"
@@ -183,6 +194,10 @@ export function OfficiantDashboardDialog({
   onSelectCouple,
   couples,
   onAddCeremony,
+  documentsData = [],
+  onDocumentView,
+  onDocumentDownload,
+  onDocumentDelete,
   initialView = "dashboard",
 }: OfficiantDashboardDialogProps) {
   // Subscription information
@@ -205,15 +220,6 @@ export function OfficiantDashboardDialog({
     new Date()
   );
   const [showAddCeremonyDialog, setShowAddCeremonyDialog] = useState(false);
-  const [documents, setDocuments] = useState<
-    Array<{
-      id: string;
-      name: string;
-      size: string;
-      type: string;
-      updated: string;
-    }>
-  >([]);
   const [user, setUser] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   // Form state for Add New Ceremony - mirrors Communication Portal
@@ -494,34 +500,6 @@ export function OfficiantDashboardDialog({
 
   // ✅ Load documents from Supabase (placeholder for now - can be implemented later)
   useEffect(() => {
-    // TODO: Implement document loading from Supabase storage or database
-    // For now, show sample documents
-    const defaultDocs = [
-      {
-        id: "1",
-        name: "Wedding Ceremony Template",
-        size: "245 KB",
-        type: "PDF",
-        updated: "2 days ago",
-      },
-      {
-        id: "2",
-        name: "Service Agreement",
-        size: "156 KB",
-        type: "PDF",
-        updated: "1 week ago",
-      },
-      {
-        id: "3",
-        name: "Vows Examples",
-        size: "389 KB",
-        type: "PDF",
-        updated: "3 weeks ago",
-      },
-    ];
-    setDocuments(defaultDocs);
-  }, []);
-  useEffect(() => {
     const fetchUser = async () => {
       const {
         data: { user },
@@ -594,27 +572,6 @@ export function OfficiantDashboardDialog({
   const handleCeremonyClick = (ceremonyId: string) => {
     onSelectCouple(ceremonyId);
     onOpenChange(false);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    const newDocs = Array.from(files).map((file) => ({
-      id: Date.now().toString() + Math.random(),
-      name: file.name,
-      size: `${(file.size / 1024).toFixed(0)} KB`,
-      type: file.type.includes("pdf")
-        ? "PDF"
-        : file.type.includes("doc")
-        ? "DOC"
-        : "FILE",
-      updated: "Just now",
-    }));
-
-    const updatedDocs = [...documents, ...newDocs];
-    setDocuments(updatedDocs);
-    localStorage.setItem("officiantDocuments", JSON.stringify(updatedDocs));
   };
 
   const handleAddCeremony = async () => {
@@ -2055,45 +2012,37 @@ export function OfficiantDashboardDialog({
                   Documents
                 </h2>
                 <p className="text-gray-600 mb-6">
-                  Manage templates, contracts, and ceremony scripts
+                  Review and manage your uploaded contracts
                 </p>
 
-                {/* Upload Document Button */}
-                <div className="flex justify-end mb-6">
-                  <label htmlFor="file-upload">
-                    <Button
-                      className="bg-blue-500 hover:bg-blue-600 text-white"
-                      asChild
-                    >
-                      <span>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Document
-                      </span>
-                    </Button>
-                  </label>
-                  <input
-                    id="file-upload"
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={handleFileUpload}
-                    accept=".pdf,.doc,.docx,.txt"
-                  />
-                </div>
-
                 {/* Documents Grid */}
-                <div className="grid grid-cols-3 gap-6 mb-6">
-                  {documents.map((doc) => (
+                <div className="grid grid-cols-1 gap-4 mb-6 lg:grid-cols-2">
+                  {documentsData.length === 0 && (
+                    <Card className="lg:col-span-2 border-dashed border-gray-300">
+                      <CardContent className="py-12 text-center">
+                        <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                        <p className="font-medium text-gray-900 mb-1">
+                          No contracts uploaded yet
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Uploaded contracts will appear here automatically.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {documentsData.map((doc) => (
                     <Card key={doc.id}>
                       <CardContent className="pt-6">
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between gap-4">
                           <div className="flex items-start space-x-3">
                             <div
                               className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                 doc.type === "PDF"
                                   ? "bg-blue-100"
-                                  : doc.type === "DOC"
+                                  : doc.type === "DOC" || doc.type === "DOCX"
                                   ? "bg-green-100"
+                                  : doc.type === "TXT"
+                                  ? "bg-emerald-100"
                                   : "bg-purple-100"
                               }`}
                             >
@@ -2101,16 +2050,25 @@ export function OfficiantDashboardDialog({
                                 className={`w-5 h-5 ${
                                   doc.type === "PDF"
                                     ? "text-blue-600"
-                                    : doc.type === "DOC"
+                                    : doc.type === "DOC" || doc.type === "DOCX"
                                     ? "text-green-600"
+                                    : doc.type === "TXT"
+                                    ? "text-emerald-600"
                                     : "text-purple-600"
                                 }`}
                               />
                             </div>
                             <div>
-                              <p className="font-semibold text-gray-900 text-sm">
-                                {doc.name}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-gray-900 text-sm">
+                                  {doc.name}
+                                </p>
+                                {doc.status && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {doc.status}
+                                  </Badge>
+                                )}
+                              </div>
                               <p className="text-xs text-gray-500 mt-1">
                                 {doc.type} • {doc.size}
                               </p>
@@ -2119,8 +2077,33 @@ export function OfficiantDashboardDialog({
                               </p>
                             </div>
                           </div>
-                          <Button variant="ghost" size="sm">
-                            <Download className="w-4 h-4" />
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                            onClick={() => onDocumentView?.(doc.id)}
+                          >
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-gray-200 text-gray-700 hover:bg-gray-50"
+                            onClick={() => onDocumentDownload?.(doc.id)}
+                          >
+                            <Download className="w-4 h-4 mr-1" />
+                            Download
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-red-200 text-red-700 hover:bg-red-50"
+                            onClick={() => onDocumentDelete?.(doc.id)}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Delete
                           </Button>
                         </div>
                       </CardContent>
@@ -2128,33 +2111,6 @@ export function OfficiantDashboardDialog({
                   ))}
                 </div>
 
-                {/* Upload Area */}
-                <Card className="border-2 border-dashed border-gray-300">
-                  <CardContent className="pt-6">
-                    <label
-                      htmlFor="file-upload-drop"
-                      className="cursor-pointer"
-                    >
-                      <div className="text-center py-12">
-                        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <p className="font-medium text-gray-900 mb-1">
-                          Upload New Document
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Click to browse or drag and drop
-                        </p>
-                      </div>
-                    </label>
-                    <input
-                      id="file-upload-drop"
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={handleFileUpload}
-                      accept=".pdf,.doc,.docx,.txt"
-                    />
-                  </CardContent>
-                </Card>
               </div>
             )}
 

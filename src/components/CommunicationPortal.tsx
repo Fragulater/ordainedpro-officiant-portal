@@ -26,6 +26,7 @@ import {
   loadContracts as loadContractsFromDB,
   addContract as addContractToDB,
   updateContract as updateContractInDB,
+  deleteContract as deleteContractFromDB,
   loadPayments as loadPaymentsFromDB,
   addPayment as addPaymentToDB,
   updatePayment as updatePaymentInDB,
@@ -55,6 +56,20 @@ const getCoupleColors = (coupleId: number) => {
     { bride: "bg-orange-500", groom: "bg-cyan-500", brideRing: "ring-orange-100", groomRing: "ring-cyan-100", brideText: "text-orange-600", groomText: "text-cyan-600", brideIcon: "text-orange-500", groomIcon: "text-cyan-500" },
   ]
   return colorPairs[(coupleId - 1) % colorPairs.length]
+}
+
+const deriveContractStoragePath = (fileUrl: string | null | undefined) => {
+  if (!fileUrl) return null
+
+  try {
+    const url = new URL(fileUrl)
+    const marker = "/storage/v1/object/public/contracts/"
+    const markerIndex = url.pathname.indexOf(marker)
+    if (markerIndex === -1) return null
+    return decodeURIComponent(url.pathname.slice(markerIndex + marker.length))
+  } catch {
+    return null
+  }
 }
 
 // AI Chatbot Interfaces
@@ -856,12 +871,26 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       const transformedContracts = result.data.map((c: any) => ({
         id: c.id,
         name: c.name,
+        description: c.description || "",
         status: c.status || "draft",
         signedDate: c.signed_date ? new Date(c.signed_date).toLocaleDateString() : "",
         sentDate: c.sent_date ? new Date(c.sent_date).toLocaleDateString() : "",
         createdDate: c.created_at ? new Date(c.created_at).toLocaleDateString() : "",
-        type: "service_agreement",
-        fileUrl: c.file_url
+        expiryDate: c.expiry_date || "",
+        type: c.type || "Custom Contract",
+        fileUrl: c.file_url,
+        fileType: c.file_type || "application/octet-stream",
+        fileSize: c.file_size || 0,
+        file: c.file_url ? {
+          id: `contract-file-${c.id}`,
+          file: new File([], c.name, { type: c.file_type || "application/octet-stream" }),
+          name: c.name,
+          size: c.file_size || 0,
+          type: c.file_type || "application/octet-stream",
+          url: c.file_url,
+          uploadProgress: 100,
+          status: "completed" as const,
+        } : undefined
       }))
       setContracts(transformedContracts)
       console.log("âœ… Loaded", transformedContracts.length, "contracts for couple", editCoupleInfo.id)
@@ -2428,7 +2457,7 @@ ${shareScriptForm.body}`)
     // Removed popup - success logged to console
   }
 
-  const handleContractAction = (contractId: number, action: string) => {
+  const handleContractAction = async (contractId: number, action: string) => {
     const contract = contracts.find(c => c.id === contractId)
     if (!contract) return
 
@@ -2440,6 +2469,20 @@ ${shareScriptForm.body}`)
         break
       case 'delete':
         if (confirm(`Are you sure you want to delete "${contract.name}"? This action cannot be undone.`)) {
+          const deleteResult = await deleteContractFromDB(contractId)
+          if (!deleteResult.ok) {
+            alert(`Failed to delete contract: ${deleteResult.error}`)
+            return
+          }
+
+          const storagePath = deriveContractStoragePath(contract.fileUrl || contract.file?.url)
+          if (storagePath) {
+            const { error: storageError } = await supabase.storage.from("contracts").remove([storagePath])
+            if (storageError) {
+              console.error("Failed to delete contract file from storage:", storageError)
+            }
+          }
+
           setContracts(prev => prev.filter(c => c.id !== contractId))
           console.log('Deleted contract:', contract.name)
         }
@@ -2601,10 +2644,42 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
 
     console.log("[SCRIPT]œ Uploading contract for couple:", editCoupleInfo.id)
 
+    const uploadedFile = contractData.file
+    if (!uploadedFile?.file) {
+      alert("Please upload a contract file before saving.")
+      return
+    }
+
+    const fileExt = uploadedFile.name.split(".").pop() || "file"
+    const fileName = `${Date.now()}_${currentUser.id}.${fileExt}`
+    const filePath = `${currentUser.id}/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from("contracts")
+      .upload(filePath, uploadedFile.file, {
+        contentType: uploadedFile.type || uploadedFile.file.type || "application/octet-stream",
+        upsert: true
+      })
+
+    if (uploadError) {
+      console.error("Failed to upload contract file:", uploadError)
+      alert(`Failed to upload contract file: ${uploadError.message}`)
+      return
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("contracts")
+      .getPublicUrl(filePath)
+
     // Save to database
     const result = await addContractToDB(currentUser.id, editCoupleInfo.id, {
       name: contractData.name,
-      fileUrl: (contractData as any).fileUrl || "",
+      description: contractData.description || "",
+      type: contractData.type || "Custom Contract",
+      expiryDate: contractData.expiryDate || "",
+      fileUrl: publicUrlData.publicUrl,
+      fileType: uploadedFile.type || uploadedFile.file.type || "application/octet-stream",
+      fileSize: uploadedFile.size || uploadedFile.file.size || 0,
       status: contractData.status || 'draft'
     })
 
@@ -2614,11 +2689,22 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
         ...contractData,
         id: result.data.id,
         createdDate: new Date().toLocaleDateString(),
-        status: contractData.status || 'draft'
+        status: contractData.status || 'draft',
+        fileUrl: result.data.file_url || publicUrlData.publicUrl,
+        fileType: result.data.file_type || uploadedFile.type || uploadedFile.file.type,
+        fileSize: result.data.file_size || uploadedFile.size || uploadedFile.file.size,
+        file: {
+          ...uploadedFile,
+          url: result.data.file_url || publicUrlData.publicUrl,
+          status: "completed" as const,
+          uploadProgress: 100
+        }
       }
 
       // Add contract to the list immediately
       setContracts(prev => [...prev, newContract as any])
+      setViewingContract(newContract as any)
+      setShowContractViewerDialog(true)
 
       console.log("âœ… Contract uploaded:", newContract)
 
@@ -2627,8 +2713,15 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
         alert(`Contract "${contractData.name}" uploaded successfully and is now available in Contract Management!`)
       }, 100)
     } else {
+      const cleanupPath = deriveContractStoragePath(publicUrlData.publicUrl)
+      if (cleanupPath) {
+        const { error: cleanupError } = await supabase.storage.from("contracts").remove([cleanupPath])
+        if (cleanupError) {
+          console.error("Failed to clean up uploaded contract after database error:", cleanupError)
+        }
+      }
       console.error("âŒ Failed to upload contract:", result.error)
-      alert("Failed to upload contract. Please try again.")
+      alert(`Failed to save contract: ${result.error || "Please try again."}`)
     }
   }
 

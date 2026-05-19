@@ -89,11 +89,17 @@ export interface Contract {
   couple_id: number
   user_id: string
   name: string
+  description?: string | null
+  type?: string | null
+  expiry_date?: string | null
   file_url?: string
+  file_type?: string | null
+  file_size?: number | null
   status?: string
   sent_date?: string
   signed_date?: string
   created_at?: string
+  updated_at?: string
 }
 
 export interface Payment {
@@ -527,7 +533,12 @@ export async function loadContracts(userId: string, coupleId: number): Promise<{
 
 export async function addContract(userId: string, coupleId: number, contractData: {
   name: string
+  description?: string
+  type?: string
+  expiryDate?: string
   fileUrl?: string
+  fileType?: string
+  fileSize?: number
   status?: string
 }): Promise<{ ok: boolean; data?: Contract; error?: string }> {
   try {
@@ -537,7 +548,12 @@ export async function addContract(userId: string, coupleId: number, contractData
         user_id: userId,
         couple_id: coupleId,
         name: contractData.name,
+        description: contractData.description || null,
+        type: contractData.type || "Custom Contract",
+        expiry_date: contractData.expiryDate || null,
         file_url: contractData.fileUrl || null,
+        file_type: contractData.fileType || null,
+        file_size: contractData.fileSize || null,
         status: contractData.status || "draft"
       })
       .select()
@@ -560,7 +576,10 @@ export async function updateContract(contractId: number, updates: Partial<Contra
   try {
     const { error } = await supabase
       .from("contracts")
-      .update(updates)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
       .eq("id", contractId)
 
     if (error) {
@@ -572,6 +591,26 @@ export async function updateContract(contractId: number, updates: Partial<Contra
     return { ok: true }
   } catch (err: any) {
     console.error("[ERROR] Exception updating contract:", err)
+    return { ok: false, error: err.message }
+  }
+}
+
+export async function deleteContract(contractId: number): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from("contracts")
+      .delete()
+      .eq("id", contractId)
+
+    if (error) {
+      console.error("[ERROR] Error deleting contract:", error)
+      return { ok: false, error: error.message }
+    }
+
+    console.log("[OK] Contract deleted:", contractId)
+    return { ok: true }
+  } catch (err: any) {
+    console.error("[ERROR] Exception deleting contract:", err)
     return { ok: false, error: err.message }
   }
 }

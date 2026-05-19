@@ -5,7 +5,9 @@ import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 export function PortalOfficiantDashboardDialog() {
   const {
+    contracts,
     getCoupleColors,
+    handleContractAction,
     allCouples,
     setAllCouples,
     setActiveCoupleIndex,
@@ -15,6 +17,32 @@ export function PortalOfficiantDashboardDialog() {
     setEditWeddingDetails,
   } = useCommunicationPortal()
 
+  const formatContractSize = (size?: number) => {
+    if (!size) return "0 KB"
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
+    return `${Math.max(1, Math.round(size / 1024))} KB`
+  }
+
+  const getDocumentType = (contract: any) => {
+    const fileName = (contract.file?.name || contract.name || "").toLowerCase()
+    const fileType = (contract.file?.type || contract.fileType || "").toLowerCase()
+
+    if (fileType.includes("pdf") || fileName.endsWith(".pdf")) return "PDF"
+    if (fileName.endsWith(".docx")) return "DOCX"
+    if (fileType.includes("word") || fileName.endsWith(".doc")) return "DOC"
+    if (fileType.startsWith("text/") || fileName.endsWith(".txt")) return "TXT"
+    return "FILE"
+  }
+
+  const documentsData = contracts.map((contract: any) => ({
+    id: contract.id.toString(),
+    name: contract.name,
+    size: formatContractSize(contract.fileSize || contract.file?.size),
+    type: getDocumentType(contract),
+    updated: contract.createdDate || "Recently added",
+    status: contract.status ? contract.status.charAt(0).toUpperCase() + contract.status.slice(1) : "Draft",
+  }))
+
   return (
     <>
       {/* Officiant Dashboard Dialog */}
@@ -22,6 +50,14 @@ export function PortalOfficiantDashboardDialog() {
         open={showDashboardDialog}
         onOpenChange={setShowDashboardDialog}
         couples={allCouples}
+        documentsData={documentsData}
+        onDocumentView={(documentId) => handleContractAction(Number(documentId), "view")}
+        onDocumentDownload={(documentId) => {
+          const contract = contracts.find((item: any) => item.id.toString() === documentId)
+          if (!contract) return
+          window.open(contract.file?.url || contract.fileUrl || "#", "_blank", "noopener,noreferrer")
+        }}
+        onDocumentDelete={(documentId) => handleContractAction(Number(documentId), "delete")}
         onSelectCouple={(ceremonyId) => {
           // Find the couple by ID and set as active
           const coupleIndex = allCouples.findIndex((c) => c.id.toString() === ceremonyId)
