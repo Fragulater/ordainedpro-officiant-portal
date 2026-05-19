@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +20,7 @@ const getInitials = (name: string | null | undefined): string => {
 }
 
 export function PortalOverview() {
+  const [showPrivateNotesDialog, setShowPrivateNotesDialog] = useState(false)
   const {
     showEditCoupleDialog,
     setShowEditCoupleDialog,
@@ -61,6 +63,8 @@ export function PortalOverview() {
   const officiantLabel = officiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
   const officiantEmail = officiantProfile?.email || currentUser?.email || "No email"
   const officiantPhone = officiantProfile?.phone || "No phone"
+  const privateNotes = editWeddingDetails?.officiantNotes?.trim() || ""
+  const hasPrivateNotes = privateNotes.length > 0
 
   return (
     <>
@@ -377,17 +381,25 @@ export function PortalOverview() {
                   <p className="font-semibold text-gray-900">Expected Guests</p>
                   <p className="text-gray-600">{editWeddingDetails?.expectedGuests || '0'} people</p>
                 </div>
-                {editWeddingDetails?.officiantNotes && (
-                  <div className="pt-3 border-t border-gray-200">
-                    <p className="font-semibold text-gray-900 mb-2 flex items-center">
-                      <FileText className="w-4 h-4 mr-1" />
-                      Officiant Notes
-                    </p>
-                    <p className="text-gray-600 whitespace-pre-wrap text-xs bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                      {editWeddingDetails.officiantNotes}
-                    </p>
-                  </div>
-                )}
+                <div className="pt-3 border-t border-gray-200">
+                  <p className="font-semibold text-gray-900 mb-2 flex items-center">
+                    <FileText className="w-4 h-4 mr-1" />
+                    Private Notes
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowPrivateNotesDialog(true)}
+                    className={`w-full justify-start h-10 ${
+                      hasPrivateNotes
+                        ? "border-green-300 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800"
+                        : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-600"
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    {hasPrivateNotes ? "View Private Notes" : "No Private Notes"}
+                  </Button>
+                </div>
                 <Badge className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 w-fit shadow-md">
                   <Clock className="w-3 h-3 mr-1" />
                   {editWeddingDetails?.weddingDate
@@ -398,6 +410,31 @@ export function PortalOverview() {
             </CardContent>
           </Card>
         </div>
+
+        <Dialog open={showPrivateNotesDialog} onOpenChange={setShowPrivateNotesDialog}>
+          <DialogContent className="max-w-2xl max-h-[85vh]">
+            <DialogHeader>
+              <DialogTitle className="text-blue-900 flex items-center">
+                <FileText className="w-5 h-5 mr-2" />
+                Private Notes
+              </DialogTitle>
+              <DialogDescription>
+                Only you can see these notes for this wedding.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-gray-200 bg-white p-4">
+              {hasPrivateNotes ? (
+                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-700">
+                  {privateNotes}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  No private notes have been added yet.
+                </p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Enhanced Tabs Navigation with all sections */}
     </>

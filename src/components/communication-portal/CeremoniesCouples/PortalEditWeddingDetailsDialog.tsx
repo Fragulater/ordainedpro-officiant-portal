@@ -149,8 +149,9 @@ export function PortalEditWeddingDetailsDialog() {
                   value={editWeddingDetails.officiantNotes || ""}
                   onChange={(e) => setEditWeddingDetails({...editWeddingDetails, officiantNotes: e.target.value})}
                   placeholder="Add any private notes, reminders, or special considerations for this wedding..."
-                  rows={6}
-                  className="mt-1 border-blue-200 focus:border-blue-500"
+                  rows={14}
+                  className="mt-1 min-h-[320px] resize-y border-blue-200 focus:border-blue-500"
+                  spellCheck
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   These notes are for your reference only and won't be shared with the couple
