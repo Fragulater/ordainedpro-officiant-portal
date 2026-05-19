@@ -30,6 +30,8 @@ export function PortalOverview() {
     editWeddingDetails,
     handleEditCoupleInfo,
     handleOpenEditWeddingDialog,
+    officiantProfile,
+    currentUser,
   } = useCommunicationPortal()
 
   // Guard against null/undefined editCoupleInfo
@@ -46,6 +48,19 @@ export function PortalOverview() {
   // Safely get current couple colors
   const currentCouple = allCouples?.[activeCoupleIndex]
   const colors = currentCouple?.colors || {}
+  const officiantName =
+    [
+      officiantProfile?.full_name,
+      officiantProfile?.name,
+      currentUser?.user_metadata?.full_name,
+      currentUser?.user_metadata?.name
+    ]
+      .map((name) => name?.trim())
+      .find((name) => name && !name.includes("@")) || "Officiant"
+  const officiantFirstName = officiantName === "Officiant" ? "Officiant" : officiantName.split(/\s+/)[0]
+  const officiantLabel = officiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
+  const officiantEmail = officiantProfile?.email || currentUser?.email || "No email"
+  const officiantPhone = officiantProfile?.phone || "No phone"
 
   return (
     <>
@@ -266,12 +281,12 @@ export function PortalOverview() {
               <div className="space-y-4">
                 <div className="flex items-center space-x-3">
                   <Avatar className="w-12 h-12 ring-2 ring-blue-100">
-                    <AvatarImage src="/api/placeholder/48/48" />
-                    <AvatarFallback className="bg-blue-500 text-white">PM</AvatarFallback>
+                    <AvatarImage src={officiantProfile?.headshot_url || ""} />
+                    <AvatarFallback className="bg-blue-500 text-white">{getInitials(officiantName)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold text-gray-900">Pastor Michael Adams</p>
-                    <p className="text-sm text-blue-600 font-medium">Licensed Officiant</p>
+                    <p className="font-semibold text-gray-900">{officiantLabel}</p>
+                    <p className="text-sm text-blue-600 font-medium">Officiant</p>
                     <div className="flex items-center mt-1">
                       <Star className="w-3 h-3 text-yellow-400 fill-current" />
                       <Badge variant="secondary" className="text-xs ml-1 bg-yellow-50 text-yellow-700">
@@ -284,11 +299,11 @@ export function PortalOverview() {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center text-gray-600 hover:text-blue-600 transition-colors">
                     <Phone className="w-4 h-4 mr-2" />
-                    (555) 987-6543
+                    {officiantPhone}
                   </div>
                   <div className="flex items-center text-gray-600 hover:text-blue-600 transition-colors">
                     <Mail className="w-4 h-4 mr-2" />
-                    pastor.michael@ordainedpro.com
+                    {officiantEmail}
                   </div>
                 </div>
               </div>

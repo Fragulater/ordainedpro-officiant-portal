@@ -42,9 +42,10 @@ export interface AddTaskDialogProps {
   onAddTask: (task: Omit<Task, "id" | "createdDate">) => void
   isOpen: boolean
   onOpenChange: (open: boolean) => void
+  reminderRecipient?: string
 }
 
-export function AddTaskDialog({ onAddTask, isOpen, onOpenChange }: AddTaskDialogProps) {
+export function AddTaskDialog({ onAddTask, isOpen, onOpenChange, reminderRecipient = "Officiant" }: AddTaskDialogProps) {
   const [formData, setFormData] = useState({
     task: "",
     dueDate: "",
@@ -332,7 +333,7 @@ export function AddTaskDialog({ onAddTask, isOpen, onOpenChange }: AddTaskDialog
 
                   <div className="mt-2 p-2 bg-blue-100 rounded text-xs text-blue-800 flex items-center">
                     <Bell className="w-3 h-3 mr-1" />
-                    Email will be sent to: pastor.michael@ordainedpro.com
+                    Email will be sent to: {reminderRecipient}
                   </div>
                 </div>
               )}

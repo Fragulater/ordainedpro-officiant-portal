@@ -36,10 +36,23 @@ export function PortalHeader() {
     toggleCeremonyStatus,
     handleUnarchiveCouple,
     editCoupleInfo,
+    officiantProfile,
+    currentUser,
   } = useCommunicationPortal()
 
   // Safety check - if no couples loaded, show minimal header
   const hasValidCouple = editCoupleInfo?.brideName && allCouples.length > 0
+  const officiantName =
+    [
+      officiantProfile?.full_name,
+      officiantProfile?.name,
+      currentUser?.user_metadata?.full_name,
+      currentUser?.user_metadata?.name
+    ]
+      .map((name) => name?.trim())
+      .find((name) => name && !name.includes("@")) || "Officiant"
+  const officiantFirstName = officiantName === "Officiant" ? "Officiant" : officiantName.split(/\s+/)[0]
+  const officiantLabel = officiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
 
   return (
     <header className="bg-white shadow-sm border-b border-blue-100">
@@ -603,12 +616,12 @@ export function PortalHeader() {
 
               <div className="flex items-center space-x-2">
                 <Avatar className="ring-2 ring-blue-100">
-                  <AvatarImage src="/api/placeholder/32/32" />
-                  <AvatarFallback className="bg-blue-500 text-white">PM</AvatarFallback>
+                  <AvatarImage src={officiantProfile?.headshot_url || ""} />
+                  <AvatarFallback className="bg-blue-500 text-white">{getInitials(officiantName)}</AvatarFallback>
                 </Avatar>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">Pastor Michael</p>
-                  <p className="text-xs text-gray-500">Licensed Officiant</p>
+                  <p className="text-sm font-medium text-gray-900">{officiantLabel}</p>
+                  <p className="text-xs text-gray-500">Officiant</p>
                 </div>
               </div>
             </div>

@@ -329,6 +329,27 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const [messages, setMessages] = useState<any[]>([])
   const [isSendingMessage, setIsSendingMessage] = useState(false)
 
+  const getCleanDisplayName = (...candidates: Array<string | null | undefined>) => {
+    const name = candidates
+      .map((candidate) => candidate?.trim())
+      .find((candidate) => candidate && !candidate.includes("@"))
+
+    return name || "Officiant"
+  }
+
+  const officiantName = getCleanDisplayName(
+    officiantProfile?.full_name,
+    officiantProfile?.name,
+    currentUser?.user_metadata?.full_name,
+    currentUser?.user_metadata?.name
+  )
+  const officiantFirstName =
+    officiantName === "Officiant" ? "Officiant" : officiantName.split(/\s+/)[0]
+  const officiantLabel =
+    officiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
+  const officiantEmail = officiantProfile?.email || currentUser?.email || ""
+  const officiantPhone = officiantProfile?.phone || ""
+
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [newMessage, setNewMessage] = useState("")
   const [newTask, setNewTask] = useState("")
@@ -383,7 +404,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     balanceDue: 500,
     total: 800,
     notes: 'Payment due within 30 days. Thank you for choosing our services for your special day!',
-    paymentMethods: 'Check, Cash, Venmo (@Pastor-Michael), PayPal (pastor.michael@ordainedpro.com), Zelle',
+    paymentMethods: 'Check, Cash, Venmo, PayPal, Zelle',
     terms: 'Payment due within 30 days of invoice date. Final payment must be received at least 7 days before the wedding ceremony. Late payments may incur additional fees.',
     bankDetails: 'Bank transfers available upon request',
     emailRecipients: 'both'
@@ -561,7 +582,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
         // Load officiant profile
         const { data: profile, error: profileError } = await supabase
-          .from("officiant_profiles")
+          .from("profiles")
           .select("*")
           .eq("user_id", user.id)
           .single()
@@ -1002,7 +1023,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const calendarEvents = {
     "2024-08-15": {
       events: [
-        { id: 1, time: "2:00 PM", title: "Pre-marriage Consultation", type: "meeting", location: "Pastor Michael's Office", attendees: ["Sarah Johnson", "David Chen"] }
+        { id: 1, time: "2:00 PM", title: "Pre-marriage Consultation", type: "meeting", location: `${officiantLabel}'s Office`, attendees: ["Sarah Johnson", "David Chen"] }
       ]
     },
     "2024-08-20": {
@@ -1012,18 +1033,18 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     },
     "2024-08-22": {
       events: [
-        { id: 3, time: "11:00 AM", title: "Final venue walkthrough", type: "task", location: "Sunset Gardens", attendees: ["Pastor Michael"] },
-        { id: 4, time: "2:00 PM", title: "Marriage license review", type: "task", location: "City Hall", attendees: ["Pastor Michael"] }
+        { id: 3, time: "11:00 AM", title: "Final venue walkthrough", type: "task", location: "Sunset Gardens", attendees: [officiantLabel] },
+        { id: 4, time: "2:00 PM", title: "Marriage license review", type: "task", location: "City Hall", attendees: [officiantLabel] }
       ]
     },
     "2024-08-24": {
       events: [
-        { id: 5, time: "6:00 PM", title: "Wedding Rehearsal", type: "rehearsal", location: "Sunset Gardens", attendees: ["Wedding Party", "Pastor Michael"] }
+        { id: 5, time: "6:00 PM", title: "Wedding Rehearsal", type: "rehearsal", location: "Sunset Gardens", attendees: ["Wedding Party", officiantLabel] }
       ]
     },
     "2024-08-25": {
       events: [
-        { id: 6, time: "3:00 PM", title: "Setup and preparation", type: "preparation", location: "Sunset Gardens", attendees: ["Pastor Michael"] },
+        { id: 6, time: "3:00 PM", title: "Setup and preparation", type: "preparation", location: "Sunset Gardens", attendees: [officiantLabel] },
         { id: 7, time: "4:00 PM", title: "Wedding Ceremony", type: "ceremony", location: "Sunset Gardens", attendees: ["75 guests"] }
       ]
     },
@@ -2104,7 +2125,7 @@ This script has been personalized for your wedding on ${new Date(editWeddingDeta
 Looking forward to your feedback!
 
 Best regards,
-Pastor Michael Adams`,
+${officiantLabel}`,
       includeNotes: true
     })
     setShowShareScriptDialog(true)
@@ -2426,7 +2447,7 @@ ${shareScriptForm.body}`)
           to: '',
           customEmail: '',
           subject: `Contract: ${contract.name}`,
-          body: `Hi,\n\nI've prepared your "${contract.name}" for review and signature. Please take a look at the attached contract and let me know if you have any questions.\n\nBest regards,\nPastor Michael`
+          body: `Hi,\n\nI've prepared your "${contract.name}" for review and signature. Please take a look at the attached contract and let me know if you have any questions.\n\nBest regards,\n${officiantLabel}`
         })
         setShowSendContractDialog(true)
         console.log('Opening send dialog for contract:', contract.name)
@@ -2521,10 +2542,7 @@ If you have any questions about the payment or need to discuss payment options, 
 Looking forward to officiating your beautiful ceremony!
 
 Warm regards,
-Pastor Michael Adams
-Licensed Officiant
-(555) 987-6543
-pastor.michael@ordainedpro.com`
+${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail ? `\n${officiantEmail}` : ''}`
     })
     setShowSendPaymentReminderDialog(true)
   }
@@ -3151,13 +3169,13 @@ Note: This is an initial draft. Further development needed to incorporate specif
     ].filter(Boolean)
 
     const coupleName = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
-    const officiantName = officiantProfile?.full_name || 'Your Officiant'
+    const taskOfficiantName = officiantLabel
 
     // Send immediate confirmation email about the task
     for (const email of recipients) {
       try {
         const isOfficiant = email === officiantProfile?.email || email === currentUser?.email
-        const emailContent = generateTaskReminderEmail(task, isOfficiant, coupleName, officiantName)
+        const emailContent = generateTaskReminderEmail(task, isOfficiant, coupleName, taskOfficiantName)
 
         const response = await fetch("/api/send-email", {
           method: "POST",
@@ -3166,7 +3184,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
             to: email,
             subject: emailContent.subject,
             message: emailContent.body,
-            fromName: officiantName
+            fromName: taskOfficiantName
           })
         })
 
@@ -3747,11 +3765,6 @@ OrdainedPro Wedding Portal
     setIsSendingMessage(true)
 
     try {
-      // Get officiant name from profile or user metadata
-      const officiantName = officiantProfile?.full_name ||
-                           currentUser?.user_metadata?.full_name ||
-                           "Wedding Officiant"
-
       // Get couple info
       const coupleId = editCoupleInfo.id
       const coupleName = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
@@ -3769,7 +3782,7 @@ OrdainedPro Wedding Portal
           user_id: currentUser.id,
           couple_id: coupleId,
           sender: "officiant",
-          sender_name: officiantName,
+          sender_name: officiantLabel,
           content: newMessage || "(File attachments)",
           read: true, // Officiant's own message is read
           created_at: new Date().toISOString(),
@@ -3788,7 +3801,7 @@ OrdainedPro Wedding Portal
           // Add to local messages state
           setMessages(prev => [...prev, {
             id: savedMessage[0].id,
-            sender: officiantName,
+            sender: officiantLabel,
             role: "officiant",
             message: newMessage,
             timestamp: "Just now",
@@ -3835,9 +3848,9 @@ OrdainedPro Wedding Portal
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               to: email,
-              subject: `Message from ${officiantName} - Wedding Planning`,
+              subject: `Message from ${officiantLabel} - Wedding Planning`,
               message: newMessage,
-              fromName: officiantName,
+              fromName: officiantLabel,
               coupleName: coupleName,
               coupleId: coupleId,
               officiantId: currentUser?.id,
@@ -3971,11 +3984,7 @@ ${invoiceForm.notes}
 We're honored to be part of your special day and look forward to creating a beautiful ceremony that reflects your love story!
 
 Blessings,
-Pastor Michael Adams
-Licensed Wedding Officiant
-[SCRIPT]ž (555) 987-6543
-[SCRIPT]§ pastor.michael@ordainedpro.com
-Œ www.ordainedpro.com
+${officiantLabel}${officiantPhone ? `\n[SCRIPT]ž ${officiantPhone}` : ''}${officiantEmail ? `\n[SCRIPT]§ ${officiantEmail}` : ''}${officiantProfile?.website ? `\nŒ ${officiantProfile.website}` : ''}
 
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•`
   }

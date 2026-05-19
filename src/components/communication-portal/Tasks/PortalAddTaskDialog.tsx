@@ -8,6 +8,8 @@ export function PortalAddTaskDialog() {
     showAddTaskDialog,
     setShowAddTaskDialog,
     handleAddTask,
+    officiantProfile,
+    currentUser,
   } = useCommunicationPortal()
 
   return (
@@ -17,6 +19,7 @@ export function PortalAddTaskDialog() {
         isOpen={showAddTaskDialog}
         onOpenChange={setShowAddTaskDialog}
         onAddTask={handleAddTask}
+        reminderRecipient={officiantProfile?.email || currentUser?.email || "Officiant"}
       />
     </>
   )

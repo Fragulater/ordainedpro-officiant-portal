@@ -36,7 +36,21 @@ export function MessagesTab() {
     formatFileSize,
     getFileIcon,
     handleSendMessage,
+    officiantProfile,
+    currentUser,
   } = useCommunicationPortal()
+
+  const officiantName =
+    [
+      officiantProfile?.full_name,
+      officiantProfile?.name,
+      currentUser?.user_metadata?.full_name,
+      currentUser?.user_metadata?.name
+    ]
+      .map((name) => name?.trim())
+      .find((name) => name && !name.includes("@")) || "Officiant"
+  const officiantFirstName = officiantName === "Officiant" ? "Officiant" : officiantName.split(/\s+/)[0]
+  const officiantLabel = officiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
 
   return (
 <TabsContent value="messages">
@@ -166,7 +180,7 @@ export function MessagesTab() {
                           to: 'both',
                           customEmail: '',
                           subject: 'Wedding Documents for Review',
-                          body: `Dear ${brideFirst} and ${groomFirst},\n\nI'm sharing some documents for your review. Please take a look and let me know if you have any questions or feedback.\n\nBest regards,\nPastor Michael Adams`,
+                          body: `Dear ${brideFirst} and ${groomFirst},\n\nI'm sharing some documents for your review. Please take a look and let me know if you have any questions or feedback.\n\nBest regards,\n${officiantLabel}`,
                           includeNotes: true
                         })
                         setShowShareScriptDialog(true)

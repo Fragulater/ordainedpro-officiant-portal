@@ -240,17 +240,17 @@ export function OfficiantDashboardDialog({
 
   // Profile state
   const [profile, setProfile] = useState<OfficiantProfile>({
-    fullName: "Pastor Michael Adams",
-    businessName: "Grace Wedding Ceremonies",
+    fullName: "",
+    businessName: "",
     headshot: "",
-    city: "Garden City",
-    state: "CA",
-    yearsExperience: 5,
-    rating: 4.9,
-    totalReviews: 127,
-    phone: "(555) 987-6543",
-    email: "pastor.michael@ordainedpro.com",
-    website: "https://pastoradams.com",
+    city: "",
+    state: "",
+    yearsExperience: 0,
+    rating: 4.8,
+    totalReviews: 0,
+    phone: "",
+    email: "",
+    website: "",
     socialMedia: {
       facebook: "",
       instagram: "",
@@ -265,6 +265,40 @@ export function OfficiantDashboardDialog({
     photoGallery: [],
     videoUrl: "",
   });
+
+  const getCleanDisplayName = (...candidates: Array<string | null | undefined>) => {
+    const name = candidates
+      .map((candidate) => candidate?.trim())
+      .find((candidate) => candidate && !candidate.includes("@"));
+
+    return name || "Officiant";
+  };
+
+  const getInitials = (name: string) => {
+    if (name === "Officiant") return "OF";
+
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  };
+
+  const officiantFullName = getCleanDisplayName(
+    profile.fullName,
+    user?.user_metadata?.full_name,
+    user?.user_metadata?.name
+  );
+  const officiantFirstName =
+    officiantFullName === "Officiant"
+      ? "Officiant"
+      : officiantFullName.split(/\s+/)[0];
+  const officiantLabel =
+    officiantFullName === "Officiant"
+      ? "Officiant"
+      : `Officiant ${officiantFirstName}`;
   const [showPreview, setShowPreview] = useState(false);
   const getCoupleColors = (coupleId: number) => {
     const colorPairs = [
@@ -963,7 +997,7 @@ export function OfficiantDashboardDialog({
               </div>
               <div>
                 <h2 className="font-bold text-gray-900">OrdainedPro</h2>
-                <p className="text-xs text-gray-500">Officiant Dashboard</p>
+                <p className="text-xs text-gray-500">Officiant</p>
               </div>
             </div>
 
@@ -1038,11 +1072,7 @@ export function OfficiantDashboardDialog({
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">
-                    Welcome Back
-                    {user
-                      ? `, ${user.user_metadata.full_name || user.email}`
-                      : ""}
-                    !
+                    Welcome back, {officiantFirstName}!
                   </h1>
                   <p className="text-gray-600">
                     Manage your ceremonies and profile
@@ -1059,26 +1089,18 @@ export function OfficiantDashboardDialog({
                   <Avatar className="w-12 h-12">
                     <AvatarImage
                       src={user?.user_metadata?.avatar_url || ""}
-                      alt={user?.user_metadata?.full_name || "User"}
+                      alt={officiantFullName}
                     />
                     <AvatarFallback className="bg-blue-600 text-white">
-                      {user?.user_metadata?.full_name
-                        ? user.user_metadata.full_name
-                            .split(" ")
-                            .map((n: string) => n[0])
-                            .join("")
-                            .toUpperCase()
-                        : "U"}
+                      {getInitials(officiantFullName)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <p className="font-semibold text-gray-900">
-                      {user?.user_metadata?.full_name ||
-                        user?.email ||
-                        "Loading..."}
+                      {officiantFullName}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {user?.user_metadata?.role || "Officiant"}
+                      {officiantLabel}
                     </p>
                   </div>
                 </div>
@@ -1490,10 +1512,7 @@ export function OfficiantDashboardDialog({
                                 <AvatarImage src={profile.headshot} key={profile.headshot} />
                               ) : (
                                 <AvatarFallback className="bg-blue-600 text-white text-3xl">
-                                  {profile.fullName
-                                    .split(" ")
-                                    .map((n: string) => n[0])
-                                    .join("")}
+                                  {getInitials(officiantFullName)}
                                 </AvatarFallback>
                               )}
                             </Avatar>
@@ -1503,10 +1522,10 @@ export function OfficiantDashboardDialog({
                         {/* Name & Location */}
                         <div className="text-center">
                           <h3 className="font-bold text-lg text-gray-900">
-                            {profile.fullName}
+                            {officiantFullName}
                           </h3>
                           <p className="text-sm text-gray-600">
-                            {profile.city}, {profile.state}
+                            {[profile.city, profile.state].filter(Boolean).join(", ")}
                           </p>
                         </div>
 
@@ -2779,20 +2798,17 @@ export function OfficiantDashboardDialog({
                           <AvatarImage src={profile.headshot} key={profile.headshot} />
                         ) : (
                           <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white text-2xl">
-                            {profile.fullName
-                              .split(" ")
-                              .map((n: string) => n[0])
-                              .join("")}
+                            {getInitials(officiantFullName)}
                           </AvatarFallback>
                         )}
                       </Avatar>
 
                       <h3 className="font-bold text-lg text-gray-900 text-center">
-                        {profile.fullName}
+                        {officiantFullName}
                       </h3>
                       <div className="flex items-center text-gray-600 text-sm mt-1">
                         <MapPin className="w-4 h-4 mr-1" />
-                        {profile.city}, {profile.state}
+                        {[profile.city, profile.state].filter(Boolean).join(", ")}
                       </div>
                     </div>
 

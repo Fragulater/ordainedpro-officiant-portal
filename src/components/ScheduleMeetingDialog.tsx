@@ -56,6 +56,9 @@ export interface ScheduleMeetingDialogProps {
   onOpenChange: (open: boolean) => void
   coupleEmails?: string[]
   coupleName?: string
+  officiantName?: string
+  officiantEmail?: string
+  officiantPhone?: string
 }
 
 export function ScheduleMeetingDialog({
@@ -63,8 +66,18 @@ export function ScheduleMeetingDialog({
   isOpen,
   onOpenChange,
   coupleEmails = ["ganuactivate@gmail.com", "ganuactivate@gmail.com"],
-  coupleName = "Sarah & David"
+  coupleName = "Sarah & David",
+  officiantName = "Officiant",
+  officiantEmail = "",
+  officiantPhone = ""
 }: ScheduleMeetingDialogProps) {
+  const cleanOfficiantName =
+    officiantName && !officiantName.includes("@") ? officiantName : "Officiant"
+  const officiantFirstName =
+    cleanOfficiantName === "Officiant" ? "Officiant" : cleanOfficiantName.split(/\s+/)[0]
+  const officiantLabel =
+    cleanOfficiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
+
   const [formData, setFormData] = useState({
     subject: "",
     body: "",
@@ -97,17 +110,17 @@ export function ScheduleMeetingDialog({
     {
       name: "Initial Consultation",
       subject: "Wedding Ceremony Consultation - {couple}",
-      body: "Dear {couple},\n\nI'm excited to meet with you to discuss your upcoming wedding ceremony! During our consultation, we'll cover:\n\n• Your vision for the ceremony\n• Personal vows and readings\n• Unity ceremonies and traditions\n• Timeline and logistics\n• Any special requests or requirements\n\nPlease come prepared with any questions you may have. I look forward to helping make your special day perfect!\n\nWarm regards,\nPastor Michael"
+      body: `Dear {couple},\n\nI'm excited to meet with you to discuss your upcoming wedding ceremony! During our consultation, we'll cover:\n\n• Your vision for the ceremony\n• Personal vows and readings\n• Unity ceremonies and traditions\n• Timeline and logistics\n• Any special requests or requirements\n\nPlease come prepared with any questions you may have. I look forward to helping make your special day perfect!\n\nWarm regards,\n${officiantLabel}`
     },
     {
       name: "Ceremony Planning",
       subject: "Wedding Ceremony Planning Meeting - {couple}",
-      body: "Hello {couple},\n\nLet's meet to finalize the details of your wedding ceremony. We'll review:\n\n• Final ceremony script\n• Music selections\n• Processional order\n• Rehearsal arrangements\n• Day-of logistics\n\nPlease bring any final changes or special requests you'd like to discuss.\n\nBlessings,\nPastor Michael"
+      body: `Hello {couple},\n\nLet's meet to finalize the details of your wedding ceremony. We'll review:\n\n• Final ceremony script\n• Music selections\n• Processional order\n• Rehearsal arrangements\n• Day-of logistics\n\nPlease bring any final changes or special requests you'd like to discuss.\n\nBlessings,\n${officiantLabel}`
     },
     {
       name: "Pre-Wedding Check-in",
       subject: "Pre-Wedding Check-in - {couple}",
-      body: "Dear {couple},\n\nAs your wedding day approaches, I'd love to connect and ensure everything is ready. We'll discuss:\n\n• Final ceremony details\n• Last-minute questions\n• Wedding day timeline\n• Emotional preparation\n• Any concerns or excitement you'd like to share\n\nLooking forward to celebrating with you soon!\n\nWith joy,\nPastor Michael"
+      body: `Dear {couple},\n\nAs your wedding day approaches, I'd love to connect and ensure everything is ready. We'll discuss:\n\n• Final ceremony details\n• Last-minute questions\n• Wedding day timeline\n• Emotional preparation\n• Any concerns or excitement you'd like to share\n\nLooking forward to celebrating with you soon!\n\nWith joy,\n${officiantLabel}`
     }
   ]
 
@@ -177,7 +190,7 @@ export function ScheduleMeetingDialog({
       description: meetingData.body,
       location: meetingData.location,
       attendees: meetingData.attendees,
-      organizer: "pastor.michael@ordainedpro.com"
+      organizer: officiantEmail || officiantLabel
     }
 
     return calendarEvent
@@ -192,7 +205,7 @@ export function ScheduleMeetingDialog({
 
     return {
       to: meetingData.attendees,
-      cc: ["pastor.michael@ordainedpro.com"],
+      cc: officiantEmail ? [officiantEmail] : [],
       subject: `📅 Meeting Request: ${meetingData.subject}`,
       body: `
 Dear ${coupleName},
@@ -234,10 +247,7 @@ Join URL: https://zoom.us/j/1234567890
 Looking forward to meeting with you!
 
 Warm regards,
-Pastor Michael Adams
-Licensed Wedding Officiant
-📧 pastor.michael@ordainedpro.com
-📱 (555) 987-6543
+${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantPhone ? `\n📱 ${officiantPhone}` : ''}
 
 ───────────────────────────────
 🏷️ This is an automated message from OrdainedPro Communication Portal
@@ -444,7 +454,7 @@ Please reply to this email to confirm your attendance.
               to: email,
               subject: `📅 Meeting Invitation: ${formData.subject}`,
               message: meetingEmailBody,
-              fromName: "Pastor Michael",
+              fromName: officiantLabel,
               coupleName: coupleName
             }),
           });
@@ -812,11 +822,11 @@ Please reply to this email to confirm your attendance.
               <div className="space-y-2">
                 <div className="flex items-center text-sm">
                   <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center mr-2">
-                    <span className="text-white text-xs">PM</span>
+                    <span className="text-white text-xs">OF</span>
                   </div>
                   <div>
-                    <p className="font-medium">Pastor Michael (Organizer)</p>
-                    <p className="text-xs text-gray-600">ganuactivate@gmail.com</p>
+                    <p className="font-medium">{officiantLabel} (Organizer)</p>
+                    {officiantEmail && <p className="text-xs text-gray-600">{officiantEmail}</p>}
                   </div>
                 </div>
                 {formData.attendees.map((email, index) => (
