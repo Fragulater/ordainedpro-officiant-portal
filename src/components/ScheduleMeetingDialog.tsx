@@ -90,7 +90,7 @@ export function ScheduleMeetingDialog({
     responseDeadline: "",
     sendCalendarInvite: true,
     sendEmailNotification: true,
-    includeZoomLink: true
+    includeMeetingLink: true
   })
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
@@ -131,6 +131,13 @@ export function ScheduleMeetingDialog({
     { value: 90, label: "1.5 hours" },
     { value: 120, label: "2 hours" }
   ]
+
+  const formatMeetingLink = (value: string) => {
+    const trimmedValue = value.trim()
+    if (!trimmedValue) return ""
+    if (/^https?:\/\//i.test(trimmedValue)) return trimmedValue
+    return `https://${trimmedValue}`
+  }
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {}
@@ -198,7 +205,7 @@ export function ScheduleMeetingDialog({
 
   const generateEmailContent = (meetingData: any, calendarEvent: any) => {
     const meetingTypeInfo: Record<string, string> = {
-      'video': '💻 Video Call (Zoom link will be provided)',
+      'video': 'Video Call (Google Meet link below)',
       'phone': '📞 Phone Call',
       'in-person': `📍 In-Person at ${meetingData.location || 'Location TBD'}`
     }
@@ -234,14 +241,10 @@ ${meetingData.body}
 📧 Reply to this email with: ACCEPT, DECLINE, or RESCHEDULE
 📱 A calendar invitation is attached to this email
 
-${meetingData.meetingType === 'video' && meetingData.includeZoomLink ? `
-🎥 VIDEO CALL DETAILS:
-━━━━━━━━━━━━━━━━━━━━
-Zoom Meeting ID: 123-456-7890
-Password: WeddingMeeting2024
-Join URL: https://zoom.us/j/1234567890
-
-📱 Dial-in Number: +1-555-123-4567
+${meetingData.meetingType === 'video' && meetingData.includeMeetingLink && meetingData.location ? `
+VIDEO CALL DETAILS:
+-------------------------------------
+Google Meet: ${meetingData.location}
 ` : ''}
 
 Looking forward to meeting with you!
@@ -413,7 +416,7 @@ END:VCALENDAR`
 
       // 2️⃣ Send meeting invite email through our API
       const meetingTypeLabels = {
-        'video': 'Video Call (Zoom/Google Meet)',
+        'video': 'Video Call (Google Meet)',
         'phone': 'Phone Call',
         'in-person': 'In-Person Meeting'
       };
@@ -435,7 +438,7 @@ END:VCALENDAR`
 ⏰ Time: ${formData.time}
 ⏱️ Duration: ${formData.duration} minutes
 📍 Type: ${meetingTypeLabels[formData.meetingType]}
-${formData.location ? `📌 Location: ${formData.location}` : ''}
+${formData.location ? `${formData.meetingType === 'video' ? '🔗 Google Meet' : '📌 Location'}: ${formData.location}` : ''}
 ${formData.responseDeadline ? `📩 Please respond by: ${new Date(formData.responseDeadline).toLocaleDateString()}` : ''}
 
 Please reply to this email to confirm your attendance.
@@ -508,7 +511,7 @@ Please reply to this email to confirm your attendance.
         responseDeadline: "",
         sendCalendarInvite: true,
         sendEmailNotification: true,
-        includeZoomLink: true,
+        includeMeetingLink: true,
       });
 
       setErrors({});
@@ -530,9 +533,14 @@ Please reply to this email to confirm your attendance.
 
 
   const handleInputChange = (field: string, value: string | boolean | number | string[]) => {
+    const nextValue =
+      field === "location" && typeof value === "string" && formData.meetingType === "video"
+        ? formatMeetingLink(value)
+        : value
+
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: nextValue
     }))
 
     // Clear error when user starts typing
@@ -725,7 +733,7 @@ Please reply to this email to confirm your attendance.
               </Label>
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { value: 'video', label: 'Video Call', icon: Video, description: 'Zoom/Google Meet' },
+                  { value: 'video', label: 'Video Call', icon: Video, description: 'Google Meet' },
                   { value: 'phone', label: 'Phone Call', icon: Phone, description: 'Voice only' },
                   { value: 'in-person', label: 'In Person', icon: Users, description: 'Face to face' }
                 ].map((type) => (
@@ -771,6 +779,20 @@ Please reply to this email to confirm your attendance.
                 />
               </div>
             )}
+            {formData.meetingType === 'video' && (
+              <div>
+                <Label htmlFor="location" className="text-sm font-medium text-gray-700">
+                  Google Meet Link
+                </Label>
+                <Input
+                  id="location"
+                  value={formData.location}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
+                  placeholder="https://meet.google.com/..."
+                  className="mt-1 border-blue-200 focus:border-blue-500"
+                />
+              </div>
+            )}
           </div>
 
           {/* Right Sidebar */}
@@ -798,7 +820,12 @@ Please reply to this email to confirm your attendance.
                 {formData.meetingType === 'video' && (
                   <div className="flex items-center text-blue-600">
                     <Video className="w-3 h-3 mr-1" />
-                    Video Call (Zoom)
+                    {formData.location ? "Video Call (Google Meet)" : "Video Call"}
+                  </div>
+                )}
+                {formData.meetingType === 'video' && formData.location && (
+                  <div className="text-xs break-all text-blue-700">
+                    {formData.location}
                   </div>
                 )}
                 {formData.meetingType === 'phone' && (
@@ -873,12 +900,12 @@ Please reply to this email to confirm your attendance.
                 {formData.meetingType === 'video' && (
                   <div className="flex items-center space-x-2">
                     <Checkbox
-                      id="includeZoomLink"
-                      checked={formData.includeZoomLink}
-                      onCheckedChange={(checked: boolean) => handleInputChange('includeZoomLink', checked)}
+                      id="includeMeetingLink"
+                      checked={formData.includeMeetingLink}
+                      onCheckedChange={(checked: boolean) => handleInputChange('includeMeetingLink', checked)}
                     />
-                    <Label htmlFor="includeZoomLink" className="text-sm">
-                      Include Zoom meeting details
+                    <Label htmlFor="includeMeetingLink" className="text-sm">
+                      Include Google Meet link
                     </Label>
                   </div>
                 )}
