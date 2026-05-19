@@ -278,10 +278,32 @@ export function PortalOverview() {
 
           <Card className="border-blue-100 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-4 bg-gradient-to-r from-blue-50 to-indigo-50">
-              <CardTitle className="text-lg flex items-center text-blue-900">
-                <User className="w-5 h-5 mr-2 text-blue-600" />
-                Officiant
-              </CardTitle>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <CardTitle className="text-lg flex items-center text-blue-900">
+                  <User className="w-5 h-5 mr-2 text-blue-600" />
+                  Officiant
+                </CardTitle>
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setShowDashboardDialog(true)}
+                    className="h-8 bg-black px-3 text-xs text-white hover:bg-gray-800"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5 mr-1.5" />
+                    Dashboard
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setShowAddCeremonyDialog(true)}
+                    className="h-8 bg-blue-500 px-3 text-xs text-white hover:bg-blue-600"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1.5" />
+                    New Ceremony
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="space-y-4">
@@ -311,25 +333,6 @@ export function PortalOverview() {
                     <Mail className="w-4 h-4 mr-2" />
                     {officiantEmail}
                   </div>
-                </div>
-                <Separator />
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    type="button"
-                    onClick={() => setShowDashboardDialog(true)}
-                    className="h-10 bg-black px-3 text-xs text-white hover:bg-gray-800"
-                  >
-                    <LayoutDashboard className="w-4 h-4 mr-2" />
-                    Dashboard
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => setShowAddCeremonyDialog(true)}
-                    className="h-10 bg-blue-500 px-3 text-xs text-white hover:bg-blue-600"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    New Ceremony
-                  </Button>
                 </div>
               </div>
             </CardContent>
