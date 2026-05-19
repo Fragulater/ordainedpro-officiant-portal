@@ -3304,7 +3304,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
     ].filter(Boolean)
 
     const coupleName = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
-    const taskOfficiantName = officiantLabel
+    const taskOfficiantName = officiantName
 
     // Send immediate confirmation email about the task
     for (const email of recipients) {
@@ -3339,6 +3339,47 @@ Note: This is an initial draft. Further development needed to incorporate specif
   }
 
   const generateTaskReminderEmail = (task: Task, isOfficiant: boolean, coupleName: string, officiantName: string) => {
+    const cleanOfficiantName = officiantName === "Officiant" ? "Your Officiant" : officiantName
+    const cleanOfficiantFirstName =
+      cleanOfficiantName === "Your Officiant" ? cleanOfficiantName : cleanOfficiantName.split(/\s+/)[0]
+    const cleanGreeting = isOfficiant ? `Dear ${cleanOfficiantName}` : `Dear ${coupleName}`
+    const cleanClosingNote = isOfficiant
+      ? "Please ensure this task is completed before the wedding date."
+      : `${cleanOfficiantName} has created this task for your wedding planning. Please review and complete it as needed.`
+    const cleanPriorityLabel: Record<string, string> = {
+      low: "Low",
+      medium: "Medium",
+      high: "High",
+      urgent: "Urgent",
+    }
+    const cleanDueDateLabel = new Date(task.dueDate).toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+    const cleanDetailsSection = task.details ? `Details:\n${task.details}\n\n` : ""
+    const cleanContactLine = isOfficiant ? "" : "If you have any questions, please contact your officiant.\n\n"
+
+    return {
+      subject: `Wedding Task: ${task.task}`,
+      body: `${cleanGreeting},
+
+A new task has been created for your wedding ceremony:
+
+Task: ${task.task}
+Due Date: ${cleanDueDateLabel}
+Due Time: ${task.dueTime}
+Priority: ${cleanPriorityLabel[task.priority] || "Medium"}
+Category: ${task.category}
+
+${cleanDetailsSection}${cleanClosingNote}
+
+${cleanContactLine}Thank you,
+${cleanOfficiantFirstName}
+`,
+    }
+
     const priorityEmoji: Record<string, string> = {
       low: 'Ÿ¢',
       medium: 'Ÿ¡',

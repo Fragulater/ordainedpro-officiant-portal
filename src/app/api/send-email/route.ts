@@ -115,6 +115,9 @@ function generateEmailHtml(
   subject: string,
   attachments?: EmailAttachment[]
 ): string {
+  const trimmedMessage = message.trim();
+  const startsWithGreeting = /^dear\s/i.test(trimmedMessage);
+
   // Build attachments section if there are any
   let attachmentsHtml = '';
   if (attachments && attachments.length > 0) {
@@ -162,9 +165,11 @@ function generateEmailHtml(
           <!-- Body -->
           <tr>
             <td style="padding: 40px;">
+              ${startsWithGreeting ? "" : `
               <p style="margin: 0 0 20px; color: #374151; font-size: 16px;">
                 Dear ${coupleName || "Couple"},
               </p>
+              `}
 
               <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 20px; border-radius: 0 8px 8px 0; margin: 20px 0;">
                 <p style="margin: 0; color: #1f2937; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">
