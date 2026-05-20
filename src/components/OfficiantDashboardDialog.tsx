@@ -40,6 +40,9 @@ import {
   TrendingUp,
   Upload,
   Download,
+  Eye,
+  Pencil,
+  Trash2,
   Plus,
   ChevronRight,
   Save,
@@ -115,10 +118,13 @@ interface OfficiantDashboardDialogProps {
     type: string;
     updated: string;
     status?: string;
+    source?: "contract" | "user_file";
   }>;
   onDocumentView?: (documentId: string) => void;
+  onDocumentEdit?: (documentId: string) => void;
   onDocumentDownload?: (documentId: string) => void;
   onDocumentDelete?: (documentId: string) => void;
+  onDocumentAssignToCouple?: (documentId: string, coupleId: number) => void;
   initialView?:
     | "dashboard"
     | "ceremonies"
@@ -196,8 +202,10 @@ export function OfficiantDashboardDialog({
   onAddCeremony,
   documentsData = [],
   onDocumentView,
+  onDocumentEdit,
   onDocumentDownload,
   onDocumentDelete,
+  onDocumentAssignToCouple,
   initialView = "dashboard",
 }: OfficiantDashboardDialogProps) {
   // Subscription information
@@ -220,6 +228,8 @@ export function OfficiantDashboardDialog({
     new Date()
   );
   const [showAddCeremonyDialog, setShowAddCeremonyDialog] = useState(false);
+  const [documentToAssign, setDocumentToAssign] = useState<string | null>(null);
+  const [assignCoupleId, setAssignCoupleId] = useState("");
   const [user, setUser] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   // Form state for Add New Ceremony - mirrors Communication Portal
@@ -2078,38 +2088,119 @@ export function OfficiantDashboardDialog({
                             </div>
                           </div>
                         </div>
-                        <div className="mt-4 flex flex-wrap gap-2">
+                        <div className="mt-4 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3">
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                            variant="ghost"
+                            title="View document"
+                            aria-label={`View ${doc.name}`}
+                            className="h-9 justify-start rounded-lg bg-blue-50 px-3 text-xs text-blue-600 hover:bg-blue-100 hover:text-blue-700"
                             onClick={() => onDocumentView?.(doc.id)}
                           >
-                            View
+                            <Eye className="w-4 h-4" />
+                            <span className="ml-2">View</span>
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="border-gray-200 text-gray-700 hover:bg-gray-50"
-                            onClick={() => onDocumentDownload?.(doc.id)}
+                            variant="ghost"
+                            title="Edit document"
+                            aria-label={`Edit ${doc.name}`}
+                            className="h-9 justify-start rounded-lg bg-purple-50 px-3 text-xs text-purple-600 hover:bg-purple-100 hover:text-purple-700"
+                            onClick={() => onDocumentEdit?.(doc.id)}
                           >
-                            <Download className="w-4 h-4 mr-1" />
-                            Download
+                            <Pencil className="w-4 h-4" />
+                            <span className="ml-2">Edit</span>
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="border-red-200 text-red-700 hover:bg-red-50"
+                            variant="ghost"
+                            title="Delete document"
+                            aria-label={`Delete ${doc.name}`}
+                            className="h-9 justify-start rounded-lg bg-red-50 px-3 text-xs text-red-600 hover:bg-red-100 hover:text-red-700"
                             onClick={() => onDocumentDelete?.(doc.id)}
                           >
-                            <X className="w-4 h-4 mr-1" />
-                            Delete
+                            <Trash2 className="w-4 h-4" />
+                            <span className="ml-2">Delete</span>
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Download document"
+                            aria-label={`Download ${doc.name}`}
+                            className="h-9 justify-start rounded-lg bg-green-50 px-3 text-xs text-green-600 hover:bg-green-100 hover:text-green-700"
+                            onClick={() => onDocumentDownload?.(doc.id)}
+                          >
+                            <Download className="w-4 h-4" />
+                            <span className="ml-2">Download</span>
+                          </Button>
+                          {doc.source === "user_file" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title="Add document to an active couple"
+                              aria-label={`Add ${doc.name} to a couple`}
+                              className="col-span-2 h-9 justify-start rounded-lg bg-pink-50 px-3 text-xs text-pink-600 hover:bg-pink-100 hover:text-pink-700"
+                              onClick={() => {
+                                setDocumentToAssign(doc.id);
+                                setAssignCoupleId("");
+                              }}
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span className="ml-2">Add to Couple</span>
+                            </Button>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
+
+                <Dialog open={Boolean(documentToAssign)} onOpenChange={(open) => !open && setDocumentToAssign(null)}>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Add Script to Couple</DialogTitle>
+                      <DialogDescription>
+                        Choose an active couple. The script will be copied into that couple's files.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="assign-couple">Active couple</Label>
+                        <select
+                          id="assign-couple"
+                          className="mt-2 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm"
+                          value={assignCoupleId}
+                          onChange={(event) => setAssignCoupleId(event.target.value)}
+                        >
+                          <option value="">Select a couple</option>
+                          {(couples || [])
+                            .filter((couple) => couple.isActive !== false)
+                            .map((couple) => (
+                              <option key={couple.id} value={couple.id}>
+                                {couple.brideName} & {couple.groomName}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setDocumentToAssign(null)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          disabled={!assignCoupleId || !documentToAssign}
+                          onClick={() => {
+                            if (!documentToAssign || !assignCoupleId) return;
+                            onDocumentAssignToCouple?.(documentToAssign, Number(assignCoupleId));
+                            setDocumentToAssign(null);
+                          }}
+                          className="bg-pink-500 hover:bg-pink-600"
+                        >
+                          Add to Couple
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
 
               </div>
             )}

@@ -1,6 +1,7 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getServerCookieOptions } from "./shared-auth";
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
@@ -10,6 +11,7 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: getServerCookieOptions(request.nextUrl.hostname),
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll: (cookiesToSet) => {

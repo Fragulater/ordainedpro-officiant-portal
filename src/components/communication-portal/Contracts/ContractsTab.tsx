@@ -42,11 +42,11 @@ export function ContractsTab() {
                             <div className="flex items-center space-x-3">
                               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                                 contract.status === 'signed' ? 'bg-green-100' :
-                                contract.status === 'pending' ? 'bg-yellow-100' : 'bg-gray-100'
+                                ['pending', 'sent'].includes(contract.status) ? 'bg-yellow-100' : 'bg-gray-100'
                               }`}>
                                 <FileSignature className={`w-6 h-6 ${
                                   contract.status === 'signed' ? 'text-green-600' :
-                                  contract.status === 'pending' ? 'text-yellow-600' : 'text-gray-600'
+                                  ['pending', 'sent'].includes(contract.status) ? 'text-yellow-600' : 'text-gray-600'
                                 }`} />
                               </div>
                               <div>
@@ -54,17 +54,17 @@ export function ContractsTab() {
                                 <div className="flex items-center space-x-4 mt-1">
                                   <Badge variant={
                                     contract.status === 'signed' ? 'default' :
-                                    contract.status === 'pending' ? 'secondary' : 'outline'
+                                    ['pending', 'sent'].includes(contract.status) ? 'secondary' : 'outline'
                                   } className={
                                     contract.status === 'signed' ? 'bg-green-100 text-green-800' :
-                                    contract.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                                    ['pending', 'sent'].includes(contract.status) ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
                                   }>
                                     {contract.status === 'signed' ? 'Signed' :
-                                     contract.status === 'pending' ? 'Pending Signature' : 'Draft'}
+                                     ['pending', 'sent'].includes(contract.status) ? 'Sent' : 'Draft'}
                                   </Badge>
                                   <p className="text-sm text-gray-500">
                                     {contract.status === 'signed' && `Signed by ${contract.signedBy} on ${contract.signedDate}`}
-                                    {contract.status === 'pending' && `Sent on ${contract.sentDate}`}
+                                    {['pending', 'sent'].includes(contract.status) && `Sent on ${contract.sentDate}`}
                                     {contract.status === 'draft' && `Created on ${contract.createdDate}`}
                                   </p>
                                 </div>

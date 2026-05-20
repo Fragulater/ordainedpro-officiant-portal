@@ -1,6 +1,8 @@
 "use client"
 
+import { useCallback, useEffect, useState } from "react"
 import { OfficiantDashboardDialog } from "@/components/OfficiantDashboardDialog"
+import { supabase } from "@/supabase/utils/client"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 export function PortalOfficiantDashboardDialog() {
@@ -16,6 +18,7 @@ export function PortalOfficiantDashboardDialog() {
     setEditCoupleInfo,
     setEditWeddingDetails,
   } = useCommunicationPortal()
+  const [userFiles, setUserFiles] = useState<any[]>([])
 
   const formatContractSize = (size?: number) => {
     if (!size) return "0 KB"
@@ -34,14 +37,123 @@ export function PortalOfficiantDashboardDialog() {
     return "FILE"
   }
 
-  const documentsData = contracts.map((contract: any) => ({
+  const loadUserFiles = useCallback(async () => {
+    if (!showDashboardDialog) return
+
+    const { data: authData } = await supabase.auth.getUser()
+    const userId = authData.user?.id
+    if (!userId) {
+      setUserFiles([])
+      return
+    }
+
+    const { data, error } = await supabase
+      .from("user_files")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Failed to load saved documents:", error)
+      setUserFiles([])
+      return
+    }
+
+    setUserFiles(data || [])
+  }, [showDashboardDialog])
+
+  useEffect(() => {
+    loadUserFiles()
+  }, [loadUserFiles])
+
+  const getUserFileType = (file: any) => {
+    const fileName = (file.name || "").toLowerCase()
+    const fileType = (file.type || "").toLowerCase()
+
+    if (fileType.includes("pdf") || fileName.endsWith(".pdf")) return "PDF"
+    if (fileName.endsWith(".docx")) return "DOCX"
+    if (fileType.includes("word") || fileName.endsWith(".doc")) return "DOC"
+    if (fileType.startsWith("text/") || fileName.endsWith(".txt")) return "TXT"
+    if (fileType.includes("html") || fileName.endsWith(".html")) return "HTML"
+    return "FILE"
+  }
+
+  const documentsData = [
+    ...userFiles.map((file: any) => ({
+      id: `user-file:${file.id}`,
+      name: file.name,
+      size: formatContractSize(file.size),
+      type: getUserFileType(file),
+      updated: file.created_at ? new Date(file.created_at).toLocaleDateString() : "Recently added",
+      status: "Saved",
+      source: "user_file" as const,
+    })),
+    ...contracts.map((contract: any) => ({
     id: contract.id.toString(),
     name: contract.name,
     size: formatContractSize(contract.fileSize || contract.file?.size),
     type: getDocumentType(contract),
     updated: contract.createdDate || "Recently added",
     status: contract.status ? contract.status.charAt(0).toUpperCase() + contract.status.slice(1) : "Draft",
-  }))
+      source: "contract" as const,
+    })),
+  ]
+
+  const getUserFileByDocumentId = (documentId: string) => {
+    if (!documentId.startsWith("user-file:")) return null
+    const id = documentId.replace("user-file:", "")
+    return userFiles.find((file: any) => String(file.id) === id) || null
+  }
+
+  const handleSavedFileDownload = (documentId: string) => {
+    const userFile = getUserFileByDocumentId(documentId)
+    if (!userFile) return false
+    window.open(userFile.url || "#", "_blank", "noopener,noreferrer")
+    return true
+  }
+
+  const handleSavedFileDelete = async (documentId: string) => {
+    const userFile = getUserFileByDocumentId(documentId)
+    if (!userFile) return false
+
+    const { error } = await supabase
+      .from("user_files")
+      .delete()
+      .eq("id", userFile.id)
+
+    if (error) {
+      console.error("Failed to delete saved document:", error)
+      return true
+    }
+
+    setUserFiles((prev) => prev.filter((file: any) => file.id !== userFile.id))
+    return true
+  }
+
+  const handleAssignSavedFileToCouple = async (documentId: string, coupleId: number) => {
+    const userFile = getUserFileByDocumentId(documentId)
+    if (!userFile) return
+
+    const { data: authData } = await supabase.auth.getUser()
+    const userId = authData.user?.id
+    if (!userId) return
+
+    const { error } = await supabase
+      .from("couple_files")
+      .insert({
+        user_id: userId,
+        couple_id: coupleId,
+        file_name: userFile.name,
+        file_url: userFile.url,
+        file_type: userFile.type || "text/plain",
+        file_size: userFile.size || 0,
+        category: "Purchased Script",
+      })
+
+    if (error) {
+      console.error("Failed to add script to couple:", error)
+    }
+  }
 
   return (
     <>
@@ -51,13 +163,21 @@ export function PortalOfficiantDashboardDialog() {
         onOpenChange={setShowDashboardDialog}
         couples={allCouples}
         documentsData={documentsData}
-        onDocumentView={(documentId) => handleContractAction(Number(documentId), "view")}
+        onDocumentView={(documentId) => {
+          if (handleSavedFileDownload(documentId)) return
+          handleContractAction(Number(documentId), "view")
+        }}
         onDocumentDownload={(documentId) => {
+          if (handleSavedFileDownload(documentId)) return
           const contract = contracts.find((item: any) => item.id.toString() === documentId)
           if (!contract) return
           window.open(contract.file?.url || contract.fileUrl || "#", "_blank", "noopener,noreferrer")
         }}
-        onDocumentDelete={(documentId) => handleContractAction(Number(documentId), "delete")}
+        onDocumentDelete={async (documentId) => {
+          if (await handleSavedFileDelete(documentId)) return
+          handleContractAction(Number(documentId), "delete")
+        }}
+        onDocumentAssignToCouple={handleAssignSavedFileToCouple}
         onSelectCouple={(ceremonyId) => {
           // Find the couple by ID and set as active
           const coupleIndex = allCouples.findIndex((c) => c.id.toString() === ceremonyId)

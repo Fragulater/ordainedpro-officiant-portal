@@ -19,9 +19,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { to, subject, message, fromName, coupleName, coupleId, officiantId, attachments } = body;
+    const recipients = Array.isArray(to)
+      ? to.filter((email) => typeof email === "string" && email.trim())
+      : typeof to === "string" && to.trim()
+        ? [to.trim()]
+        : [];
 
     // Validate required fields
-    if (!to || !subject || !message) {
+    if (recipients.length === 0 || !subject || !message) {
       return NextResponse.json(
         { error: "Missing required fields: to, subject, message" },
         { status: 400 }
@@ -51,7 +56,7 @@ export async function POST(request: NextRequest) {
         reply_to: coupleId && officiantId
           ? `reply+${coupleId}_${officiantId}@ziloesteo.resend.app`
           : "reply@ziloesteo.resend.app",
-        to: [to],
+        to: recipients,
         subject: subject,
         html: generateEmailHtml(fromName, coupleName, message, subject, attachments),
         text: message,

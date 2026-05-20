@@ -14,6 +14,19 @@ CREATE TABLE IF NOT EXISTS public.scripts (
   status TEXT NOT NULL DEFAULT 'Draft',
   content TEXT NOT NULL DEFAULT '',
   description TEXT,
+  is_published BOOLEAN NOT NULL DEFAULT FALSE,
+  price DECIMAL(10, 2) DEFAULT 0,
+  sales_count INTEGER NOT NULL DEFAULT 0,
+  earnings_total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  rating DECIMAL(3, 2) NOT NULL DEFAULT 0,
+  marketplace_languages TEXT[] NOT NULL DEFAULT '{}',
+  marketplace_categories TEXT[] NOT NULL DEFAULT '{}',
+  marketplace_ceremony_types TEXT[] NOT NULL DEFAULT '{}',
+  marketplace_published_at TIMESTAMPTZ,
+  marketplace_url TEXT,
+  stripe_product_id TEXT,
+  stripe_price_id TEXT,
+  last_sale_at TIMESTAMPTZ,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -31,6 +44,11 @@ DROP POLICY IF EXISTS "Users can view own scripts" ON public.scripts;
 CREATE POLICY "Users can view own scripts"
   ON public.scripts FOR SELECT
   USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Anyone can view published scripts" ON public.scripts;
+CREATE POLICY "Anyone can view published scripts"
+  ON public.scripts FOR SELECT
+  USING (is_published = TRUE);
 
 DROP POLICY IF EXISTS "Users can insert own scripts" ON public.scripts;
 CREATE POLICY "Users can insert own scripts"

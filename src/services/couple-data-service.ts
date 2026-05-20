@@ -54,6 +54,10 @@ export interface Task {
   priority?: string
   category?: string
   details?: string
+  email_reminder?: boolean
+  reminder_days?: number
+  reminder_sent?: boolean
+  reminder_sent_at?: string
   created_at?: string
 }
 
@@ -112,6 +116,17 @@ export interface Payment {
   status?: string
   due_date?: string
   paid_date?: string
+  created_at?: string
+}
+
+export interface InvoiceServiceItem {
+  id: number
+  user_id: string
+  service: string
+  description?: string | null
+  category?: string | null
+  quantity?: number
+  rate?: number
   created_at?: string
 }
 
@@ -247,6 +262,8 @@ export async function addTask(userId: string, coupleId: number, taskData: {
   priority?: string
   category?: string
   details?: string
+  emailReminder?: boolean
+  reminderDays?: number
 }): Promise<{ ok: boolean; data?: Task; error?: string }> {
   try {
     const { data, error } = await supabase
@@ -260,7 +277,11 @@ export async function addTask(userId: string, coupleId: number, taskData: {
         due_time: taskData.dueTime || null,
         priority: taskData.priority || "medium",
         category: taskData.category || null,
-        details: taskData.details || null
+        details: taskData.details || null,
+        email_reminder: taskData.emailReminder || false,
+        reminder_days: taskData.reminderDays || 1,
+        reminder_sent: false,
+        reminder_sent_at: null
       })
       .select()
       .single()
@@ -576,10 +597,7 @@ export async function updateContract(contractId: number, updates: Partial<Contra
   try {
     const { error } = await supabase
       .from("contracts")
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
+      .update(updates)
       .eq("id", contractId)
 
     if (error) {
@@ -641,6 +659,26 @@ export async function loadPayments(userId: string, coupleId: number): Promise<{ 
   }
 }
 
+export async function loadAllPayments(userId: string): Promise<{ ok: boolean; data?: Payment[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("[ERROR] Error loading all payments:", error)
+      return { ok: false, error: error.message }
+    }
+
+    return { ok: true, data: data || [] }
+  } catch (err: any) {
+    console.error("[ERROR] Exception loading all payments:", err)
+    return { ok: false, error: err.message }
+  }
+}
+
 export async function addPayment(userId: string, coupleId: number, paymentData: {
   description: string
   amount: number
@@ -697,6 +735,82 @@ export async function updatePayment(paymentId: number, updates: Partial<Payment>
 }
 
 // ============================================
+// INVOICE SERVICE ITEMS (per officiant)
+// ============================================
+
+export async function loadInvoiceServices(userId: string): Promise<{ ok: boolean; data?: InvoiceServiceItem[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("invoice_service_items")
+      .select("*")
+      .eq("user_id", userId)
+      .order("service", { ascending: true })
+
+    if (error) {
+      console.error("[ERROR] Error loading invoice services:", error)
+      return { ok: false, error: error.message }
+    }
+
+    return { ok: true, data: data || [] }
+  } catch (err: any) {
+    console.error("[ERROR] Exception loading invoice services:", err)
+    return { ok: false, error: err.message }
+  }
+}
+
+export async function addInvoiceService(userId: string, serviceData: {
+  service: string
+  description?: string
+  category?: string
+  quantity?: number
+  rate?: number
+}): Promise<{ ok: boolean; data?: InvoiceServiceItem; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("invoice_service_items")
+      .upsert({
+        user_id: userId,
+        service: serviceData.service.trim(),
+        description: serviceData.description || null,
+        category: serviceData.category || "Ceremony Services",
+        quantity: serviceData.quantity || 1,
+        rate: serviceData.rate || 0,
+      }, { onConflict: "user_id,service" })
+      .select()
+      .single()
+
+    if (error) {
+      console.error("[ERROR] Error adding invoice service:", error)
+      return { ok: false, error: error.message }
+    }
+
+    return { ok: true, data }
+  } catch (err: any) {
+    console.error("[ERROR] Exception adding invoice service:", err)
+    return { ok: false, error: err.message }
+  }
+}
+
+export async function deleteInvoiceService(serviceId: number): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from("invoice_service_items")
+      .delete()
+      .eq("id", serviceId)
+
+    if (error) {
+      console.error("[ERROR] Error deleting invoice service:", error)
+      return { ok: false, error: error.message }
+    }
+
+    return { ok: true }
+  } catch (err: any) {
+    console.error("[ERROR] Exception deleting invoice service:", err)
+    return { ok: false, error: err.message }
+  }
+}
+
+// ============================================
 // SCRIPTS (per officiant, optionally per couple)
 // ============================================
 
@@ -709,8 +823,33 @@ export interface Script {
   status: string
   content: string
   description?: string
+  is_published?: boolean
+  price?: number | null
+  sales_count?: number
+  earnings_total?: number
+  rating?: number
+  marketplace_languages?: string[]
+  marketplace_categories?: string[]
+  marketplace_ceremony_types?: string[]
+  marketplace_visibility?: string
+  marketplace_published_at?: string | null
+  marketplace_url?: string | null
+  stripe_product_id?: string | null
+  stripe_price_id?: string | null
   created_at?: string
   updated_at?: string
+}
+
+export interface ScriptSale {
+  id: number
+  user_id: string
+  script_id: number
+  buyer_email?: string | null
+  amount: number
+  platform_fee?: number
+  net_amount: number
+  stripe_payment_intent_id?: string | null
+  created_at?: string
 }
 
 export async function loadScripts(userId: string, coupleId?: number): Promise<{ ok: boolean; data?: Script[]; error?: string }> {
@@ -748,6 +887,12 @@ export async function addScript(userId: string, scriptData: {
   content: string
   description?: string
   coupleId?: number | null
+  isPublished?: boolean
+  price?: number
+  marketplaceLanguages?: string[]
+  marketplaceCategories?: string[]
+  marketplaceCeremonyTypes?: string[]
+  marketplaceVisibility?: string
 }): Promise<{ ok: boolean; data?: Script; error?: string }> {
   try {
     const { data, error } = await supabase
@@ -759,7 +904,14 @@ export async function addScript(userId: string, scriptData: {
         type: scriptData.type,
         status: scriptData.status,
         content: scriptData.content,
-        description: scriptData.description || null
+        description: scriptData.description || null,
+        is_published: scriptData.isPublished || false,
+        price: scriptData.price || null,
+        marketplace_languages: scriptData.marketplaceLanguages || [],
+        marketplace_categories: scriptData.marketplaceCategories || [],
+        marketplace_ceremony_types: scriptData.marketplaceCeremonyTypes || [],
+        marketplace_visibility: scriptData.marketplaceVisibility || "main_marketplace",
+        marketplace_published_at: scriptData.isPublished ? new Date().toISOString() : null
       })
       .select()
       .single()
@@ -773,6 +925,26 @@ export async function addScript(userId: string, scriptData: {
     return { ok: true, data }
   } catch (err: any) {
     console.error("[ERROR] Exception adding script:", err)
+    return { ok: false, error: err.message }
+  }
+}
+
+export async function loadScriptSales(userId: string): Promise<{ ok: boolean; data?: ScriptSale[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("script_sales")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("[ERROR] Error loading script sales:", error)
+      return { ok: false, error: error.message }
+    }
+
+    return { ok: true, data: data || [] }
+  } catch (err: any) {
+    console.error("[ERROR] Exception loading script sales:", err)
     return { ok: false, error: err.message }
   }
 }

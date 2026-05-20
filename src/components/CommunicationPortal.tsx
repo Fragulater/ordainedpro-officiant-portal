@@ -28,12 +28,17 @@ import {
   updateContract as updateContractInDB,
   deleteContract as deleteContractFromDB,
   loadPayments as loadPaymentsFromDB,
+  loadAllPayments as loadAllPaymentsFromDB,
   addPayment as addPaymentToDB,
   updatePayment as updatePaymentInDB,
+  loadInvoiceServices as loadInvoiceServicesFromDB,
+  addInvoiceService as addInvoiceServiceToDB,
+  deleteInvoiceService as deleteInvoiceServiceFromDB,
   loadScripts as loadScriptsFromDB,
   addScript as addScriptToDB,
   updateScript as updateScriptInDB,
   deleteScript as deleteScriptFromDB,
+  loadScriptSales as loadScriptSalesFromDB,
   autoSaveScript as autoSaveScriptToDB
 } from "@/services/couple-data-service"
 import { PortalHeader } from "./communication-portal/CeremoniesCouples/PortalHeader"
@@ -70,6 +75,69 @@ const deriveContractStoragePath = (fileUrl: string | null | undefined) => {
   } catch {
     return null
   }
+}
+
+const getContractFileUrl = (contract: any) => contract?.fileUrl || contract?.file_url || contract?.file?.url || ""
+
+const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`
+
+const getInvoiceItemAmount = (item: { quantity: number; rate: number }) => item.quantity * item.rate
+
+const calculateInvoiceValues = (form: any) => {
+  const subtotal = form.items.reduce((sum: number, item: any) => sum + getInvoiceItemAmount(item), 0)
+  const taxAmount = subtotal * (form.taxRate / 100)
+  const total = subtotal + taxAmount
+  const balanceDue = Math.max(0, total - (form.depositPaid || 0))
+
+  return {
+    subtotal: Math.round(subtotal * 100) / 100,
+    taxAmount: Math.round(taxAmount * 100) / 100,
+    total: Math.round(total * 100) / 100,
+    balanceDue: Math.round(balanceDue * 100) / 100,
+  }
+}
+
+const marketplaceBaseUrl = process.env.NEXT_PUBLIC_MARKETPLACE_URL || "https://scripts.ordainedpro.com"
+const MAIN_MARKETPLACE_SCRIPT_LIMIT = 10
+
+const userHasActiveSellerSubscription = async (userId: string) => {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("tier,status,cancel_at_period_end,created_at")
+    .eq("user_id", userId)
+    .in("tier", ["aspirant", "professional"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.error("Unable to verify seller subscription:", error)
+    return false
+  }
+
+  return data?.status === "active" && data?.cancel_at_period_end !== true
+}
+
+const getMainMarketplaceScriptCount = async (userId: string, excludeScriptId?: number) => {
+  let query = supabase
+    .from("scripts")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("is_published", true)
+    .eq("marketplace_visibility", "main_marketplace")
+
+  if (excludeScriptId) {
+    query = query.neq("id", excludeScriptId)
+  }
+
+  const { count, error } = await query
+
+  if (error) {
+    console.error("Unable to count main marketplace scripts:", error)
+    return null
+  }
+
+  return count || 0
 }
 
 // AI Chatbot Interfaces
@@ -383,6 +451,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const [showSendPaymentReminderDialog, setShowSendPaymentReminderDialog] = useState(false)
   const [showGenerateInvoiceDialog, setShowGenerateInvoiceDialog] = useState(false)
   const [sendingContract, setSendingContract] = useState<any>(null)
+  const [isSendingContractEmail, setIsSendingContractEmail] = useState(false)
   const [emailForm, setEmailForm] = useState({
     to: '',
     customEmail: '',
@@ -425,6 +494,8 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     bankDetails: 'Bank transfers available upon request',
     emailRecipients: 'both'
   })
+  const [savedInvoiceServices, setSavedInvoiceServices] = useState<any[]>([])
+  const [isSendingInvoice, setIsSendingInvoice] = useState(false)
   const [viewingContract, setViewingContract] = useState<any>(null)
   const [viewingFile, setViewingFile] = useState<any>(null)
   const [editMeetingForm, setEditMeetingForm] = useState({
@@ -763,8 +834,8 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         priority: t.priority || "medium",
         category: t.category || "General",
         details: t.details || "",
-        emailReminder: false,
-        reminderDays: 1,
+        emailReminder: t.email_reminder || false,
+        reminderDays: t.reminder_days || 1,
         createdDate: t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : ""
       }))
       setTasks(transformedTasks)
@@ -965,6 +1036,46 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     loadPaymentsForCouple()
   }, [loadPaymentsForCouple])
 
+  const loadFinancialPaymentsForUser = useCallback(async () => {
+    if (!currentUser?.id) return
+
+    const result = await loadAllPaymentsFromDB(currentUser.id)
+    if (result.ok && result.data) {
+      setAllPaymentRecords(result.data.map((payment: any) => ({
+        id: payment.id,
+        coupleId: payment.couple_id,
+        description: payment.description,
+        amount: Number(payment.amount) || 0,
+        type: payment.payment_type || "service",
+        status: payment.status || "pending",
+        dueDate: payment.due_date || "",
+        paidDate: payment.paid_date || payment.created_at || "",
+        createdAt: payment.created_at || "",
+      })))
+    } else {
+      setAllPaymentRecords([])
+    }
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    loadFinancialPaymentsForUser()
+  }, [loadFinancialPaymentsForUser])
+
+  const loadSavedInvoiceServices = useCallback(async () => {
+    if (!currentUser?.id) return
+
+    const result = await loadInvoiceServicesFromDB(currentUser.id)
+    if (result.ok && result.data) {
+      setSavedInvoiceServices(result.data)
+    } else {
+      setSavedInvoiceServices([])
+    }
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    loadSavedInvoiceServices()
+  }, [loadSavedInvoiceServices])
+
   // Load scripts when user changes
   const [isLoadingScripts, setIsLoadingScripts] = useState(false)
 
@@ -990,7 +1101,25 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
           month: 'short',
           day: 'numeric'
         }) : '',
-        coupleId: s.couple_id
+        createdDate: s.created_at ? new Date(s.created_at).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        }) : '',
+        coupleId: s.couple_id,
+        isPublished: s.is_published || false,
+        price: Number(s.price) || 0,
+        sales: s.sales_count || 0,
+        earnings: Number(s.earnings_total) || 0,
+        rating: Number(s.rating) || 0,
+        marketplaceLanguages: Array.isArray(s.marketplace_languages) ? s.marketplace_languages : [],
+        marketplaceCategories: Array.isArray(s.marketplace_categories) ? s.marketplace_categories : [],
+        marketplaceCeremonyTypes: Array.isArray(s.marketplace_ceremony_types) ? s.marketplace_ceremony_types : [],
+        marketplaceVisibility: s.marketplace_visibility || "main_marketplace",
+        marketplacePublishedAt: s.marketplace_published_at,
+        marketplaceUrl: s.marketplace_url || `${marketplaceBaseUrl}/scripts/${s.id}`,
+        stripeProductId: s.stripe_product_id,
+        stripePriceId: s.stripe_price_id
       }))
       setCoupleScripts(transformedScripts)
       console.log("âœ… Loaded", transformedScripts.length, "scripts from database")
@@ -1005,6 +1134,21 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   useEffect(() => {
     loadScriptsForUser()
   }, [loadScriptsForUser])
+
+  const loadSalesForUser = useCallback(async () => {
+    if (!currentUser?.id) return
+
+    const result = await loadScriptSalesFromDB(currentUser.id)
+    if (result.ok && result.data) {
+      setScriptSales(result.data)
+    } else {
+      setScriptSales([])
+    }
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    loadSalesForUser()
+  }, [loadSalesForUser])
 
   // Script Management States
   const [showScriptEditorDialog, setShowScriptEditorDialog] = useState(false)
@@ -1726,7 +1870,7 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
         const timestamp = new Date().toLocaleTimeString()
 
         // Auto-save to database
-        if (editingScript.id && typeof editingScript.id === 'number') {
+        if (coupleScripts.some(script => script.id === editingScript.id)) {
           const result = await autoSaveScriptToDB(editingScript.id, currentContent)
           if (result.ok) {
             console.log(`Auto-saved "${editingScript.title}" to database at ${timestamp}`)
@@ -1853,7 +1997,8 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
       console.log('Loading content for script:', script.title)
     }
 
-    // Switch to Script Editor tab instead of opening dialog
+    // Open the dedicated script editor dialog and keep the editor tab in sync.
+    setShowScriptEditorDialog(true)
     setScriptBuilderTab('editor')
   }
 
@@ -1929,7 +2074,9 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
       return
     }
 
-    if (paymentInfo.balance > 0 && amount > paymentInfo.balance) {
+    const isRefund = newPayment.kind === "refund"
+
+    if (!isRefund && paymentInfo.balance > 0 && amount > paymentInfo.balance) {
       alert(`Payment amount (${amount}) cannot exceed balance due (${paymentInfo.balance})`)
       return
     }
@@ -1938,10 +2085,10 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
 
     // Save to database
     const result = await addPaymentToDB(currentUser.id, editCoupleInfo.id, {
-      description: amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
+      description: isRefund ? `Refund - ${newPayment.notes || "Manual refund"}` : amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
       amount: amount,
-      paymentType: "service",
-      status: "paid",
+      paymentType: isRefund ? "refund" : newPayment.method,
+      status: isRefund ? "refunded" : "paid",
       dueDate: newPayment.date
     })
 
@@ -1951,9 +2098,9 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
         id: result.data.id,
         date: new Date(newPayment.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
         amount: amount,
-        type: amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
+        type: isRefund ? "Refund" : amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
         method: newPayment.method,
-        status: "paid",
+        status: isRefund ? "refunded" : "paid",
         notes: newPayment.notes
       }
 
@@ -1961,8 +2108,8 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
       setPaymentHistory(prev => [...prev, payment])
 
       // Update payment info
-      const newDepositPaid = paymentInfo.depositPaid + amount
-      const newBalance = Math.max(0, paymentInfo.balance - amount)
+      const newDepositPaid = isRefund ? Math.max(0, paymentInfo.depositPaid - amount) : paymentInfo.depositPaid + amount
+      const newBalance = isRefund ? paymentInfo.balance + amount : Math.max(0, paymentInfo.balance - amount)
 
       setPaymentInfo(prev => ({
         ...prev,
@@ -1976,13 +2123,17 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
         amount: "",
         date: new Date().toISOString().split('T')[0],
         method: "Credit Card",
-        notes: ""
+        notes: "",
+        kind: "payment"
       })
       setShowRecordPaymentDialog(false)
+      loadFinancialPaymentsForUser()
 
       // Show success message
       console.log("âœ… Payment recorded:", payment)
-      if (newBalance === 0) {
+      if (isRefund) {
+        alert(`Refund of ${amount} recorded successfully.`)
+      } else if (newBalance === 0) {
         alert("Payment recorded successfully! This ceremony is now PAID IN FULL! [CELEBRATE]")
       } else {
         alert(`Payment of ${amount} recorded successfully!\n\nRemaining balance: ${newBalance}`)
@@ -2168,8 +2319,8 @@ ${officiantLabel}`,
     if (!editingScript || !currentUser?.id) return
 
     // Check if this is a new script or existing script (before any updates)
-    const isNewScript = !coupleScripts.find(script => script.id === editingScript.id) &&
-                        typeof editingScript.id !== 'number'
+    const existingDbScript = coupleScripts.find(script => script.id === editingScript.id)
+    const isNewScript = !existingDbScript
 
     // Get the current content from the editor element to ensure we have the latest formatted content
     const editorElement = editorRef.current || document.getElementById('script-editor') as HTMLDivElement
@@ -2178,7 +2329,8 @@ ${officiantLabel}`,
     console.log('Save Script Debug:', {
       isNewScript,
       editingScriptId: editingScript.id,
-      existingScripts: coupleScripts.map(s => s.id),
+        existingScripts: coupleScripts.map(s => s.id),
+        existingDbScriptFound: !!existingDbScript,
       editorFound: !!editorElement
     })
 
@@ -2494,7 +2646,7 @@ ${shareScriptForm.body}`)
           to: '',
           customEmail: '',
           subject: `Contract: ${contract.name}`,
-          body: `Hi,\n\nI've prepared your "${contract.name}" for review and signature. Please take a look at the attached contract and let me know if you have any questions.\n\nBest regards,\n${officiantLabel}`
+          body: `Hi,\n\nI've prepared your "${contract.name}" for review and signature. Please use the document link below to take a look, and let me know if you have any questions.\n\nBest regards,\n${officiantLabel}`
         })
         setShowSendContractDialog(true)
         console.log('Opening send dialog for contract:', contract.name)
@@ -2561,7 +2713,315 @@ ${shareScriptForm.body}`)
     })
 
     console.log(`Contract "${sendingContract.name}" sent to: ${recipient}`)
-    alert(`Contract "${sendingContract.name}" has been sent successfully to ${recipient}!`)
+  }
+
+  const readScriptUploadFile = async (file: File) => {
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+
+    if (fileExtension === 'docx') {
+      const arrayBuffer = await file.arrayBuffer()
+      const result = await mammoth.extractRawText({ arrayBuffer })
+      return result.value
+    }
+
+    if (fileExtension === 'txt') {
+      return file.text()
+    }
+
+    throw new Error(`Unsupported file type: .${fileExtension}. Please upload a .docx or .txt file.`)
+  }
+
+  type MarketplaceScriptDetails = {
+    price: number
+    languages: string[]
+    categories: string[]
+    ceremonyTypes: string[]
+    visibility: "main_marketplace" | "store_only"
+  }
+
+  const handleUploadMarketplaceScript = async (file: File, details: MarketplaceScriptDetails) => {
+    if (!file || !currentUser?.id) return
+
+    try {
+      const canSell = await userHasActiveSellerSubscription(currentUser.id)
+      if (!canSell) {
+        alert("An active Aspirant or Professional subscription is required to sell scripts in the marketplace.")
+        return
+      }
+
+      const content = await readScriptUploadFile(file)
+      const title = file.name.replace(/\.(docx|txt)$/i, '')
+      const price = Math.max(0, Number(details.price || 0))
+      const primaryCeremonyType = details.ceremonyTypes[0] || "Other"
+      const visibility = details.visibility || "main_marketplace"
+
+      if (visibility === "main_marketplace") {
+        const mainMarketplaceCount = await getMainMarketplaceScriptCount(currentUser.id)
+        if (mainMarketplaceCount === null) {
+          alert("Unable to verify your marketplace script count. Please try again.")
+          return
+        }
+
+        if (mainMarketplaceCount >= MAIN_MARKETPLACE_SCRIPT_LIMIT) {
+          alert("You have reached the maximum of 10 scripts allowed in the main marketplace. Remove one from the marketplace or publish this script to your store only.")
+          return
+        }
+      }
+
+      const result = await addScriptToDB(currentUser.id, {
+        title,
+        type: primaryCeremonyType,
+        status: visibility === "main_marketplace" ? "Published" : "Store Listing",
+        content,
+        description: content.slice(0, 220),
+        coupleId: null,
+        isPublished: true,
+        price,
+        marketplaceLanguages: details.languages,
+        marketplaceCategories: details.categories,
+        marketplaceCeremonyTypes: details.ceremonyTypes,
+        marketplaceVisibility: visibility,
+      })
+
+      if (!result.ok || !result.data) {
+        alert(`Failed to publish script: ${result.error || "Please try again."}`)
+        return
+      }
+
+      const marketplaceUrl = `${marketplaceBaseUrl}/scripts/${result.data.id}`
+      await updateScriptInDB(result.data.id, { marketplace_url: marketplaceUrl })
+
+      const publishedScript = {
+        id: result.data.id,
+        title: result.data.title,
+        type: result.data.type,
+        status: result.data.status,
+        content: result.data.content,
+        description: result.data.description || '',
+        lastModified: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+        createdDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+        coupleId: null,
+        isPublished: true,
+        marketplaceVisibility: visibility,
+        price,
+        sales: 0,
+        earnings: 0,
+        rating: 0,
+        marketplaceLanguages: details.languages,
+        marketplaceCategories: details.categories,
+        marketplaceCeremonyTypes: details.ceremonyTypes,
+        marketplaceUrl,
+      }
+
+      setCoupleScripts(prev => [publishedScript, ...prev])
+    } catch (error) {
+      console.error("Failed to upload marketplace script:", error)
+      alert(error instanceof Error ? error.message : "Failed to upload marketplace script.")
+    }
+  }
+
+  const handlePublishScriptToMarketplace = async (script: any, details: MarketplaceScriptDetails) => {
+    if (typeof script.id !== 'number') {
+      alert("Please save this script before publishing it to the marketplace.")
+      return
+    }
+
+    if (!currentUser?.id) return
+
+    const canSell = await userHasActiveSellerSubscription(currentUser.id)
+    if (!canSell) {
+      alert("An active Aspirant or Professional subscription is required to sell scripts in the marketplace.")
+      return
+    }
+
+    const price = Math.max(0, Number(details.price || 0))
+    const primaryCeremonyType = details.ceremonyTypes[0] || script.type || "Other"
+    const visibility = details.visibility || "main_marketplace"
+    const marketplaceUrl = `${marketplaceBaseUrl}/scripts/${script.id}`
+
+    if (visibility === "main_marketplace") {
+      const mainMarketplaceCount = await getMainMarketplaceScriptCount(currentUser.id, script.id)
+      if (mainMarketplaceCount === null) {
+        alert("Unable to verify your marketplace script count. Please try again.")
+        return
+      }
+
+      if (mainMarketplaceCount >= MAIN_MARKETPLACE_SCRIPT_LIMIT) {
+        alert("You have reached the maximum of 10 scripts allowed in the main marketplace. Remove one from the marketplace or publish this script to your store only.")
+        return
+      }
+    }
+
+    const result = await updateScriptInDB(script.id, {
+      is_published: true,
+      price,
+      status: visibility === "main_marketplace" ? "Published" : "Store Listing",
+      type: primaryCeremonyType,
+      marketplace_languages: details.languages,
+      marketplace_categories: details.categories,
+      marketplace_ceremony_types: details.ceremonyTypes,
+      marketplace_visibility: visibility,
+      marketplace_published_at: new Date().toISOString(),
+      marketplace_url: marketplaceUrl,
+    } as any)
+
+    if (!result.ok) {
+      alert(`Failed to publish script: ${result.error}`)
+      return
+    }
+
+    setCoupleScripts(prev => prev.map(item =>
+      item.id === script.id
+        ? {
+            ...item,
+            isPublished: true,
+            price,
+            status: visibility === "main_marketplace" ? "Published" : "Store Listing",
+            type: primaryCeremonyType,
+            marketplaceLanguages: details.languages,
+            marketplaceCategories: details.categories,
+            marketplaceCeremonyTypes: details.ceremonyTypes,
+            marketplaceVisibility: visibility,
+            marketplacePublishedAt: new Date().toISOString(),
+            marketplaceUrl,
+          }
+        : item
+    ))
+  }
+
+  const handleUnpublishScriptFromMarketplace = async (script: any) => {
+    if (typeof script.id !== 'number') return
+
+    if (!confirm(`Remove "${script.title}" from the public marketplace? The script will stay in your library as a draft.`)) {
+      return
+    }
+
+    const result = await updateScriptInDB(script.id, {
+      is_published: false,
+      status: "Marketplace Draft",
+    } as any)
+
+    if (!result.ok) {
+      alert(`Failed to unpublish script: ${result.error}`)
+      return
+    }
+
+    setCoupleScripts(prev => prev.map(item =>
+      item.id === script.id ? { ...item, isPublished: false, status: "Marketplace Draft" } : item
+    ))
+  }
+
+  const handleViewMarketplaceScript = (script: any) => {
+    if (!script.isPublished) {
+      handleViewScript(script)
+      return
+    }
+
+    if (script.marketplaceVisibility === "store_only" && currentUser?.id) {
+      window.open(`${marketplaceBaseUrl}/store/${currentUser.id}`, "_blank", "noopener,noreferrer")
+      return
+    }
+
+    window.open(script.marketplaceUrl || `${marketplaceBaseUrl}/scripts/${script.id}`, "_blank", "noopener,noreferrer")
+  }
+
+  const getContractEmailRecipients = () => {
+    if (emailForm.to === "both") {
+      return [editCoupleInfo?.brideEmail, editCoupleInfo?.groomEmail]
+        .filter((email): email is string => Boolean(email?.trim()))
+        .filter((email, index, all) => all.indexOf(email) === index)
+    }
+
+    if (emailForm.to) {
+      return [emailForm.to]
+    }
+
+    const customEmail = emailForm.customEmail.trim()
+    return customEmail && customEmail !== "custom" ? [customEmail] : []
+  }
+
+  const handleSendContractRealEmail = async () => {
+    if (!sendingContract || isSendingContractEmail) return
+
+    const recipients = getContractEmailRecipients()
+    if (recipients.length === 0) {
+      alert('Please select a recipient or enter an email address.')
+      return
+    }
+
+    if (!emailForm.subject.trim()) {
+      alert('Please enter a subject.')
+      return
+    }
+
+    if (!emailForm.body.trim()) {
+      alert('Please enter a message body.')
+      return
+    }
+
+    const contractUrl = getContractFileUrl(sendingContract)
+    if (!contractUrl) {
+      alert("This contract does not have a document link yet.")
+      return
+    }
+
+    setIsSendingContractEmail(true)
+
+    try {
+      const messageWithLink = `${emailForm.body.trim()}\n\nView/download contract:\n${contractUrl}`
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: recipients,
+          subject: emailForm.subject.trim(),
+          message: messageWithLink,
+          fromName: officiantName,
+          coupleName: `${editCoupleInfo?.brideName || ""} & ${editCoupleInfo?.groomName || ""}`.trim(),
+          coupleId: editCoupleInfo?.id,
+          officiantId: currentUser?.id,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null)
+        throw new Error(error?.error || "Failed to send contract email.")
+      }
+
+      const sentAt = new Date()
+      const updateResult = await updateContractInDB(sendingContract.id, {
+        status: "sent",
+        sent_date: sentAt.toISOString(),
+      })
+
+      if (!updateResult.ok) {
+        console.error("Contract email sent, but status update failed:", updateResult.error)
+      }
+
+      setContracts(prev => prev.map(c =>
+        c.id === sendingContract.id
+          ? { ...c, status: 'sent', sentDate: sentAt.toLocaleDateString(), sent_date: sentAt.toISOString() } as any
+          : c
+      ))
+
+      setShowSendContractDialog(false)
+      setSendingContract(null)
+      setEmailForm({
+        to: '',
+        customEmail: '',
+        subject: '',
+        body: ''
+      })
+
+      console.log(`Contract "${sendingContract.name}" sent to: ${recipients.join(", ")}`)
+    } catch (error) {
+      console.error("Failed to send contract email:", error)
+      alert(error instanceof Error ? error.message : "Failed to send contract email.")
+    } finally {
+      setIsSendingContractEmail(false)
+    }
   }
 
   // Handle opening payment reminder dialog
@@ -2708,10 +3168,6 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
 
       console.log("âœ… Contract uploaded:", newContract)
 
-      // Show success message
-      setTimeout(() => {
-        alert(`Contract "${contractData.name}" uploaded successfully and is now available in Contract Management!`)
-      }, 100)
     } else {
       const cleanupPath = deriveContractStoragePath(publicUrlData.publicUrl)
       if (cleanupPath) {
@@ -2737,6 +3193,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
 
   // Payments are now loaded per couple from the database
   const [paymentHistory, setPaymentHistory] = useState<any[]>([])
+  const [allPaymentRecords, setAllPaymentRecords] = useState<any[]>([])
   const [isLoadingPayments, setIsLoadingPayments] = useState(false)
 
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false)
@@ -2745,12 +3202,16 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     amount: "",
     date: new Date().toISOString().split('T')[0],
     method: "Credit Card",
-    notes: ""
+    notes: "",
+    kind: "payment"
   })
   const [uploadingScript, setUploadingScript] = useState(false)
 
   // Scripts are now loaded from database
   const [coupleScripts, setCoupleScripts] = useState<any[]>([])
+  const [scriptSales, setScriptSales] = useState<any[]>([])
+  const [showMarketplaceAnalytics, setShowMarketplaceAnalytics] = useState(false)
+  const [showPayoutHistory, setShowPayoutHistory] = useState(false)
 
   // Demo scripts for marketplace (not editable)
   const demoScriptsForMarketplace = [
@@ -2881,35 +3342,103 @@ Note: This is an initial draft. Further development needed to incorporate specif
     }
   ]
 
-  const myScripts = [
-    {
-      id: 1,
-      title: "Traditional Christian Wedding Ceremony",
-      price: 25,
-      sales: 42,
-      rating: 4.8,
-      status: "active",
-      earnings: 1050
-    },
-    {
-      id: 2,
-      title: "Modern Non-Religious Unity Ceremony",
-      price: 20,
-      sales: 28,
-      rating: 4.9,
-      status: "active",
-      earnings: 560
-    },
-    {
-      id: 3,
-      title: "Interfaith Wedding Script",
-      price: 30,
-      sales: 15,
-      rating: 4.7,
-      status: "draft",
-      earnings: 450
+  const accountCreatedAt = currentUser?.created_at || officiantProfile?.created_at || new Date().toISOString()
+  const accountCreatedDate = new Date(accountCreatedAt)
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+  const publishedScripts = coupleScripts.filter(script => script.isPublished)
+  const marketplaceDrafts = coupleScripts.filter(script => !script.isPublished && !script.coupleId)
+  const myScripts = [...publishedScripts, ...marketplaceDrafts].map(script => ({
+    ...script,
+    status: script.isPublished ? "active" : "draft",
+    sales: script.sales || scriptSales.filter(sale => sale.script_id === script.id).length,
+    earnings: script.earnings || scriptSales
+      .filter(sale => sale.script_id === script.id)
+      .reduce((sum, sale) => sum + Number(sale.net_amount || sale.amount || 0), 0),
+    rating: script.rating || 0,
+    price: script.price || 0,
+  }))
+  const mainMarketplaceScriptCount = coupleScripts.filter(script =>
+    script.isPublished && (script.marketplaceVisibility || "main_marketplace") === "main_marketplace"
+  ).length
+  const marketplaceTotalEarnings = scriptSales
+    .filter(sale => new Date(sale.created_at || Date.now()) >= accountCreatedDate)
+    .reduce((sum, sale) => sum + Number(sale.net_amount || sale.amount || 0), 0)
+  const marketplaceMonthEarnings = scriptSales
+    .filter(sale => new Date(sale.created_at || Date.now()) >= monthStart)
+    .reduce((sum, sale) => sum + Number(sale.net_amount || sale.amount || 0), 0)
+  const marketplaceSalesCount = scriptSales.filter(sale => new Date(sale.created_at || Date.now()) >= accountCreatedDate).length
+  const marketplaceAverageSale = marketplaceSalesCount > 0 ? marketplaceTotalEarnings / marketplaceSalesCount : 0
+  const marketplaceTopScript = myScripts
+    .slice()
+    .sort((a, b) => (b.earnings || 0) - (a.earnings || 0))[0]
+
+  const getPaymentDateValue = (payment: any) => new Date(payment.dueDate || payment.paidDate || payment.createdAt || Date.now())
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth()
+  const paidPaymentRecords = allPaymentRecords.filter(payment => payment.status === "paid")
+  const refundPaymentRecords = allPaymentRecords.filter(payment => payment.status === "refunded" || payment.type === "refund")
+  const pendingPaymentRecords = allPaymentRecords.filter(payment => payment.status === "pending")
+  const financialReport = {
+    grossIncome: paidPaymentRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    refunds: refundPaymentRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    netIncome: 0,
+    monthIncome: paidPaymentRecords
+      .filter(payment => {
+        const date = getPaymentDateValue(payment)
+        return date.getFullYear() === currentYear && date.getMonth() === currentMonth
+      })
+      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    yearIncome: paidPaymentRecords
+      .filter(payment => getPaymentDateValue(payment).getFullYear() === currentYear)
+      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    outstanding: pendingPaymentRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    paymentsReceived: paidPaymentRecords.length,
+    refundsIssued: refundPaymentRecords.length,
+  }
+  financialReport.netIncome = financialReport.grossIncome - financialReport.refunds
+  const financialRows = allPaymentRecords.map(payment => {
+    const couple = allCouples.find((item: any) => item.id === payment.coupleId)
+    return {
+      ...payment,
+      coupleName: couple ? `${couple.brideName} & ${couple.groomName}` : `Couple #${payment.coupleId || "Unassigned"}`,
+      weddingDate: couple?.weddingDetails?.weddingDate || "",
     }
-  ]
+  })
+  const outstandingBalanceRows = financialRows
+    .filter(payment => payment.status === "pending")
+    .sort((a, b) => getPaymentDateValue(a).getTime() - getPaymentDateValue(b).getTime())
+  const refundRows = financialRows.filter(payment => payment.status === "refunded" || payment.type === "refund")
+
+  const exportFinancialCsv = () => {
+    const headers = ["Date", "Couple", "Wedding Date", "Description", "Type", "Status", "Amount"]
+    const rows = financialRows.map(row => [
+      row.dueDate || row.paidDate || row.createdAt || "",
+      row.coupleName,
+      row.weddingDate,
+      row.description || "",
+      row.type || "",
+      row.status || "",
+      Number(row.amount || 0).toFixed(2),
+    ])
+    const csv = [headers, ...rows]
+      .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(","))
+      .join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `ordainedpro-financial-report-${new Date().toISOString().split("T")[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const printFinancialReport = () => {
+    window.print()
+  }
 
   const popularScripts = [
     { id: 1, title: "Beach Wedding Ceremony", author: "Rev. Sarah M.", price: 22, rating: 4.9, sales: 156 },
@@ -3223,12 +3752,29 @@ Note: This is an initial draft. Further development needed to incorporate specif
       }
 
       console.log(`Ceremony archived on server: ID ${currentCouple.id}`)
-      alert(`This ceremony has been archived on the server.\n\nYou can view and restore it from "View Archived Ceremonies" or the Archived filter in My Ceremonies.`)
     } else {
       setEditCoupleInfo({ ...currentCouple, isActive: true })
       console.log(`Ceremony restored on server: ID ${currentCouple.id}`)
       alert("Ceremony has been restored on the server and is now active!")
     }
+  }
+
+  const handleArchiveCoupleFromScript = async () => {
+    const currentCouple = allCouples[activeCoupleIndex]
+    if (!currentCouple?.id) return
+
+    if (!currentCouple.isActive) {
+      setShowArchivedCeremoniesDialog(true)
+      return
+    }
+
+    const confirmed = confirm(
+      `Archive this script and couple profile?\n\nIf you archive this script, it will also archive the couple's profile. You can revitalize it later from the Officiant Dashboard under Archived Ceremonies.`
+    )
+
+    if (!confirmed) return
+
+    await toggleCeremonyStatus()
   }
 
   const handleUnarchiveCouple = async (coupleId: number) => {
@@ -3262,7 +3808,9 @@ Note: This is an initial draft. Further development needed to incorporate specif
       dueTime: newTaskData.dueTime,
       priority: newTaskData.priority,
       category: newTaskData.category,
-      details: newTaskData.details
+      details: newTaskData.details,
+      emailReminder: newTaskData.emailReminder,
+      reminderDays: newTaskData.reminderDays
     })
 
     if (result.ok && result.data) {
@@ -3274,7 +3822,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
       }
       setTasks(prev => [...prev, newTask])
 
-      // Simulate backend email notification setup
+      // Send an immediate notification; future reminders are handled by the scheduled checker.
       if (newTaskData.emailReminder) {
         scheduleEmailNotification(newTask)
       }
@@ -3333,8 +3881,6 @@ Note: This is an initial draft. Further development needed to incorporate specif
       }
     }
 
-    // Store reminder in database for future sending
-    // TODO: Create task_reminders table and Supabase Edge Function for scheduled sends
     console.log(`[SCRIPT]… Reminder scheduled for ${reminderDate.toDateString()} - Recipients: ${recipients.join(', ')}`)
   }
 
@@ -3612,7 +4158,12 @@ OrdainedPro Wedding Portal
 
   // File viewer handler
   const handleViewFile = (file: any) => {
-    setViewingFile(file)
+    setViewingFile({ ...file, startInEditMode: false })
+    setShowFileViewerDialog(true)
+  }
+
+  const handleEditFile = (file: any) => {
+    setViewingFile({ ...file, startInEditMode: true })
     setShowFileViewerDialog(true)
   }
 
@@ -4073,6 +4624,63 @@ OrdainedPro Wedding Portal
     }
   }
 
+  const saveInvoiceServiceItem = async (item: any) => {
+    if (!currentUser?.id || !item.service?.trim()) return null
+
+    const result = await addInvoiceServiceToDB(currentUser.id, {
+      service: item.service,
+      description: item.description,
+      category: item.category,
+      quantity: item.quantity,
+      rate: item.rate,
+    })
+
+    if (result.ok && result.data) {
+      setSavedInvoiceServices(prev => {
+        const withoutDuplicate = prev.filter(service => service.id !== result.data?.id && service.service !== result.data?.service)
+        return [...withoutDuplicate, result.data].sort((a, b) => a.service.localeCompare(b.service))
+      })
+      return result.data
+    }
+
+    console.error("Failed to save invoice service:", result.error)
+    return null
+  }
+
+  const handleSaveInvoiceService = async (item: any) => {
+    const saved = await saveInvoiceServiceItem(item)
+    if (!saved) {
+      alert("Please add a service name before saving it.")
+    }
+  }
+
+  const handleDeleteInvoiceService = async (serviceId: number) => {
+    const result = await deleteInvoiceServiceFromDB(serviceId)
+    if (!result.ok) {
+      alert(`Failed to delete service: ${result.error}`)
+      return
+    }
+
+    setSavedInvoiceServices(prev => prev.filter(service => service.id !== serviceId))
+  }
+
+  const handleQuickAddInvoiceService = (serviceId: string) => {
+    const savedService = savedInvoiceServices.find(service => service.id.toString() === serviceId)
+    if (!savedService) return
+
+    const newItem = {
+      id: Date.now(),
+      service: savedService.service,
+      description: savedService.description || "",
+      category: savedService.category || "Ceremony Services",
+      quantity: savedService.quantity || 1,
+      rate: Number(savedService.rate) || 0,
+      amount: (savedService.quantity || 1) * (Number(savedService.rate) || 0),
+    }
+
+    setInvoiceForm(prev => ({ ...prev, items: [...prev.items, newItem] }))
+  }
+
   // Handle opening invoice generation dialog
   const handleOpenInvoiceDialog = () => {
     // Generate invoice number with ceremony-specific format
@@ -4080,6 +4688,7 @@ OrdainedPro Wedding Portal
     const today = new Date().toISOString().split('T')[0]
     const dueDate = new Date()
     dueDate.setDate(dueDate.getDate() + 30) // 30 days from today
+    const weddingDetails = editCoupleInfo?.weddingDetails || editWeddingDetails
 
     setInvoiceForm(prev => ({
       ...prev,
@@ -4087,8 +4696,8 @@ OrdainedPro Wedding Portal
       invoiceDate: today,
       dueDate: dueDate.toISOString().split('T')[0],
       coupleName: `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`,
-      weddingDate: editWeddingDetails.weddingDate,
-      venue: editWeddingDetails.venueName,
+      weddingDate: weddingDetails?.weddingDate || "",
+      venue: weddingDetails?.venueName || "",
       depositPaid: paymentInfo.depositPaid,
       balanceDue: paymentInfo.balance
     }))
@@ -4112,6 +4721,8 @@ OrdainedPro Wedding Portal
 
   // Generate invoice email content
   const generateInvoiceContent = () => {
+    const totals = calculateInvoiceValues(invoiceForm)
+
     return `Dear ${getFirstName(editCoupleInfo?.brideName)} and ${getFirstName(editCoupleInfo?.groomName)},
 
 Congratulations on your upcoming wedding! Please find your ceremony services invoice attached.
@@ -4140,14 +4751,17 @@ ${invoiceForm.items.map(item =>
 ).join('\n\n')}
 
 PAYMENT SUMMARY:
-* Subtotal: ${invoiceForm.subtotal}
-${invoiceForm.taxRate > 0 ? `* Tax (${invoiceForm.taxRate}%): ${invoiceForm.taxAmount}` : ''}
-* Deposit Previously Paid: -${invoiceForm.depositPaid}
-* Balance Due: ${invoiceForm.balanceDue}
-* TOTAL INVOICE AMOUNT: ${invoiceForm.total}
+* Subtotal: ${formatCurrency(totals.subtotal)}
+${invoiceForm.taxRate > 0 ? `* Tax (${invoiceForm.taxRate}%): ${formatCurrency(totals.taxAmount)}` : ''}
+* Deposit Previously Paid: -${formatCurrency(invoiceForm.depositPaid)}
+* Balance Due: ${formatCurrency(totals.balanceDue)}
+* TOTAL INVOICE AMOUNT: ${formatCurrency(totals.total)}
 
 PAYMENT METHODS ACCEPTED:
 ${invoiceForm.paymentMethods}
+
+ONLINE PAYMENT:
+Stripe payment link will be added here once the officiant Stripe setup is connected.
 
 ${invoiceForm.bankDetails ? `BANKING INFORMATION:\n${invoiceForm.bankDetails}\n` : ''}
 
@@ -4165,8 +4779,32 @@ ${officiantLabel}${officiantPhone ? `\n[SCRIPT]ž ${officiantPhone}` : ''}${offi
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•`
   }
 
+  const getInvoiceRecipients = () => {
+    if (invoiceForm.emailRecipients === 'both') {
+      return [editCoupleInfo.brideEmail, editCoupleInfo.groomEmail]
+        .filter((email): email is string => Boolean(email?.trim()))
+        .filter((email, index, all) => all.indexOf(email) === index)
+    }
+
+    if (invoiceForm.emailRecipients === 'bride') {
+      return editCoupleInfo.brideEmail ? [editCoupleInfo.brideEmail] : []
+    }
+
+    if (invoiceForm.emailRecipients === 'groom') {
+      return editCoupleInfo.groomEmail ? [editCoupleInfo.groomEmail] : []
+    }
+
+    if (invoiceForm.emailRecipients === 'custom') {
+      return []
+    }
+
+    return invoiceForm.emailRecipients?.trim() ? [invoiceForm.emailRecipients.trim()] : []
+  }
+
   // Handle invoice generation and sending
-  const handleGenerateAndSendInvoice = () => {
+  const handleGenerateAndSendInvoice = async () => {
+    if (isSendingInvoice) return
+
     if (!invoiceForm.invoiceNumber.trim()) {
       alert('Please enter an invoice number.')
       return
@@ -4187,35 +4825,75 @@ ${officiantLabel}${officiantPhone ? `\n[SCRIPT]ž ${officiantPhone}` : ''}${offi
       return
     }
 
-    // Calculate totals before generating
-    calculateInvoiceTotals()
+    const recipients = getInvoiceRecipients()
+    if (recipients.length === 0) {
+      alert('Please select at least one valid invoice recipient.')
+      return
+    }
+
+    const totals = calculateInvoiceValues(invoiceForm)
+    setInvoiceForm(prev => ({ ...prev, ...totals }))
 
     // Generate invoice content
     const invoiceContent = generateInvoiceContent()
 
-    // Determine email recipients
-    const recipients = invoiceForm.emailRecipients === 'both'
-      ? `${editCoupleInfo.brideEmail}, ${editCoupleInfo.groomEmail}`
-      : invoiceForm.emailRecipients === 'bride'
-      ? editCoupleInfo.brideEmail
-      : invoiceForm.emailRecipients === 'groom'
-      ? editCoupleInfo.groomEmail
-      : invoiceForm.emailRecipients
+    setIsSendingInvoice(true)
 
-    // Create invoice as a file attachment for messaging
-    const invoiceAttachment: UploadedFile = {
-      id: `invoice_${invoiceForm.invoiceNumber}_${Date.now()}`,
-      file: new File(['invoice content'], `${invoiceForm.invoiceNumber}.pdf`, { type: 'application/pdf' }),
-      name: `${invoiceForm.invoiceNumber}.pdf`,
-      size: 1048576, // 1MB simulated size
-      type: 'application/pdf',
-      url: '#',
-      uploadProgress: 100,
-      status: 'completed'
+    try {
+      await Promise.all(invoiceForm.items.map(item => saveInvoiceServiceItem(item)))
+
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: recipients,
+          subject: `Wedding Invoice ${invoiceForm.invoiceNumber}`,
+          message: invoiceContent,
+          fromName: officiantName,
+          coupleName: invoiceForm.coupleName,
+          coupleId: editCoupleInfo?.id,
+          officiantId: currentUser?.id,
+          attachments: [
+            {
+              filename: `${invoiceForm.invoiceNumber}.txt`,
+              content: invoiceContent,
+              contentType: "text",
+            },
+          ],
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null)
+        throw new Error(error?.error || "Failed to send invoice email.")
+      }
+
+      const paymentResult = await addPaymentToDB(currentUser.id, editCoupleInfo.id, {
+        description: `Invoice ${invoiceForm.invoiceNumber} - ${invoiceForm.coupleName}`,
+        amount: totals.balanceDue,
+        paymentType: "service",
+        status: totals.balanceDue > 0 ? "pending" : "paid",
+        dueDate: invoiceForm.dueDate,
+      })
+
+      if (!paymentResult.ok) {
+        console.error("Invoice email sent, but payment record was not saved:", paymentResult.error)
+      } else {
+        loadPaymentsForCouple()
+      }
+
+      setShowGenerateInvoiceDialog(false)
+      console.log(`Invoice ${invoiceForm.invoiceNumber} generated and sent to ${recipients.join(", ")}`)
+      return
+    } catch (error) {
+      console.error("Failed to generate/send invoice:", error)
+      alert(error instanceof Error ? error.message : "Failed to send invoice.")
+      return
+    } finally {
+      setIsSendingInvoice(false)
     }
-
-    // Add to messaging platform with detailed tracking
-    setMessageAttachments([invoiceAttachment])
     setNewMessage(`[SCRIPT]§ Wedding Invoice Sent
 
 Couple: ${invoiceForm.coupleName}
@@ -4471,12 +5149,16 @@ ${invoiceContent}`)
     setShowGenerateInvoiceDialog,
     sendingContract,
     setSendingContract,
+    isSendingContractEmail,
     emailForm,
     setEmailForm,
     paymentReminderForm,
     setPaymentReminderForm,
     invoiceForm,
     setInvoiceForm,
+    savedInvoiceServices,
+    setSavedInvoiceServices,
+    isSendingInvoice,
     viewingContract,
     setViewingContract,
     viewingFile,
@@ -4628,14 +5310,24 @@ ${invoiceContent}`)
     handleSaveScript,
     handleSendScript,
     handleContractAction,
-    handleSendContractEmail,
+    handleSendContractEmail: handleSendContractRealEmail,
     handleOpenPaymentReminderDialog,
     handleSendPaymentReminderEmail,
     handleContractUploaded,
+    handleSaveInvoiceService,
+    handleDeleteInvoiceService,
+    handleQuickAddInvoiceService,
     paymentInfo,
     setPaymentInfo,
     paymentHistory,
     setPaymentHistory,
+    allPaymentRecords,
+    financialReport,
+    financialRows,
+    outstandingBalanceRows,
+    refundRows,
+    exportFinancialCsv,
+    printFinancialReport,
     showInvoiceDialog,
     setShowInvoiceDialog,
     showRecordPaymentDialog,
@@ -4646,6 +5338,22 @@ ${invoiceContent}`)
     setUploadingScript,
     coupleScripts,
     setCoupleScripts,
+    scriptSales,
+    mainMarketplaceScriptCount,
+    marketplaceTotalEarnings,
+    marketplaceMonthEarnings,
+    marketplaceSalesCount,
+    marketplaceAverageSale,
+    marketplaceTopScript,
+    accountCreatedAt,
+    showMarketplaceAnalytics,
+    setShowMarketplaceAnalytics,
+    showPayoutHistory,
+    setShowPayoutHistory,
+    handleUploadMarketplaceScript,
+    handlePublishScriptToMarketplace,
+    handleUnpublishScriptFromMarketplace,
+    handleViewMarketplaceScript,
     myScripts,
     popularScripts,
     handleAddCeremony,
@@ -4660,6 +5368,7 @@ ${invoiceContent}`)
     handleEditMeeting,
     handleUpdateMeeting,
     toggleCeremonyStatus,
+    handleArchiveCoupleFromScript,
     handleUnarchiveCouple,
     handleAddTask,
     scheduleEmailNotification,
@@ -4676,6 +5385,7 @@ ${invoiceContent}`)
     getMeetingStatusIcon,
     getMeetingTypeIcon,
     handleViewFile,
+    handleEditFile,
     getContractViewerContent,
     getFileViewerContent,
     handleFilesUploaded,

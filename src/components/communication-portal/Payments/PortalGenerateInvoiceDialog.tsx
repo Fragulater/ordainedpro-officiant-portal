@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Send, Plus, Heart, CreditCard, Receipt, Trash2 } from "lucide-react"
+import { Send, Plus, Heart, CreditCard, Receipt, Trash2, Save } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 export function PortalGenerateInvoiceDialog() {
@@ -17,6 +17,11 @@ export function PortalGenerateInvoiceDialog() {
     invoiceForm,
     setInvoiceForm,
     editCoupleInfo,
+    savedInvoiceServices,
+    isSendingInvoice,
+    handleSaveInvoiceService,
+    handleDeleteInvoiceService,
+    handleQuickAddInvoiceService,
     handleGenerateAndSendInvoice,
   } = useCommunicationPortal()
 
@@ -250,20 +255,32 @@ export function PortalGenerateInvoiceDialog() {
                         />
                       </div>
                       <div className="md:col-span-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            if (invoiceForm.items.length > 1) {
-                              const newItems = invoiceForm.items.filter((_, idx) => idx !== index)
-                              setInvoiceForm({...invoiceForm, items: newItems})
-                            }
-                          }}
-                          className="text-red-600 hover:text-red-800"
-                          disabled={invoiceForm.items.length === 1}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex gap-2 md:flex-col">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSaveInvoiceService(item)}
+                            className="text-green-700 hover:text-green-900"
+                            title="Save service for future invoices"
+                          >
+                            <Save className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              if (invoiceForm.items.length > 1) {
+                                const newItems = invoiceForm.items.filter((_, idx) => idx !== index)
+                                setInvoiceForm({...invoiceForm, items: newItems})
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-800"
+                            disabled={invoiceForm.items.length === 1}
+                            title="Remove from this invoice"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                     <div className="mt-2 text-right">
@@ -297,62 +314,41 @@ export function PortalGenerateInvoiceDialog() {
                   Add Service Item
                 </Button>
 
-                {/* Quick Add Common Services */}
-                <Select
-                  onValueChange={(value) => {
-                    const commonServices = {
-                      'rehearsal': {
-                        service: 'Rehearsal Coordination',
-                        description: 'Ceremony rehearsal coordination and direction',
-                        category: 'Rehearsal',
-                        quantity: 1,
-                        rate: 150
-                      },
-                      'consultation': {
-                        service: 'Pre-Wedding Consultation',
-                        description: 'Wedding planning consultation and script development',
-                        category: 'Consultation',
-                        quantity: 1,
-                        rate: 100
-                      },
-                      'travel': {
-                        service: 'Travel Fee',
-                        description: 'Travel expenses to wedding venue',
-                        category: 'Travel',
-                        quantity: 1,
-                        rate: 50
-                      },
-                      'documentation': {
-                        service: 'Marriage License Filing',
-                        description: 'Processing and filing of marriage documentation',
-                        category: 'Documentation',
-                        quantity: 1,
-                        rate: 25
-                      }
-                    }
-
-                    if (commonServices[value as keyof typeof commonServices]) {
-                      const service = commonServices[value as keyof typeof commonServices]
-                      const newItem = {
-                        id: Date.now(),
-                        ...service,
-                        amount: service.quantity * service.rate
-                      }
-                      setInvoiceForm({...invoiceForm, items: [...invoiceForm.items, newItem]})
-                    }
-                  }}
-                >
+                <Select onValueChange={handleQuickAddInvoiceService}>
                   <SelectTrigger className="w-[200px] border-green-200">
-                    <SelectValue placeholder="Quick Add Service" />
+                    <SelectValue placeholder="Saved Services" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="rehearsal">+ Rehearsal ($150)</SelectItem>
-                    <SelectItem value="consultation">+ Consultation ($100)</SelectItem>
-                    <SelectItem value="travel">+ Travel Fee ($50)</SelectItem>
-                    <SelectItem value="documentation">+ Documentation ($25)</SelectItem>
+                    {savedInvoiceServices.length === 0 ? (
+                      <SelectItem value="none">No saved services yet</SelectItem>
+                    ) : (
+                      savedInvoiceServices.map((service: any) => (
+                        <SelectItem key={service.id} value={service.id.toString()}>
+                          + {service.service} (${Number(service.rate || 0).toFixed(2)})
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
+
+              {savedInvoiceServices.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {savedInvoiceServices.map((service: any) => (
+                    <div key={service.id} className="flex items-center gap-2 rounded-md border border-green-200 bg-white px-3 py-1 text-sm">
+                      <span>{service.service}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteInvoiceService(service.id)}
+                        className="text-red-500 hover:text-red-700"
+                        title="Delete saved service"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Payment Information */}
@@ -549,10 +545,10 @@ export function PortalGenerateInvoiceDialog() {
             <Button
               onClick={handleGenerateAndSendInvoice}
               className="bg-green-500 hover:bg-green-600"
-              disabled={!invoiceForm.invoiceNumber || !invoiceForm.invoiceDate || !invoiceForm.dueDate}
+              disabled={isSendingInvoice || !invoiceForm.invoiceNumber || !invoiceForm.invoiceDate || !invoiceForm.dueDate}
             >
               <Send className="w-4 h-4 mr-2" />
-              Generate & Send Invoice
+              {isSendingInvoice ? "Sending..." : "Generate & Send Invoice"}
             </Button>
           </div>
         </DialogContent>

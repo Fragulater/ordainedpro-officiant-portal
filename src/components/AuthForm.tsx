@@ -16,6 +16,7 @@ export default function AuthForm() {
     const [isLogin, setIsLogin] = useState(true)
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState("")
+    const [legalAccepted, setLegalAccepted] = useState(false)
 
     // Supabase client is imported as a singleton - no need for useMemo
 
@@ -60,12 +61,59 @@ export default function AuthForm() {
                 await new Promise(resolve => setTimeout(resolve, 300))
                 window.location.href = nextUrl
             } else {
+                if (!legalAccepted) {
+                    setMessage("Please accept the Terms of Service and Privacy Policy to create an account.")
+                    setLoading(false)
+                    return
+                }
+
                 const { data, error } = await supabase.auth.signUp({
                     email,
-                    password
+                    password,
+                    options: {
+                        data: {
+                            name: email.split("@")[0],
+                            full_name: email.split("@")[0],
+                            user_type: "officiant",
+                        },
+                    },
                 })
 
                 if (error) throw error
+
+                if (data.user) {
+                    await supabase
+                        .from("profiles")
+                        .upsert(
+                            {
+                                user_id: data.user.id,
+                                full_name: data.user.user_metadata?.full_name || email.split("@")[0],
+                                email,
+                                user_type: "officiant",
+                            },
+                            { onConflict: "user_id" }
+                        )
+
+                    await supabase
+                        .from("legal_acceptances")
+                        .insert([
+                            {
+                                user_id: data.user.id,
+                                document_slug: "terms-of-service",
+                                document_version: "1.0-placeholder",
+                                context: "portal_signup",
+                            },
+                            {
+                                user_id: data.user.id,
+                                document_slug: "privacy-policy",
+                                document_version: "1.0-placeholder",
+                                context: "portal_signup",
+                            },
+                        ])
+                        .then(({ error }) => {
+                            if (error) console.warn("Legal acceptance tracking is not ready yet:", error.message)
+                        })
+                }
 
                 setMessage("Signup successful! Please check your email to confirm your account.")
                 console.log("✅ Signup result:", data)
@@ -100,6 +148,28 @@ export default function AuthForm() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                 />
+                {!isLogin && (
+                    <label className="flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-gray-700">
+                        <input
+                            type="checkbox"
+                            checked={legalAccepted}
+                            onChange={(event) => setLegalAccepted(event.target.checked)}
+                            className="mt-1"
+                            required
+                        />
+                        <span>
+                            I agree to the{" "}
+                            <a className="text-blue-700 underline" href="/legal/terms-of-service" target="_blank" rel="noreferrer">
+                                Terms of Service
+                            </a>{" "}
+                            and{" "}
+                            <a className="text-blue-700 underline" href="/legal/privacy-policy" target="_blank" rel="noreferrer">
+                                Privacy Policy
+                            </a>
+                            .
+                        </span>
+                    </label>
+                )}
                 <Button
                     type="submit"
                     className="w-full bg-blue-600 hover:bg-blue-700"

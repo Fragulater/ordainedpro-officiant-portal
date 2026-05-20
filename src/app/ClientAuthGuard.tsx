@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/supabase/utils/client"
-import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js"
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js"
 import PortalClient from "./PortalClient"
 
 export default function ClientAuthGuard() {
@@ -13,56 +12,85 @@ export default function ClientAuthGuard() {
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
 
-  // Supabase client is a singleton - no need for useMemo
-
   useEffect(() => {
-    // Check current session
+    let isMounted = true
+    let unsubscribe: (() => void) | undefined
+
     const checkAuth = async () => {
       try {
-        console.log("🔍 Checking authentication...")
+        const { supabase } = await import("@/supabase/utils/client")
 
-        // Safety check - make sure supabase is available
+        if (!isMounted) return
+
+        console.log("Checking authentication...")
+
         if (!supabase || !supabase.auth) {
-          console.error("❌ Supabase client not available")
+          console.error("Supabase client not available")
           setAuthError("Authentication service unavailable")
           setLoading(false)
           return
         }
 
-        // First try getSession for faster initial check
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession()
 
         if (sessionError) {
-          console.error("❌ Session error:", sessionError.message)
+          console.error("Session error:", sessionError.message)
         }
 
         if (session?.user) {
-          console.log("✅ User authenticated via session:", session.user.email)
+          console.log("User authenticated via session:", session.user.email)
           setUser(session.user)
           setLoading(false)
-          return
-        }
+        } else {
+          const {
+            data: { user },
+            error,
+          } = await supabase.auth.getUser()
 
-        // Fallback to getUser() which validates with server
-        const { data: { user }, error } = await supabase.auth.getUser()
+          console.log("Auth check result:", {
+            hasUser: !!user,
+            email: user?.email,
+            error: error?.message,
+          })
 
-        console.log("🔍 Auth check result:", {
-          hasUser: !!user,
-          email: user?.email,
-          error: error?.message
-        })
+          if (error || !user) {
+            console.log("No user found, redirecting to /auth")
+            setIsRedirecting(true)
+            setLoading(false)
+            router.replace("/auth")
+            return
+          }
 
-        if (error || !user) {
-          console.log("❌ No user found, redirecting to /auth")
-          setIsRedirecting(true)
+          console.log("User authenticated:", user.email)
+          setUser(user)
           setLoading(false)
-          router.replace("/auth")
-          return
         }
 
-        console.log("✅ User authenticated:", user.email)
-        setUser(user)
-        setLoading(false)
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange(
+          (event: AuthChangeEvent, session: Session | null) => {
+            console.log("Auth state changed:", {
+              event,
+              hasUser: !!session?.user,
+            })
+
+            if (event === "SIGNED_OUT" || !session?.user) {
+              setUser(null)
+              setIsRedirecting(true)
+              router.replace("/auth")
+            } else if (session?.user) {
+              setUser(session.user)
+              setIsRedirecting(false)
+              setLoading(false)
+            }
+          }
+        )
+
+        unsubscribe = () => subscription.unsubscribe()
       } catch (error) {
         console.error("Auth check error:", error)
         setAuthError("Authentication check failed")
@@ -74,27 +102,12 @@ export default function ClientAuthGuard() {
 
     checkAuth()
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      console.log("🔄 Auth state changed:", { event, hasUser: !!session?.user })
-
-      if (event === 'SIGNED_OUT' || !session?.user) {
-        setUser(null)
-        setIsRedirecting(true)
-        router.replace("/auth")
-      } else if (session?.user) {
-        setUser(session.user)
-        setIsRedirecting(false)
-        setLoading(false)
-      }
-    })
-
     return () => {
-      subscription.unsubscribe()
+      isMounted = false
+      unsubscribe?.()
     }
-  }, [router, supabase])
+  }, [router])
 
-  // Show loading state
   if (loading || isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -111,7 +124,6 @@ export default function ClientAuthGuard() {
     )
   }
 
-  // This shouldn't happen if redirecting works, but keep as fallback
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">

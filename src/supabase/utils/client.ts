@@ -1,6 +1,8 @@
 "use client";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getBrowserCookieOptions } from "./shared-auth";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -18,11 +20,12 @@ function createSupabaseClient(): SupabaseClient {
   // Server-side: create a basic client (no persistence)
   if (typeof window === 'undefined') {
     console.log('Creating Supabase client (server-side, non-persistent)');
-    return createClient(supabaseUrl, supabaseKey, {
+    return createBrowserClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder-key', {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
       },
+      cookieOptions: getBrowserCookieOptions(),
     });
   }
 
@@ -37,15 +40,10 @@ function createSupabaseClient(): SupabaseClient {
 
   console.log('Creating Supabase client (singleton)');
 
-  // Create client with standard localStorage persistence
-  supabaseInstance = createClient(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storageKey: 'sb-auth-token',
-      storage: window.localStorage,
-    },
+  // Create client with cookie persistence so portal.ordainedpro.com and
+  // scripts.ordainedpro.com can share the same Supabase session.
+  supabaseInstance = createBrowserClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder-key', {
+    cookieOptions: getBrowserCookieOptions(),
   });
 
   // Store on window to survive module hot reloads

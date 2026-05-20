@@ -3,18 +3,46 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { FileText, Download, Eye, Loader2 } from "lucide-react"
+import { FileText, Download, Eye, Loader2, Edit, Save } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
+import { supabase } from "@/supabase/utils/client"
+import { BasicTextEditor, normalizeTextForEditor } from "@/components/BasicTextEditor"
+
+const deriveFileStoragePath = (fileUrl: string | null | undefined) => {
+  if (!fileUrl) return null
+
+  try {
+    const url = new URL(fileUrl)
+    const marker = "/storage/v1/object/public/couple-files/"
+    const markerIndex = url.pathname.indexOf(marker)
+    if (markerIndex === -1) return null
+    return decodeURIComponent(url.pathname.slice(markerIndex + marker.length))
+  } catch {
+    return null
+  }
+}
 
 export function PortalFileViewerDialog() {
   const {
+    files,
+    setFiles,
     showFileViewerDialog,
     setShowFileViewerDialog,
     viewingFile,
+    setViewingFile,
+    formatFileSize,
   } = useCommunicationPortal()
 
   const [textContent, setTextContent] = useState<string>("")
+  const [editedText, setEditedText] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isEditingText, setIsEditingText] = useState(false)
+  const [isSavingText, setIsSavingText] = useState(false)
+
+  const fileType = viewingFile?.type?.toLowerCase() || ""
+  const fileName = viewingFile?.name?.toLowerCase() || ""
+  const isTextFile = fileType.includes("text/") || fileName.endsWith(".txt")
+  const isTextDirty = isTextFile && editedText !== textContent
 
   // Fetch text content when viewing a text file
   useEffect(() => {
@@ -24,20 +52,23 @@ export function PortalFileViewerDialog() {
         return
       }
 
-      const fileType = viewingFile.type?.toLowerCase() || ""
-      if (fileType.includes('text/') || viewingFile.name?.endsWith('.txt')) {
+      if (isTextFile) {
         setIsLoading(true)
         try {
           const response = await fetch(viewingFile.url)
           if (response.ok) {
             const text = await response.text()
-            setTextContent(text)
+            const editorContent = normalizeTextForEditor(text)
+            setTextContent(editorContent)
+            setEditedText(editorContent)
           } else {
             setTextContent("Unable to load file content")
+            setEditedText("")
           }
         } catch (err) {
           console.error("Error fetching text content:", err)
           setTextContent("Unable to load file content")
+          setEditedText("")
         }
         setIsLoading(false)
       }
@@ -45,8 +76,67 @@ export function PortalFileViewerDialog() {
 
     if (showFileViewerDialog && viewingFile) {
       fetchTextContent()
+      setIsEditingText(Boolean(viewingFile.startInEditMode) && isTextFile)
     }
-  }, [showFileViewerDialog, viewingFile])
+  }, [showFileViewerDialog, viewingFile, isTextFile])
+
+  const handleSaveText = async () => {
+    if (!viewingFile || !isTextFile || !viewingFile.url) return
+
+    const storagePath = deriveFileStoragePath(viewingFile.url)
+    if (!storagePath) {
+      alert("Unable to locate the text file in storage.")
+      return
+    }
+
+      setIsSavingText(true)
+    try {
+      const textBlob = new Blob([editedText], { type: "text/plain" })
+      const { error: uploadError } = await supabase.storage
+        .from("couple-files")
+        .upload(storagePath, textBlob, {
+          contentType: "text/plain",
+          upsert: true,
+        })
+
+      if (uploadError) {
+        throw uploadError
+      }
+
+      const { error: updateError } = await supabase
+        .from("couple_files")
+        .update({
+          file_size: textBlob.size,
+          file_type: "text/plain",
+        })
+        .eq("id", viewingFile.id)
+
+      if (updateError) {
+        throw updateError
+      }
+
+      const updatedFile = {
+        ...viewingFile,
+        size: formatFileSize(textBlob.size),
+        type: "text/plain",
+        startInEditMode: false,
+      }
+
+      setTextContent(editedText)
+      setViewingFile(updatedFile)
+      setFiles(
+        files.map((file: any) =>
+          file.id === viewingFile.id ? updatedFile : file
+        )
+      )
+      setIsEditingText(false)
+    } catch (error) {
+      console.error("Failed to save text file:", error)
+      alert(error instanceof Error ? error.message : "Failed to save text file.")
+    } finally {
+      setIsSavingText(false)
+    }
+  }
 
   // Force download function
   const handleDownload = async () => {
@@ -151,9 +241,20 @@ export function PortalFileViewerDialog() {
                 <span className="ml-2 text-gray-500">Loading content...</span>
               </div>
             ) : (
-              <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
-                {textContent || "No content available"}
-              </pre>
+              isEditingText ? (
+                <BasicTextEditor
+                  value={editedText}
+                  onChange={setEditedText}
+                  minHeightClassName="min-h-[40vh]"
+                />
+              ) : (
+                <div
+                  className="prose max-w-none text-sm text-gray-700"
+                  dangerouslySetInnerHTML={{
+                    __html: textContent || "No content available",
+                  }}
+                />
+              )
             )}
           </div>
         </div>
@@ -203,11 +304,51 @@ export function PortalFileViewerDialog() {
             <div className="flex space-x-2">
               <Button
                 variant="outline"
-                onClick={() => setShowFileViewerDialog(false)}
+                onClick={() => {
+                  setIsEditingText(false)
+                  setEditedText(textContent)
+                  setShowFileViewerDialog(false)
+                }}
                 className="border-gray-300 text-gray-700 hover:bg-gray-50"
               >
                 Close
               </Button>
+              {isTextFile && (
+                isEditingText ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditedText(textContent)
+                        setIsEditingText(false)
+                      }}
+                      className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel Edit
+                    </Button>
+                    <Button
+                      onClick={handleSaveText}
+                      disabled={!isTextDirty || isSavingText}
+                      className="bg-purple-500 hover:bg-purple-600"
+                    >
+                      {isSavingText ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Save Text
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={() => setIsEditingText(true)}
+                    className="bg-purple-500 hover:bg-purple-600"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit Text
+                  </Button>
+                )
+              )}
               {viewingFile && viewingFile.url && viewingFile.url !== '#' && (
                 <Button
                   onClick={handleDownload}

@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
   category TEXT,
   details TEXT,
+  email_reminder BOOLEAN NOT NULL DEFAULT FALSE,
+  reminder_days INTEGER NOT NULL DEFAULT 1,
+  reminder_sent BOOLEAN NOT NULL DEFAULT FALSE,
+  reminder_sent_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -47,6 +51,8 @@ CREATE POLICY "Users can delete own tasks" ON tasks
 -- Index for faster queries
 CREATE INDEX IF NOT EXISTS idx_tasks_couple ON tasks(couple_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_pending_reminders
+  ON tasks (email_reminder, reminder_sent, completed, due_date);
 
 -- ============================================
 
@@ -193,6 +199,37 @@ CREATE POLICY "Users can delete own payments" ON payments
 -- Index for faster queries
 CREATE INDEX IF NOT EXISTS idx_payments_couple ON payments(couple_id);
 CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
+
+-- ============================================
+
+-- INVOICE SERVICE ITEMS TABLE
+CREATE TABLE IF NOT EXISTS invoice_service_items (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  service TEXT NOT NULL,
+  description TEXT,
+  category TEXT DEFAULT 'Ceremony Services',
+  quantity INTEGER NOT NULL DEFAULT 1,
+  rate DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, service)
+);
+
+ALTER TABLE invoice_service_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own invoice services" ON invoice_service_items
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own invoice services" ON invoice_service_items
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own invoice services" ON invoice_service_items
+  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own invoice services" ON invoice_service_items
+  FOR DELETE USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_invoice_service_items_user ON invoice_service_items(user_id);
 
 -- ============================================
 -- VERIFY COUPLES TABLE HAS REQUIRED COLUMNS

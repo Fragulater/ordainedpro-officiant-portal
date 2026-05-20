@@ -17,6 +17,7 @@ export function FilesTab() {
     handleDownloadScript,
     handleDeleteScript,
     handleViewFile,
+    handleEditFile,
     handleFilesUploaded,
     handleFileRemoved,
     getFileIcon,
@@ -197,7 +198,12 @@ export function FilesTab() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {files.map((file) => (
+                      {files.map((file) => {
+                        const fileType = file.type?.toLowerCase() || ""
+                        const fileName = file.name?.toLowerCase() || ""
+                        const isTextFile = fileType.includes("text/") || fileName.endsWith(".txt")
+
+                        return (
                         <div key={file.id} className="flex items-center space-x-3 p-4 border border-blue-100 rounded-xl bg-white hover:bg-blue-50 transition-colors group">
                           <div className="flex-shrink-0">
                             <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center">
@@ -221,6 +227,17 @@ export function FilesTab() {
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
+                            {isTextFile && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-purple-600 hover:bg-purple-100"
+                                onClick={() => handleEditFile(file)}
+                                title="Edit text file"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
@@ -241,7 +258,7 @@ export function FilesTab() {
                             </Button>
                           </div>
                         </div>
-                      ))}
+                      )})}
                     </div>
                   )}
                 </CardContent>

@@ -14,6 +14,7 @@ export function PortalSendContractEmailDialog() {
     showSendContractDialog,
     setShowSendContractDialog,
     sendingContract,
+    isSendingContractEmail,
     emailForm,
     setEmailForm,
     editCoupleInfo,
@@ -170,7 +171,7 @@ export function PortalSendContractEmailDialog() {
                     : emailForm.to || emailForm.customEmail || 'No recipient selected'
                 }</p>
                 <p><span className="font-medium">Subject:</span> {emailForm.subject || 'No subject'}</p>
-                <p><span className="font-medium">Attachment:</span> {sendingContract?.name || 'No contract'}</p>
+                <p><span className="font-medium">Document link:</span> {sendingContract?.name || 'No contract'}</p>
               </div>
             </div>
           </div>
@@ -188,13 +189,15 @@ export function PortalSendContractEmailDialog() {
               onClick={handleSendContractEmail}
               className="bg-green-500 hover:bg-green-600"
               disabled={
+                isSendingContractEmail ||
                 (!emailForm.to && !emailForm.customEmail) ||
+                emailForm.customEmail === 'custom' ||
                 !emailForm.subject.trim() ||
                 !emailForm.body.trim()
               }
             >
               <Send className="w-4 h-4 mr-2" />
-              Send Contract
+              {isSendingContractEmail ? "Sending..." : "Send Contract"}
             </Button>
           </div>
         </DialogContent>
