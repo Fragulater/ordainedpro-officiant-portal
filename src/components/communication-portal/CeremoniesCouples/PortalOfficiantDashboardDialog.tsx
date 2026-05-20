@@ -17,6 +17,8 @@ export function PortalOfficiantDashboardDialog() {
     setShowDashboardDialog,
     setEditCoupleInfo,
     setEditWeddingDetails,
+    setViewingFile,
+    setShowFileViewerDialog,
   } = useCommunicationPortal()
   const [userFiles, setUserFiles] = useState<any[]>([])
 
@@ -112,6 +114,26 @@ export function PortalOfficiantDashboardDialog() {
     return true
   }
 
+  const handleSavedFileEdit = (documentId: string) => {
+    const userFile = getUserFileByDocumentId(documentId)
+    if (!userFile) return false
+
+    setViewingFile({
+      id: userFile.id,
+      name: userFile.name,
+      size: formatContractSize(userFile.size),
+      uploadedBy: "Officiant",
+      date: userFile.created_at ? new Date(userFile.created_at).toLocaleDateString() : "",
+      type: userFile.type || "text/plain",
+      url: userFile.url || "#",
+      category: "Saved Document",
+      startInEditMode: true,
+    })
+    setShowFileViewerDialog(true)
+    setShowDashboardDialog(false)
+    return true
+  }
+
   const handleSavedFileDelete = async (documentId: string) => {
     const userFile = getUserFileByDocumentId(documentId)
     if (!userFile) return false
@@ -172,6 +194,10 @@ export function PortalOfficiantDashboardDialog() {
           const contract = contracts.find((item: any) => item.id.toString() === documentId)
           if (!contract) return
           window.open(contract.file?.url || contract.fileUrl || "#", "_blank", "noopener,noreferrer")
+        }}
+        onDocumentEdit={(documentId) => {
+          if (handleSavedFileEdit(documentId)) return
+          handleContractAction(Number(documentId), "view")
         }}
         onDocumentDelete={async (documentId) => {
           if (await handleSavedFileDelete(documentId)) return

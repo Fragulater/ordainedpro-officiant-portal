@@ -1022,9 +1022,12 @@ export function OfficiantDashboardDialog({
             <div className="mt-auto pt-8">
               <div className="bg-blue-50 rounded-lg p-4 text-sm">
                 <p className="font-medium text-blue-900">Need Help?</p>
-                <p className="text-blue-700 text-xs mt-1">
+                <a
+                  href="mailto:info@ordainedpro.com"
+                  className="mt-1 block text-xs text-blue-700 hover:text-blue-800 hover:underline"
+                >
                   Contact support for assistance
-                </p>
+                </a>
               </div>
             </div>
           </div>
