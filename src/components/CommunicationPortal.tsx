@@ -3594,9 +3594,6 @@ Note: This is an initial draft. Further development needed to incorporate specif
 
     console.log("Saving wedding details for:", coupleId, editWeddingDetails)
     setShowEditWeddingDialog(false)
-
-    // Show success message
-    alert(`Wedding details for ${coupleId} saved successfully!`)
   }
 
   const handleSwitchCouple = (index: number) => {
