@@ -283,23 +283,23 @@ export function PortalOverview() {
                   <User className="w-5 h-5 mr-2 text-blue-600" />
                   Officiant
                 </CardTitle>
-                <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                <div className="grid w-full grid-cols-2 gap-2 sm:w-[260px]">
                   <Button
                     type="button"
                     size="sm"
                     onClick={() => setShowDashboardDialog(true)}
-                    className="h-8 bg-black px-3 text-xs text-white hover:bg-gray-800"
+                    className="h-9 w-full justify-center rounded-md bg-black px-3 text-xs font-semibold text-white hover:bg-gray-800"
                   >
-                    <LayoutDashboard className="w-3.5 h-3.5 mr-1.5" />
+                    <LayoutDashboard className="w-3.5 h-3.5 mr-2 shrink-0" />
                     Dashboard
                   </Button>
                   <Button
                     type="button"
                     size="sm"
                     onClick={() => setShowAddCeremonyDialog(true)}
-                    className="h-8 bg-blue-500 px-3 text-xs text-white hover:bg-blue-600"
+                    className="h-9 w-full justify-center rounded-md bg-blue-500 px-3 text-xs font-semibold text-white hover:bg-blue-600"
                   >
-                    <Plus className="w-3.5 h-3.5 mr-1.5" />
+                    <Plus className="w-3.5 h-3.5 mr-2 shrink-0" />
                     New Ceremony
                   </Button>
                 </div>
