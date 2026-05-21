@@ -703,14 +703,14 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
           brideName: c.bride_name || "",
           brideEmail: c.bride_email || "",
           bridePhone: c.bride_phone || "",
-          brideAddress: "",
+          brideAddress: c.bride_address || "",
           groomName: c.groom_name || "",
           groomEmail: c.groom_email || "",
           groomPhone: c.groom_phone || "",
-          groomAddress: "",
+          groomAddress: c.groom_address || "",
           address: c.venue_address || "",
-          emergencyContact: "",
-          specialRequests: c.notes || "",
+          emergencyContact: c.emergency_contact || "",
+          specialRequests: c.special_requests || c.notes || "",
           isActive: c.is_active !== false,
           colors: getCoupleColors(index + 1),
           weddingDetails: {
@@ -3604,7 +3604,27 @@ Note: This is an initial draft. Further development needed to incorporate specif
     alert(`Ceremony "${ceremonyToSave.ceremonyName}" for ${newCeremony.brideName} & ${newCeremony.groomName} has been saved successfully!\n\nThis couple has been added to your ceremony list and you can now switch to them using the "Switch Ceremony" button.`)
   }
 
-  const handleEditCoupleInfo = () => {
+  const handleEditCoupleInfo = async () => {
+    if (!editCoupleInfo?.id) return
+
+    const result = await updateCoupleInDB(editCoupleInfo.id, {
+      bride_name: editCoupleInfo.brideName || "",
+      bride_email: editCoupleInfo.brideEmail || null,
+      bride_phone: editCoupleInfo.bridePhone || null,
+      bride_address: editCoupleInfo.brideAddress || null,
+      groom_name: editCoupleInfo.groomName || "",
+      groom_email: editCoupleInfo.groomEmail || null,
+      groom_phone: editCoupleInfo.groomPhone || null,
+      groom_address: editCoupleInfo.groomAddress || null,
+      emergency_contact: editCoupleInfo.emergencyContact || null,
+    })
+
+    if (!result.ok) {
+      console.error("Failed to update couple info:", result.error)
+      alert("Failed to save couple information. Please try again.")
+      return
+    }
+
     // Update the couple info in allCouples array
     const updatedCouples = [...allCouples]
     updatedCouples[activeCoupleIndex] = {
@@ -3612,6 +3632,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
       ...editCoupleInfo
     }
     setAllCouples(updatedCouples)
+    setEditCoupleInfo(updatedCouples[activeCoupleIndex])
 
     console.log("Updating couple info:", editCoupleInfo)
     setShowEditCoupleDialog(false)

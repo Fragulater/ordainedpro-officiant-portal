@@ -28,14 +28,18 @@ export interface Couple {
   user_id: string
   bride_name: string
   groom_name: string
-  bride_email?: string
-  groom_email?: string
-  bride_phone?: string
-  groom_phone?: string
-  venue_name?: string
-  venue_address?: string
-  wedding_date?: string
-  start_time?: string
+  bride_email?: string | null
+  groom_email?: string | null
+  bride_phone?: string | null
+  groom_phone?: string | null
+  bride_address?: string | null
+  groom_address?: string | null
+  emergency_contact?: string | null
+  special_requests?: string | null
+  venue_name?: string | null
+  venue_address?: string | null
+  wedding_date?: string | null
+  start_time?: string | null
   end_time?: string
   expected_guests?: number
   notes?: string
@@ -141,6 +145,8 @@ export async function addCeremony(userId: string, ceremonyData: {
   groomEmail?: string
   bridePhone?: string
   groomPhone?: string
+  brideAddress?: string
+  groomAddress?: string
   venueName?: string
   venueAddress?: string
   ceremonyDate?: string
@@ -159,6 +165,8 @@ export async function addCeremony(userId: string, ceremonyData: {
         groom_email: ceremonyData.groomEmail || null,
         bride_phone: ceremonyData.bridePhone || null,
         groom_phone: ceremonyData.groomPhone || null,
+        bride_address: ceremonyData.brideAddress || null,
+        groom_address: ceremonyData.groomAddress || null,
         venue_name: ceremonyData.venueName || null,
         venue_address: ceremonyData.venueAddress || null,
         wedding_date: ceremonyData.ceremonyDate || null,
