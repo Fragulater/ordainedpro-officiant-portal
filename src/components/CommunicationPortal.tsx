@@ -1076,10 +1076,10 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         id: p.id,
         date: p.paid_date || p.due_date || new Date(p.created_at).toLocaleDateString(),
         amount: p.amount,
-        type: p.payment_type || "Payment",
+        type: p.invoice_number || p.description || "Invoice",
         method: p.status === "paid" ? "Completed" : "Pending",
         status: p.status,
-        description: p.description,
+        description: p.notes || p.description || p.invoice_number || "Wedding ceremony invoice",
         dueDate: p.due_date
       }))
       setPaymentHistory(transformedPayments)
@@ -1128,9 +1128,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       setAllPaymentRecords(result.data.map((payment: any) => ({
         id: payment.id,
         coupleId: payment.couple_id,
-        description: payment.description,
+        description: payment.notes || payment.description || payment.invoice_number || "Wedding ceremony invoice",
         amount: Number(payment.amount) || 0,
-        type: payment.payment_type || "service",
+        type: payment.payment_method || payment.payment_type || "invoice",
         status: payment.status || "pending",
         dueDate: payment.due_date || "",
         paidDate: payment.paid_date || payment.created_at || "",
@@ -2698,8 +2698,9 @@ ${shareScriptForm.body}`)
     if (!contract) return
 
     switch (action) {
+      case 'edit':
       case 'view':
-        console.log('Viewing contract:', contract.name)
+        console.log(`${action === 'edit' ? 'Editing' : 'Viewing'} contract:`, contract.name)
         setViewingContract(contract)
         setShowContractViewerDialog(true)
         break
@@ -3177,7 +3178,6 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     })
 
     console.log(`Payment reminder sent to: ${recipient}`)
-    alert(`Payment reminder has been sent successfully to ${recipient}!`)
   }
 
   const handleContractUploaded = async (contractData: Omit<Contract, 'id' | 'createdDate'>) => {
@@ -4895,7 +4895,7 @@ OrdainedPro Wedding Portal
   }
 
   // Generate invoice email content
-  const generateInvoiceContent = () => {
+  const generateLegacyInvoiceContent = () => {
     const totals = calculateInvoiceValues(invoiceForm)
 
     return `Dear ${getFirstName(editCoupleInfo?.brideName)} and ${getFirstName(editCoupleInfo?.groomName)},
@@ -4954,6 +4954,71 @@ ${officiantLabel}${officiantPhone ? `\n[SCRIPT]ž ${officiantPhone}` : ''}${offi
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•`
   }
 
+  const generateInvoiceContent = (paymentUrl?: string) => {
+    const totals = calculateInvoiceValues(invoiceForm)
+    const weddingDate = invoiceForm.weddingDate
+      ? new Date(invoiceForm.weddingDate).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      : 'To be confirmed'
+    const invoiceDate = invoiceForm.invoiceDate ? new Date(invoiceForm.invoiceDate).toLocaleDateString() : ''
+    const dueDate = invoiceForm.dueDate ? new Date(invoiceForm.dueDate).toLocaleDateString() : ''
+    const services = invoiceForm.items.map(item => {
+      const lineTotal = item.quantity * item.rate
+      return [
+        `- ${item.service}`,
+        item.description ? `  Description: ${item.description}` : '',
+        `  Category: ${item.category || 'Wedding Services'}`,
+        `  Quantity x Rate: ${item.quantity} x ${formatCurrency(item.rate)} = ${formatCurrency(lineTotal)}`,
+      ].filter(Boolean).join('\n')
+    }).join('\n\n')
+
+    return `Dear ${getFirstName(editCoupleInfo?.brideName)} and ${getFirstName(editCoupleInfo?.groomName)},
+
+Congratulations on your upcoming wedding! Please find your ceremony services invoice below.
+
+Wedding Ceremony Invoice
+
+Couple: ${invoiceForm.coupleName}
+Wedding date: ${weddingDate}
+Venue: ${invoiceForm.venue || 'To be confirmed'}
+
+Invoice Details
+Invoice #: ${invoiceForm.invoiceNumber}
+Invoice date: ${invoiceDate}
+Due date: ${dueDate}
+
+Services Provided
+${services}
+
+Payment Summary
+Subtotal: ${formatCurrency(totals.subtotal)}
+${invoiceForm.taxRate > 0 ? `Tax (${invoiceForm.taxRate}%): ${formatCurrency(totals.taxAmount)}\n` : ''}Deposit previously paid: -${formatCurrency(invoiceForm.depositPaid)}
+Balance due: ${formatCurrency(totals.balanceDue)}
+Total invoice amount: ${formatCurrency(totals.total)}
+
+Payment Methods Accepted
+${invoiceForm.paymentMethods}
+
+Make a Payment
+${paymentUrl || 'Your officiant will send a secure online payment link separately.'}
+
+${invoiceForm.bankDetails ? `Banking Information\n${invoiceForm.bankDetails}\n` : ''}
+Terms and Conditions
+${invoiceForm.terms}
+
+Additional Notes
+${invoiceForm.notes}
+
+We're honored to be part of your special day and look forward to creating a beautiful ceremony that reflects your love story!
+
+Warm regards,
+${officiantLabel}${officiantPhone ? `\nPhone: ${officiantPhone}` : ''}${officiantEmail ? `\nEmail: ${officiantEmail}` : ''}${officiantProfile?.website ? `\nWebsite: ${officiantProfile.website}` : ''}`
+  }
+
   const getInvoiceRecipients = () => {
     if (invoiceForm.emailRecipients === 'both') {
       return [editCoupleInfo.brideEmail, editCoupleInfo.groomEmail]
@@ -5009,13 +5074,35 @@ ${officiantLabel}${officiantPhone ? `\n[SCRIPT]ž ${officiantPhone}` : ''}${offi
     const totals = calculateInvoiceValues(invoiceForm)
     setInvoiceForm(prev => ({ ...prev, ...totals }))
 
-    // Generate invoice content
-    const invoiceContent = generateInvoiceContent()
+    if (!currentUser?.id || !editCoupleInfo?.id) {
+      alert('Unable to save this invoice because the user or couple record is missing.')
+      return
+    }
 
     setIsSendingInvoice(true)
+    let invoiceContent = ""
 
     try {
       await Promise.all(invoiceForm.items.map(item => saveInvoiceServiceItem(item)))
+
+      const paymentResult = await addPaymentToDB(currentUser.id, editCoupleInfo.id, {
+        invoiceNumber: invoiceForm.invoiceNumber,
+        description: `Invoice ${invoiceForm.invoiceNumber} - ${invoiceForm.coupleName}`,
+        amount: totals.balanceDue,
+        paymentType: "invoice",
+        status: totals.balanceDue > 0 ? "pending" : "paid",
+        dueDate: invoiceForm.dueDate,
+      })
+
+      if (!paymentResult.ok || !paymentResult.data?.id) {
+        throw new Error(paymentResult.error || "Invoice email was not sent because the payment record could not be saved.")
+      }
+
+      const siteUrl = typeof window !== "undefined"
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_SITE_URL || "https://portal.ordainedpro.com"
+      const paymentPortalUrl = `${siteUrl}/pay/invoice/${paymentResult.data.id}`
+      invoiceContent = generateInvoiceContent(paymentPortalUrl)
 
       const response = await fetch("/api/send-email", {
         method: "POST",
@@ -5030,6 +5117,9 @@ ${officiantLabel}${officiantPhone ? `\n[SCRIPT]ž ${officiantPhone}` : ''}${offi
           coupleName: invoiceForm.coupleName,
           coupleId: editCoupleInfo?.id,
           officiantId: currentUser?.id,
+          emailTitle: "Wedding Invoice",
+          actionUrl: paymentPortalUrl,
+          actionLabel: "Make a payment",
           attachments: [
             {
               filename: `${invoiceForm.invoiceNumber}.txt`,
@@ -5045,19 +5135,8 @@ ${officiantLabel}${officiantPhone ? `\n[SCRIPT]ž ${officiantPhone}` : ''}${offi
         throw new Error(error?.error || "Failed to send invoice email.")
       }
 
-      const paymentResult = await addPaymentToDB(currentUser.id, editCoupleInfo.id, {
-        description: `Invoice ${invoiceForm.invoiceNumber} - ${invoiceForm.coupleName}`,
-        amount: totals.balanceDue,
-        paymentType: "service",
-        status: totals.balanceDue > 0 ? "pending" : "paid",
-        dueDate: invoiceForm.dueDate,
-      })
-
-      if (!paymentResult.ok) {
-        console.error("Invoice email sent, but payment record was not saved:", paymentResult.error)
-      } else {
-        loadPaymentsForCouple()
-      }
+      loadPaymentsForCouple()
+      loadFinancialPaymentsForUser()
 
       setShowGenerateInvoiceDialog(false)
       console.log(`Invoice ${invoiceForm.invoiceNumber} generated and sent to ${recipients.join(", ")}`)

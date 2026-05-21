@@ -252,10 +252,14 @@ export function PortalContractViewerDialog() {
         <DialogHeader>
           <DialogTitle className="text-blue-900 flex items-center">
             <FileText className="w-5 h-5 mr-2" />
-            Contract Viewer
+            {isText ? "Contract Editor" : "Contract Viewer"}
           </DialogTitle>
           <DialogDescription>
-            {viewingContract ? `Viewing: ${viewingContract.name}` : "Contract preview"}
+            {viewingContract
+              ? isText
+                ? `Editing: ${viewingContract.name}`
+                : `Viewing: ${viewingContract.name}`
+              : "Contract preview"}
           </DialogDescription>
         </DialogHeader>
 

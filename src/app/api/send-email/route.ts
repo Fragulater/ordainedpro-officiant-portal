@@ -19,7 +19,20 @@ interface EmailAttachment {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { to, subject, message, fromName, coupleName, coupleId, officiantId, attachments, calendarUrl } = body;
+    const {
+      to,
+      subject,
+      message,
+      fromName,
+      coupleName,
+      coupleId,
+      officiantId,
+      attachments,
+      calendarUrl,
+      actionUrl,
+      actionLabel,
+      emailTitle,
+    } = body;
     const recipients = Array.isArray(to)
       ? to.filter((email) => typeof email === "string" && email.trim())
       : typeof to === "string" && to.trim()
@@ -60,7 +73,7 @@ export async function POST(request: NextRequest) {
           : "reply@ziloesteo.resend.app",
         to: recipients,
         subject: subject,
-        html: generateEmailHtml(fromName, coupleName, message, subject, attachments, calendarUrl),
+        html: generateEmailHtml(fromName, coupleName, message, subject, attachments, calendarUrl, actionUrl, actionLabel, emailTitle),
         text: message,
       };
 
@@ -121,7 +134,10 @@ function generateEmailHtml(
   message: string,
   subject: string,
   attachments?: EmailAttachment[],
-  calendarUrl?: string
+  calendarUrl?: string,
+  actionUrl?: string,
+  actionLabel?: string,
+  emailTitle?: string
 ): string {
   const trimmedMessage = message.trim();
   const startsWithGreeting = /^dear\s/i.test(trimmedMessage);
@@ -145,11 +161,13 @@ function generateEmailHtml(
     `;
   }
 
-  const calendarHtml = calendarUrl ? `
+  const primaryActionUrl = actionUrl || calendarUrl;
+  const primaryActionLabel = actionLabel || (calendarUrl ? "Add to Google Calendar" : "");
+  const actionHtml = primaryActionUrl ? `
       <tr>
         <td style="padding: 0 40px 24px; text-align: center;">
-          <a href="${calendarUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 18px; border-radius: 8px;">
-            Add to Google Calendar
+          <a href="${primaryActionUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 18px; border-radius: 8px;">
+            ${primaryActionLabel}
           </a>
         </td>
       </tr>
@@ -172,7 +190,7 @@ function generateEmailHtml(
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 12px 12px 0 0;">
               <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
-                Wedding Documents
+                ${emailTitle || "Wedding Documents"}
               </h1>
               <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">
                 From your wedding officiant
@@ -206,7 +224,7 @@ function generateEmailHtml(
           ${attachmentsHtml}
 
           <!-- Calendar Section -->
-          ${calendarHtml}
+          ${actionHtml}
 
           <!-- Footer -->
           <tr>

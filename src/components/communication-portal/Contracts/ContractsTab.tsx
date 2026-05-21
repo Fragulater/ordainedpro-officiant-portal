@@ -4,7 +4,7 @@ import { TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Send, FileSignature, Eye, Upload, Trash2 } from "lucide-react"
+import { Send, FileSignature, Eye, Upload, Trash2, Pencil } from "lucide-react"
 import { Contract } from "@/components/ContractUploadDialog"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
@@ -30,7 +30,7 @@ export function ContractsTab() {
                         onClick={() => setShowContractUploadDialog(true)}
                       >
                         <Upload className="w-4 h-4 mr-2" />
-                        Upload Contract
+                        Contracts
                       </Button>
                     </div>
                   </CardHeader>
@@ -71,6 +71,16 @@ export function ContractsTab() {
                               </div>
                             </div>
                             <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                                onClick={() => handleContractAction(contract.id, 'edit')}
+                                title="Edit contract"
+                              >
+                                <Pencil className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"

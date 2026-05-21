@@ -122,12 +122,15 @@ export interface Payment {
   id: number
   couple_id: number
   user_id: string
-  description: string
+  invoice_number?: string
+  description?: string
   amount: number
   payment_type?: string
   status?: string
   due_date?: string
   paid_date?: string
+  payment_method?: string | null
+  notes?: string | null
   created_at?: string
 }
 
@@ -747,6 +750,7 @@ export async function loadAllPayments(userId: string): Promise<{ ok: boolean; da
 
 export async function addPayment(userId: string, coupleId: number, paymentData: {
   description: string
+  invoiceNumber?: string
   amount: number
   paymentType?: string
   status?: string
@@ -758,11 +762,12 @@ export async function addPayment(userId: string, coupleId: number, paymentData: 
       .insert({
         user_id: userId,
         couple_id: coupleId,
-        description: paymentData.description,
+        invoice_number: paymentData.invoiceNumber || paymentData.description,
         amount: paymentData.amount,
-        payment_type: paymentData.paymentType || "service",
         status: paymentData.status || "pending",
-        due_date: paymentData.dueDate || null
+        due_date: paymentData.dueDate || null,
+        payment_method: paymentData.paymentType || "invoice",
+        notes: paymentData.description,
       })
       .select()
       .single()

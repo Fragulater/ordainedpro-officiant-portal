@@ -11,6 +11,7 @@ import { FileUpload, UploadedFile } from "@/components/FileUpload"
 import {
   AlertCircle,
   CalendarDays,
+  CheckCircle2,
   FileBadge,
   FileSignature,
   FileText,
@@ -18,6 +19,10 @@ import {
   Save,
   Upload,
 } from "lucide-react"
+import {
+  DEFAULT_CONTRACT_TEMPLATE_FIELDS,
+  DEFAULT_OFFICIANT_CONTRACT_TEMPLATE,
+} from "@/lib/default-contract-template"
 
 export interface Contract {
   id: number
@@ -130,6 +135,37 @@ export function ContractUploadDialog({
     }
   }
 
+  const handleUseStarterTemplate = () => {
+    const file = new File(
+      [DEFAULT_OFFICIANT_CONTRACT_TEMPLATE],
+      "OrdainedPro Wedding Service Agreement Template.txt",
+      { type: "text/plain" }
+    )
+
+    const starterTemplate: UploadedFile = {
+      id: `starter_contract_${Date.now()}`,
+      file,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      uploadProgress: 100,
+      status: "completed",
+      textContent: DEFAULT_OFFICIANT_CONTRACT_TEMPLATE,
+    }
+
+    setUploadedFiles([starterTemplate])
+    setFormData((prev) => ({
+      ...prev,
+      name: prev.name || "Wedding Service Agreement Template",
+      description:
+        prev.description ||
+        "Reusable officiant contract template with blank merge fields for each couple's ceremony details, fees, deposit, travel, and signature information.",
+      type: prev.type || "Wedding Service Agreement",
+      status: prev.status || "draft",
+    }))
+    setErrors((prev) => ({ ...prev, file: "", name: "", type: "" }))
+  }
+
   const handleFileRemoved = (fileId: string) => {
     setUploadedFiles((prev) => prev.filter((file) => file.id !== fileId))
   }
@@ -166,10 +202,38 @@ export function ContractUploadDialog({
 
         <div className="space-y-6 py-4">
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
-              <Upload className="w-4 h-4 mr-2" />
-              Contract Document
-            </h4>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h4 className="font-semibold text-blue-900 mb-2 flex items-center">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Contract Document
+                </h4>
+                <p className="text-sm text-blue-800">
+                  Upload your own file, or start with the OrdainedPro template and edit the fields for each couple.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-blue-300 bg-white text-blue-700 hover:bg-blue-50"
+                onClick={handleUseStarterTemplate}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Contracts
+              </Button>
+            </div>
+
+            {uploadedFiles.some((file) => file.id.startsWith("starter_contract_")) && (
+              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3">
+                <p className="flex items-center text-sm font-medium text-green-800">
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Starter template selected
+                </p>
+                <p className="mt-1 text-xs text-green-700">
+                  Couple-specific fields are blank placeholders and can be filled from the couple profile later.
+                </p>
+              </div>
+            )}
 
             <FileUpload
               mode="full"
@@ -187,6 +251,20 @@ export function ContractUploadDialog({
                 {errors.file}
               </p>
             )}
+          </div>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <h4 className="font-semibold text-amber-900 mb-2">Reusable Template Fields</h4>
+            <p className="text-sm text-amber-800 mb-3">
+              The starter template keeps the service language but leaves these items fluid for each officiant and couple.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {DEFAULT_CONTRACT_TEMPLATE_FIELDS.map((field) => (
+                <span key={field} className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-800">
+                  {`{{${field}}}`}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
