@@ -814,6 +814,58 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     loadMessages()
   }, [loadMessages])
 
+  useEffect(() => {
+    if (!currentUser?.id || !editCoupleInfo?.id) return
+
+    const userId = currentUser.id
+    const coupleId = editCoupleInfo.id
+    const channel = supabase
+      .channel(`messages:${userId}:${coupleId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const newMessageRecord = payload.new as any
+
+          if (Number(newMessageRecord.couple_id) !== Number(coupleId)) return
+
+          setMessages((previousMessages) => {
+            const messageExists = previousMessages.some(
+              (message) => String(message.id) === String(newMessageRecord.id)
+            )
+
+            if (messageExists) return previousMessages
+
+            return [
+              ...previousMessages,
+              {
+                id: newMessageRecord.id,
+                sender:
+                  newMessageRecord.sender_name ||
+                  (newMessageRecord.sender === "officiant" ? officiantLabel : "Couple"),
+                role: newMessageRecord.sender,
+                message: newMessageRecord.content || newMessageRecord.body || "",
+                timestamp: formatMessageTime(newMessageRecord.created_at || newMessageRecord.timestamp),
+                avatar: "/api/placeholder/40/40",
+              },
+            ]
+          })
+        }
+      )
+      .subscribe((status) => {
+        console.log("[MESSAGES] Realtime subscription status:", status)
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [currentUser?.id, editCoupleInfo?.id, officiantLabel])
+
   // Load tasks when couple changes
   const loadTasksForCouple = useCallback(async () => {
     if (!currentUser?.id || !editCoupleInfo?.id) return
@@ -4519,15 +4571,20 @@ OrdainedPro Wedding Portal
         } else {
           console.log("âœ… Message saved to Supabase:", savedMessage)
 
-          // Add to local messages state
-          setMessages(prev => [...prev, {
-            id: savedMessage[0].id,
-            sender: officiantLabel,
-            role: "officiant",
-            message: newMessage,
-            timestamp: "Just now",
-            avatar: "/api/placeholder/40/40"
-          }])
+          // Add to local messages state, unless the realtime listener already added it.
+          setMessages(prev => {
+            const messageExists = prev.some((message) => String(message.id) === String(savedMessage[0].id))
+            if (messageExists) return prev
+
+            return [...prev, {
+              id: savedMessage[0].id,
+              sender: officiantLabel,
+              role: "officiant",
+              message: newMessage,
+              timestamp: "Just now",
+              avatar: "/api/placeholder/40/40"
+            }]
+          })
         }
       }
 
