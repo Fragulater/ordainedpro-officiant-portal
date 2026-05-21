@@ -40,6 +40,7 @@ import {
   TrendingUp,
   Upload,
   Download,
+  Copy,
   Eye,
   Pencil,
   Trash2,
@@ -234,6 +235,7 @@ export function OfficiantDashboardDialog({
   const [assignCoupleId, setAssignCoupleId] = useState("");
   const [user, setUser] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [publicProfileCopied, setPublicProfileCopied] = useState(false);
   // Form state for Add New Ceremony - mirrors Communication Portal
   const [newCeremony, setNewCeremony] = useState({
     ceremonyName: "",
@@ -324,6 +326,26 @@ export function OfficiantDashboardDialog({
     typeof window !== "undefined" && user?.id
       ? `${window.location.origin}${publicProfilePath}`
       : publicProfilePath;
+  const handleCopyPublicProfileUrl = async () => {
+    if (!user?.id) return;
+
+    try {
+      await navigator.clipboard.writeText(publicProfileUrl);
+      setPublicProfileCopied(true);
+      window.setTimeout(() => setPublicProfileCopied(false), 1800);
+    } catch (error) {
+      console.error("Unable to copy public profile URL:", error);
+    }
+  };
+  const handleSharePublicProfileByEmail = () => {
+    if (!user?.id) return;
+
+    const subject = encodeURIComponent(`${officiantFullName}'s OrdainedPro profile`);
+    const body = encodeURIComponent(
+      `Here is my OrdainedPro public profile:\n\n${publicProfileUrl}`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
   const getCoupleColors = (coupleId: number) => {
     const colorPairs = [
       {
@@ -1582,8 +1604,33 @@ export function OfficiantDashboardDialog({
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <Input readOnly value={publicProfileUrl} className="bg-white" />
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <Input
+                            readOnly
+                            aria-label="Public profile URL"
+                            value={publicProfileUrl}
+                            className="h-9 bg-white text-xs sm:max-w-[300px]"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="border-blue-300 bg-white text-blue-700 hover:bg-blue-100"
+                            onClick={handleCopyPublicProfileUrl}
+                            disabled={!user?.id}
+                          >
+                            <Copy className="w-4 h-4 mr-2" />
+                            {publicProfileCopied ? "Copied" : "Copy"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="border-blue-300 bg-white text-blue-700 hover:bg-blue-100"
+                            onClick={handleSharePublicProfileByEmail}
+                            disabled={!user?.id}
+                          >
+                            <Mail className="w-4 h-4 mr-2" />
+                            Share
+                          </Button>
                           <Button
                             type="button"
                             variant="outline"
