@@ -80,6 +80,7 @@ export interface Meeting {
   notes?: string
   status?: string
   response_deadline?: string
+  responseDeadline?: string
   canceled_at?: string
   canceled_by?: string
   google_event_id?: string
@@ -457,6 +458,7 @@ export async function updateMeeting(meetingId: number, updates: Partial<Meeting>
     if (updates.meeting_type !== undefined) dbUpdates.meeting_type = updates.meeting_type
     if (updates.status !== undefined) dbUpdates.status = updates.status
     if (updates.response_deadline !== undefined) dbUpdates.response_deadline = updates.response_deadline
+    if (updates.responseDeadline !== undefined) dbUpdates.response_deadline = updates.responseDeadline
     if (updates.canceled_at !== undefined) dbUpdates.canceled_at = updates.canceled_at
     if (updates.canceled_by !== undefined) dbUpdates.canceled_by = updates.canceled_by
     if (updates.google_event_id !== undefined) dbUpdates.google_event_id = updates.google_event_id

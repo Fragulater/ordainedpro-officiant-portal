@@ -30,6 +30,13 @@ export function MeetingsTab() {
     return aTime - bTime
   })
 
+  const formatResponseDeadline = (deadline?: string) => {
+    if (!deadline) return null
+    const date = new Date(`${deadline}T00:00:00`)
+    if (Number.isNaN(date.getTime())) return null
+    return date.toLocaleDateString()
+  }
+
   return (
 <TabsContent value="calendar">
             <div className="space-y-6">
@@ -107,10 +114,10 @@ export function MeetingsTab() {
                               <span className="text-lg mr-1">{getMeetingTypeIcon(meeting.meetingType)}</span>
                               {meeting.meetingType === 'in-person' ? meeting.location : meeting.meetingType.charAt(0).toUpperCase() + meeting.meetingType.slice(1)}
                             </div>
-                            {meeting.status === 'pending' && (
+                            {meeting.status === 'pending' && formatResponseDeadline(meeting.responseDeadline) && (
                               <div className="flex items-center text-orange-600">
                                 <Bell className="w-4 h-4 mr-2" />
-                                Response due: {new Date(meeting.responseDeadline).toLocaleDateString()}
+                                Response due: {formatResponseDeadline(meeting.responseDeadline)}
                               </div>
                             )}
                           </div>

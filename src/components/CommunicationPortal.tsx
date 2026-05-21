@@ -535,7 +535,8 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     duration: 60,
     meetingType: 'in-person',
     location: '',
-    body: ''
+    body: '',
+    responseDeadline: ''
   })
   const [addEventForm, setAddEventForm] = useState({
     subject: '',
@@ -3815,7 +3816,8 @@ Note: This is an initial draft. Further development needed to incorporate specif
       duration: meeting.duration || 60,
       meetingType: meeting.meetingType || 'in-person',
       location: meeting.location || '',
-      body: meeting.body || ''
+      body: meeting.body || '',
+      responseDeadline: meeting.responseDeadline || ''
     })
     setShowEditMeetingDialog(true)
   }
@@ -3831,6 +3833,8 @@ Note: This is an initial draft. Further development needed to incorporate specif
       location: editMeetingForm.location,
       body: editMeetingForm.body,
       notes: editMeetingForm.body,
+      responseDeadline: editMeetingForm.responseDeadline,
+      response_deadline: editMeetingForm.responseDeadline || null,
       status: 'pending'
     }
 
@@ -3855,7 +3859,8 @@ Note: This is an initial draft. Further development needed to incorporate specif
       duration: 60,
       meetingType: 'in-person',
       location: '',
-      body: ''
+      body: '',
+      responseDeadline: ''
     })
   }
 

@@ -92,6 +92,19 @@ export function PortalEditMeetingDialog() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="editMeetingResponseDeadline" className="text-sm font-medium text-gray-700">
+                Response Due Date
+              </Label>
+              <Input
+                id="editMeetingResponseDeadline"
+                type="date"
+                value={editMeetingForm.responseDeadline || ''}
+                onChange={(e) => setEditMeetingForm({...editMeetingForm, responseDeadline: e.target.value})}
+                className="border-blue-200 focus:border-blue-500"
+              />
+            </div>
+
             {/* Meeting Type and Location */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">

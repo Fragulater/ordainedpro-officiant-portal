@@ -377,6 +377,27 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
     ].filter(Boolean).join("\r\n")
   }
 
+  const generateGoogleCalendarUrl = (event: {
+    title: string
+    start: string
+    end: string
+    description: string
+    location: string
+  }) => {
+    const formatGoogleDate = (value: string) =>
+      new Date(value).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")
+
+    const params = new URLSearchParams({
+      action: "TEMPLATE",
+      text: event.title,
+      dates: `${formatGoogleDate(event.start)}/${formatGoogleDate(event.end)}`,
+      details: event.description,
+      location: event.location || "",
+    })
+
+    return `https://calendar.google.com/calendar/render?${params.toString()}`
+  }
+
 
   // const handleSendInvite = async () => {
   //   if (!validateForm()) return;
@@ -485,8 +506,12 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
       const activeCoupleId = coupleId || 1;
       let meetingLocation = formData.location
       let googleEventId: string | null = null
+      let calendarEventLink = ""
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Phoenix"
+      const shouldCreateGoogleEvent = formData.sendCalendarInvite && googleCalendarConfigured && googleCalendarConnected
+      const shouldIncludeMeetingLink = formData.meetingType === "video" && formData.includeMeetingLink
 
-      if (formData.meetingType === "video" && formData.includeMeetingLink && !meetingLocation) {
+      if (shouldIncludeMeetingLink && !meetingLocation && (!googleCalendarConfigured || !googleCalendarConnected)) {
         if (!googleCalendarConfigured) {
           throw new Error("Google Calendar is not configured on the server yet.")
         }
@@ -494,8 +519,9 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
         if (!googleCalendarConnected) {
           throw new Error("Connect Google Calendar first so OrdainedPro can create a Google Meet link.")
         }
+      }
 
-        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Phoenix"
+      if (shouldCreateGoogleEvent) {
         const meetResponse = await fetch("/api/google/create-meet", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -507,17 +533,27 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
             duration: formData.duration,
             attendees: formData.attendees,
             timeZone,
+            location: meetingLocation,
+            includeMeetingLink: shouldIncludeMeetingLink,
           }),
         })
 
         const meetData = await meetResponse.json()
 
-        if (!meetResponse.ok || !meetData.meetLink) {
-          throw new Error(meetData.error || "Failed to create a Google Meet link.")
+        if (!meetResponse.ok) {
+          throw new Error(meetData.error || "Failed to create a Google Calendar event.")
         }
 
-        meetingLocation = meetData.meetLink
+        if (shouldIncludeMeetingLink && !meetData.meetLink) {
+          throw new Error("Failed to create a Google Meet link.")
+        }
+
+        if (shouldIncludeMeetingLink && meetData.meetLink) {
+          meetingLocation = meetData.meetLink
+        }
+
         googleEventId = meetData.id || null
+        calendarEventLink = meetData.calendarEventLink || ""
       }
 
       // 1️⃣ Save meeting to Supabase
@@ -586,17 +622,18 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
         meetingLocation ? `${formData.meetingType === "video" ? "Google Meet" : "Location"}: ${meetingLocation}` : "",
         formData.responseDeadline ? `Please respond by: ${new Date(formData.responseDeadline).toLocaleDateString()}` : "",
         "",
-        "A calendar invitation is attached. You can accept it from your email or calendar app, or reply directly to this email.",
+        calendarEventLink
+          ? "This meeting was added through Google Calendar. Use the button below to open it, or reply directly to this email."
+          : "Use the Add to Google Calendar button below, or reply directly to this email.",
       ].filter(Boolean).join("\n")
-      const calendarInviteContent = generateICalContent({
+      const calendarEvent = {
         title: formData.subject,
         start: new Date(`${formData.date}T${formData.time}`).toISOString(),
         end: new Date(new Date(`${formData.date}T${formData.time}`).getTime() + Number(formData.duration) * 60_000).toISOString(),
         description: cleanMeetingEmailBody,
         location: meetingLocation || "",
-        attendees: formData.attendees,
-        organizer: officiantEmail || "info@ordainedpro.com",
-      })
+      }
+      const calendarUrl = calendarEventLink || generateGoogleCalendarUrl(calendarEvent)
 
       // Send to each attendee
       let emailsSent = 0;
@@ -615,14 +652,8 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
               coupleName: coupleName,
               coupleId: activeCoupleId,
               officiantId: user.id,
-              attachments: formData.sendCalendarInvite ? [
-                {
-                  filename: `meeting-invite-${formData.date}.ics`,
-                  content: calendarInviteContent,
-                  contentType: "text",
-                  mimeType: "text/calendar; method=REQUEST; charset=UTF-8",
-                },
-              ] : [],
+              calendarUrl,
+              attachments: [],
             }),
           });
 

@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
       duration,
       attendees,
       timeZone,
+      location,
+      includeMeetingLink = true,
     } = body
 
     if (!subject || !date || !time || !duration || !timeZone) {
@@ -41,6 +43,8 @@ export async function POST(request: NextRequest) {
       endDateTime: endDate.toISOString(),
       timeZone,
       attendees: Array.isArray(attendees) ? attendees : [],
+      location: location || "",
+      includeConference: includeMeetingLink !== false,
     })
 
     const meetLink =

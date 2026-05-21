@@ -174,6 +174,8 @@ type CreateGoogleMeetParams = {
   endDateTime: string
   timeZone: string
   attendees?: string[]
+  location?: string
+  includeConference?: boolean
 }
 
 export const createGoogleMeetEvent = async ({
@@ -183,6 +185,8 @@ export const createGoogleMeetEvent = async ({
   endDateTime,
   timeZone,
   attendees = [],
+  location = "",
+  includeConference = true,
 }: CreateGoogleMeetParams) => {
   const accessToken = await getGoogleAccessToken()
   if (!accessToken) {
@@ -198,6 +202,7 @@ export const createGoogleMeetEvent = async ({
     body: JSON.stringify({
       summary,
       description,
+      location,
       start: {
         dateTime: startDateTime,
         timeZone,
@@ -207,14 +212,14 @@ export const createGoogleMeetEvent = async ({
         timeZone,
       },
       attendees: attendees.filter(Boolean).map((email) => ({ email })),
-      conferenceData: {
+      ...(includeConference ? { conferenceData: {
         createRequest: {
           requestId: crypto.randomUUID(),
           conferenceSolutionKey: {
             type: "hangoutsMeet",
           },
         },
-      },
+      } } : {}),
     }),
   })
 

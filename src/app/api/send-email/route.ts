@@ -19,7 +19,7 @@ interface EmailAttachment {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { to, subject, message, fromName, coupleName, coupleId, officiantId, attachments } = body;
+    const { to, subject, message, fromName, coupleName, coupleId, officiantId, attachments, calendarUrl } = body;
     const recipients = Array.isArray(to)
       ? to.filter((email) => typeof email === "string" && email.trim())
       : typeof to === "string" && to.trim()
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
           : "reply@ziloesteo.resend.app",
         to: recipients,
         subject: subject,
-        html: generateEmailHtml(fromName, coupleName, message, subject, attachments),
+        html: generateEmailHtml(fromName, coupleName, message, subject, attachments, calendarUrl),
         text: message,
       };
 
@@ -120,7 +120,8 @@ function generateEmailHtml(
   coupleName: string,
   message: string,
   subject: string,
-  attachments?: EmailAttachment[]
+  attachments?: EmailAttachment[],
+  calendarUrl?: string
 ): string {
   const trimmedMessage = message.trim();
   const startsWithGreeting = /^dear\s/i.test(trimmedMessage);
@@ -143,6 +144,16 @@ function generateEmailHtml(
       </tr>
     `;
   }
+
+  const calendarHtml = calendarUrl ? `
+      <tr>
+        <td style="padding: 0 40px 24px; text-align: center;">
+          <a href="${calendarUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 14px; padding: 12px 18px; border-radius: 8px;">
+            Add to Google Calendar
+          </a>
+        </td>
+      </tr>
+    ` : '';
 
   return `
 <!DOCTYPE html>
@@ -193,6 +204,9 @@ function generateEmailHtml(
 
           <!-- Attachments Section -->
           ${attachmentsHtml}
+
+          <!-- Calendar Section -->
+          ${calendarHtml}
 
           <!-- Footer -->
           <tr>
