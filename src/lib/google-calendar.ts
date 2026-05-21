@@ -225,3 +225,24 @@ export const createGoogleMeetEvent = async ({
 
   return response.json()
 }
+
+export const cancelGoogleCalendarEvent = async (eventId: string) => {
+  const accessToken = await getGoogleAccessToken()
+  if (!accessToken) {
+    throw new Error("Google Calendar is not connected")
+  }
+
+  const response = await fetch(`${GOOGLE_CALENDAR_EVENTS_URL}/${encodeURIComponent(eventId)}?sendUpdates=all`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  if (!response.ok && response.status !== 410) {
+    const errorText = await response.text()
+    throw new Error(`Google Calendar event cancellation failed: ${errorText}`)
+  }
+
+  return true
+}

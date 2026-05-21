@@ -51,6 +51,36 @@ const getFirstName = (fullName: string | null | undefined): string => {
   return fullName.split(' ')[0] || 'Partner'
 }
 
+const getMeetingStart = (meeting: { date?: string; time?: string | null }) => {
+  const date = meeting.date || ""
+  const time = meeting.time || "00:00"
+  return new Date(`${date}T${time}`)
+}
+
+const getMeetingDisplayStatus = (meeting: { date?: string; time?: string | null; status?: string }) => {
+  const status = meeting.status || "pending"
+  if (!["canceled", "declined", "completed"].includes(status) && getMeetingStart(meeting).getTime() < Date.now()) {
+    return "completed"
+  }
+  if (["pending", "accepted", "declined", "confirmed", "canceled", "completed"].includes(status)) {
+    return status as Meeting["status"]
+  }
+  return "pending"
+}
+
+const formatMeetingDateTime = (meeting: { date?: string; time?: string | null }) => {
+  const start = getMeetingStart(meeting)
+  if (Number.isNaN(start.getTime())) return "Date TBD"
+
+  return start.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
 // Helper function to generate consistent colors based on couple ID
 const getCoupleColors = (coupleId: number) => {
   const colorPairs = [
@@ -959,11 +989,13 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         location: m.location || "",
         meetingType: m.meeting_type || "in-person",
         attendees: [],
-        status: m.status || "scheduled",
+        status: getMeetingDisplayStatus({ date: m.date, time: m.time, status: m.status }),
         createdDate: m.created_at ? new Date(m.created_at).toISOString().split('T')[0] : "",
         reminderSent: false,
         calendarInviteSent: false,
-        responseDeadline: ""
+        google_event_id: m.google_event_id || null,
+        googleEventId: m.google_event_id || null,
+        responseDeadline: m.response_deadline || ""
       }))
       setMeetings(transformedMeetings)
       console.log("âœ… Loaded", transformedMeetings.length, "meetings for couple", editCoupleInfo.id)
@@ -3730,9 +3762,47 @@ Note: This is an initial draft. Further development needed to incorporate specif
     }
   }
 
-  const handleDeleteMeeting = (meetingId: number) => {
-    if (confirm('Are you sure you want to delete this meeting?')) {
+  const handleDeleteMeeting = async (meetingId: number) => {
+    if (confirm('Are you sure you want to permanently delete this meeting?')) {
+      const result = await deleteMeetingFromDB(meetingId)
+      if (!result.ok) {
+        console.error("Failed to delete meeting:", result.error)
+        alert("Failed to delete meeting. Please try again.")
+        return
+      }
       setMeetings(meetings.filter(meeting => meeting.id !== meetingId))
+    }
+  }
+
+  const handleCancelMeeting = async (meetingId: number) => {
+    if (confirm('Cancel this meeting? If this meeting has a Google Calendar event, OrdainedPro will ask Google to notify the attendees.')) {
+      const meeting = meetings.find(item => item.id === meetingId)
+      const googleEventId = meeting?.google_event_id || meeting?.googleEventId
+
+      if (googleEventId) {
+        const cancelResponse = await fetch("/api/google/cancel-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventId: googleEventId }),
+        })
+
+        if (!cancelResponse.ok) {
+          const cancelError = await cancelResponse.json().catch(() => ({}))
+          console.warn("Google Calendar cancellation failed:", cancelError.error || cancelResponse.statusText)
+        }
+      }
+
+      const result = await updateMeetingInDB(meetingId, {
+        status: 'canceled',
+        canceled_at: new Date().toISOString(),
+        canceled_by: 'officiant'
+      } as any)
+      if (!result.ok) {
+        console.warn("Meeting canceled locally, but the database status was not saved:", result.error)
+      }
+      setMeetings(prev => prev.map(meeting =>
+        meeting.id === meetingId ? { ...meeting, status: 'canceled' as const } : meeting
+      ))
     }
   }
 
@@ -3741,28 +3811,39 @@ Note: This is an initial draft. Further development needed to incorporate specif
       id: meeting.id,
       subject: meeting.subject,
       date: meeting.date,
-      time: meeting.time,
-      duration: meeting.duration,
-      meetingType: meeting.meetingType,
-      location: meeting.location,
+      time: meeting.time || '',
+      duration: meeting.duration || 60,
+      meetingType: meeting.meetingType || 'in-person',
+      location: meeting.location || '',
       body: meeting.body || ''
     })
     setShowEditMeetingDialog(true)
   }
 
-  const handleUpdateMeeting = () => {
+  const handleUpdateMeeting = async () => {
+    const updatedMeeting = {
+      subject: editMeetingForm.subject,
+      date: editMeetingForm.date,
+      time: editMeetingForm.time,
+      duration: editMeetingForm.duration,
+      meetingType: editMeetingForm.meetingType as 'in-person' | 'video' | 'phone',
+      meeting_type: editMeetingForm.meetingType,
+      location: editMeetingForm.location,
+      body: editMeetingForm.body,
+      notes: editMeetingForm.body,
+      status: 'pending'
+    }
+
+    const result = await updateMeetingInDB(editMeetingForm.id, updatedMeeting as any)
+    if (!result.ok) {
+      console.error("Failed to update meeting:", result.error)
+      alert("Failed to update meeting. Please try again.")
+      return
+    }
+
     setMeetings(meetings.map(meeting =>
       meeting.id === editMeetingForm.id
-        ? {
-            ...meeting,
-            subject: editMeetingForm.subject,
-            date: editMeetingForm.date,
-            time: editMeetingForm.time,
-            duration: editMeetingForm.duration,
-            meetingType: editMeetingForm.meetingType as 'in-person' | 'video' | 'phone',
-            location: editMeetingForm.location,
-            body: editMeetingForm.body
-          }
+        ? { ...meeting, ...updatedMeeting, status: 'pending' as const }
         : meeting
     ))
     setShowEditMeetingDialog(false)
@@ -4137,25 +4218,14 @@ OrdainedPro Wedding Portal
     }, 5000) // Simulate response after 5 seconds
   }
 
-  const updateMeetingStatus = (meetingId: number, status: 'pending' | 'accepted' | 'declined' | 'confirmed') => {
+  const updateMeetingStatus = async (meetingId: number, status: 'pending' | 'accepted' | 'declined' | 'confirmed' | 'canceled' | 'completed') => {
     setMeetings(prev => prev.map(meeting =>
       meeting.id === meetingId ? { ...meeting, status } : meeting
     ))
 
-    // Show notification to user
-    const meeting = meetings.find(m => m.id === meetingId)
-    if (meeting) {
-      const statusMessages = {
-        accepted: 'âœ… Meeting accepted by couple!',
-        declined: 'âŒ Meeting declined by couple. Please reschedule.',
-        confirmed: '[CELEBRATE] Meeting confirmed!',
-        pending: 'â³ Meeting response pending...'
-      }
-
-      // In a real app, this would be a toast notification
-      setTimeout(() => {
-        alert(`[SCRIPT]… Meeting Update: ${meeting.subject}\n\n${statusMessages[status]}`)
-      }, 100)
+    const result = await updateMeetingInDB(meetingId, { status } as any)
+    if (!result.ok) {
+      console.warn("Meeting status updated locally, but not saved to the database:", result.error)
     }
   }
 
@@ -4167,7 +4237,10 @@ OrdainedPro Wedding Portal
       case 'pending':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
       case 'declined':
+      case 'canceled':
         return 'bg-red-100 text-red-800 border-red-200'
+      case 'completed':
+        return 'bg-blue-100 text-blue-800 border-blue-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -4177,28 +4250,33 @@ OrdainedPro Wedding Portal
     switch (status) {
       case 'confirmed':
       case 'accepted':
-        return 'âœ…'
+        return 'Confirmed'
       case 'pending':
-        return 'â³'
+        return 'Pending'
       case 'declined':
-        return 'âŒ'
+        return 'Declined'
+      case 'canceled':
+        return 'Canceled'
+      case 'completed':
+        return 'Completed'
       default:
-        return '[SCRIPT]…'
+        return 'Scheduled'
     }
   }
 
   const getMeetingTypeIcon = (type: string) => {
     switch (type) {
       case 'video':
-        return '’»'
+        return 'Video call'
       case 'phone':
-        return '[SCRIPT]ž'
+        return 'Phone call'
       case 'in-person':
-        return '[USERS]'
+        return 'In person'
       default:
-        return '[SCRIPT]…'
+        return 'Meeting'
     }
   }
+
 
   // File viewer handler
   const handleViewFile = (file: any) => {
@@ -5414,6 +5492,7 @@ ${invoiceContent}`)
     handleAddWeddingEvent,
     handleDeleteWeddingEvent,
     handleDeleteMeeting,
+    handleCancelMeeting,
     handleEditMeeting,
     handleUpdateMeeting,
     toggleCeremonyStatus,

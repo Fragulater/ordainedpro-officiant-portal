@@ -104,8 +104,8 @@ export function PortalEditMeetingDialog() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="in-person">In-Person</SelectItem>
-                    <SelectItem value="video-call">Video Call</SelectItem>
-                    <SelectItem value="phone-call">Phone Call</SelectItem>
+                    <SelectItem value="video">Video Call</SelectItem>
+                    <SelectItem value="phone">Phone Call</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -120,7 +120,7 @@ export function PortalEditMeetingDialog() {
                   placeholder={
                     editMeetingForm.meetingType === 'in-person'
                       ? "e.g., Pastor Office, Coffee Shop"
-                      : editMeetingForm.meetingType === 'video-call'
+                    : editMeetingForm.meetingType === 'video'
                       ? "e.g., Zoom, Google Meet"
                       : "e.g., Phone number"
                   }

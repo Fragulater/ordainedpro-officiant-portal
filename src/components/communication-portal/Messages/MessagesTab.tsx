@@ -40,6 +40,14 @@ export function MessagesTab() {
     currentUser,
   } = useCommunicationPortal()
 
+  const upcomingMeetings = meetings
+    .filter((meeting) => {
+      const status = meeting.status || "pending"
+      const start = new Date(`${meeting.date}T${meeting.time || "00:00"}`)
+      return start.getTime() >= Date.now() && !["canceled", "declined", "completed"].includes(status)
+    })
+    .sort((a, b) => new Date(`${a.date}T${a.time || "00:00"}`).getTime() - new Date(`${b.date}T${b.time || "00:00"}`).getTime())
+
   const officiantName =
     [
       officiantProfile?.full_name,
@@ -207,7 +215,7 @@ export function MessagesTab() {
                     <div>
                       <h4 className="font-semibold mb-3 text-blue-900">Next Meeting</h4>
                       <div className="space-y-2">
-                        {meetings.filter(meeting => new Date(meeting.date) >= new Date()).slice(0, 1).map((meeting) => (
+                        {upcomingMeetings.slice(0, 1).map((meeting) => (
                           <div key={meeting.id} className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg text-sm border border-blue-100">
                             <div className="flex items-center justify-between mb-1">
                               <p className="font-medium text-blue-900">{meeting.subject}</p>
@@ -215,11 +223,19 @@ export function MessagesTab() {
                                 {getMeetingStatusIcon(meeting.status)}
                               </Badge>
                             </div>
-                            <p className="text-blue-700">{new Date(meeting.date).toLocaleDateString()} at {meeting.time}</p>
-                            <p className="text-blue-600 text-xs mt-1">{getMeetingTypeIcon(meeting.meetingType)} {meeting.meetingType}</p>
+                            <p className="text-blue-700">
+                              {new Date(`${meeting.date}T${meeting.time || "00:00"}`).toLocaleString([], {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                            <p className="text-blue-600 text-xs mt-1">{getMeetingTypeIcon(meeting.meetingType)}</p>
                           </div>
                         ))}
-                        {meetings.filter(meeting => new Date(meeting.date) >= new Date()).length === 0 && (
+                        {upcomingMeetings.length === 0 && (
                           <div className="p-3 bg-gray-50 rounded-lg text-sm border border-gray-200 text-center">
                             <p className="text-gray-500">No upcoming meetings</p>
                             <Button

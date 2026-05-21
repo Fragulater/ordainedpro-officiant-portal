@@ -42,9 +42,11 @@ export interface Meeting {
   notes?: string | null
   meetingType: 'in-person' | 'video' | 'phone'
   attendees: string[]
-  status: 'pending' | 'accepted' | 'declined' | 'confirmed'
+  status: 'pending' | 'accepted' | 'declined' | 'confirmed' | 'canceled' | 'completed'
   createdDate: string
   updated_at?: string
+  google_event_id?: string | null
+  googleEventId?: string | null
   reminderSent: boolean
   calendarInviteSent: boolean
   responseDeadline: string
@@ -482,6 +484,7 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
 
       const activeCoupleId = coupleId || 1;
       let meetingLocation = formData.location
+      let googleEventId: string | null = null
 
       if (formData.meetingType === "video" && formData.includeMeetingLink && !meetingLocation) {
         if (!googleCalendarConfigured) {
@@ -514,10 +517,11 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
         }
 
         meetingLocation = meetData.meetLink
+        googleEventId = meetData.id || null
       }
 
       // 1️⃣ Save meeting to Supabase
-      const meetingData = {
+      const meetingBaseData = {
         couple_id: activeCoupleId,
         user_id: user.id,
         title: formData.subject,
@@ -528,12 +532,31 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
+      const meetingData = {
+        ...meetingBaseData,
+        duration: formData.duration,
+        meeting_type: formData.meetingType,
+        status: "pending",
+        response_deadline: formData.responseDeadline || null,
+        google_event_id: googleEventId,
+      };
 
-      const { data: meetingInsert, error: meetingError } = await supabase
+      let { data: meetingInsert, error: meetingError } = await supabase
         .from("meetings")
         .insert(meetingData)
         .select()
         .single();
+
+      if (meetingError && /schema cache|column .* does not exist|Could not find/i.test(meetingError.message)) {
+        const retry = await supabase
+          .from("meetings")
+          .insert(meetingBaseData)
+          .select()
+          .single();
+
+        meetingInsert = retry.data;
+        meetingError = retry.error;
+      }
 
       if (meetingError) throw meetingError;
 
@@ -626,6 +649,8 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
         notes: meetingInsert?.notes || formData.body || null,
         createdDate: meetingInsert?.created_at || new Date().toISOString(),
         updated_at: meetingInsert?.updated_at || new Date().toISOString(),
+        google_event_id: meetingInsert?.google_event_id || googleEventId,
+        googleEventId: meetingInsert?.google_event_id || googleEventId,
         subject: formData.subject,
         body: formData.body,
         duration: formData.duration,

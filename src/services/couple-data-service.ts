@@ -79,6 +79,11 @@ export interface Meeting {
   location?: string
   notes?: string
   status?: string
+  response_deadline?: string
+  canceled_at?: string
+  canceled_by?: string
+  google_event_id?: string
+  googleEventId?: string
   created_at?: string
 }
 
@@ -385,19 +390,39 @@ export async function addMeeting(userId: string, coupleId: number, meetingData: 
   notes?: string
 }): Promise<{ ok: boolean; data?: Meeting; error?: string }> {
   try {
-    const { data, error } = await supabase
+    const baseInsert = {
+      user_id: userId,
+      couple_id: coupleId,
+      title: meetingData.subject,
+      date: meetingData.date,
+      time: meetingData.time,
+      location: meetingData.location || null,
+      notes: meetingData.notes || null
+    }
+
+    const fullInsert = {
+      ...baseInsert,
+      duration: meetingData.duration || 60,
+      meeting_type: meetingData.meetingType || "in-person",
+      status: "pending"
+    }
+
+    let { data, error } = await supabase
       .from("meetings")
-      .insert({
-        user_id: userId,
-        couple_id: coupleId,
-        title: meetingData.subject,
-        date: meetingData.date,
-        time: meetingData.time,
-        location: meetingData.location || null,
-        notes: meetingData.notes || null
-      })
+      .insert(fullInsert)
       .select()
       .single()
+
+    if (error && /schema cache|column .* does not exist|Could not find/i.test(error.message)) {
+      const retry = await supabase
+        .from("meetings")
+        .insert(baseInsert)
+        .select()
+        .single()
+
+      data = retry.data
+      error = retry.error
+    }
 
     if (error) {
       console.error("[ERROR] Error adding meeting:", error)
@@ -417,19 +442,39 @@ export async function updateMeeting(meetingId: number, updates: Partial<Meeting>
     const dbUpdates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     }
+    const baseUpdates: Record<string, unknown> = {
+      updated_at: dbUpdates.updated_at,
+    }
 
-    if (updates.subject !== undefined) dbUpdates.title = updates.subject
-    if (updates.title !== undefined) dbUpdates.title = updates.title
-    if (updates.date !== undefined) dbUpdates.date = updates.date
-    if (updates.time !== undefined) dbUpdates.time = updates.time
-    if (updates.location !== undefined) dbUpdates.location = updates.location
-    if (updates.body !== undefined) dbUpdates.notes = updates.body
-    if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+    if (updates.subject !== undefined) dbUpdates.title = baseUpdates.title = updates.subject
+    if (updates.title !== undefined) dbUpdates.title = baseUpdates.title = updates.title
+    if (updates.date !== undefined) dbUpdates.date = baseUpdates.date = updates.date
+    if (updates.time !== undefined) dbUpdates.time = baseUpdates.time = updates.time
+    if (updates.location !== undefined) dbUpdates.location = baseUpdates.location = updates.location
+    if (updates.body !== undefined) dbUpdates.notes = baseUpdates.notes = updates.body
+    if (updates.notes !== undefined) dbUpdates.notes = baseUpdates.notes = updates.notes
+    if (updates.duration !== undefined) dbUpdates.duration = updates.duration
+    if (updates.meeting_type !== undefined) dbUpdates.meeting_type = updates.meeting_type
+    if (updates.status !== undefined) dbUpdates.status = updates.status
+    if (updates.response_deadline !== undefined) dbUpdates.response_deadline = updates.response_deadline
+    if (updates.canceled_at !== undefined) dbUpdates.canceled_at = updates.canceled_at
+    if (updates.canceled_by !== undefined) dbUpdates.canceled_by = updates.canceled_by
+    if (updates.google_event_id !== undefined) dbUpdates.google_event_id = updates.google_event_id
+    if (updates.googleEventId !== undefined) dbUpdates.google_event_id = updates.googleEventId
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from("meetings")
       .update(dbUpdates)
       .eq("id", meetingId)
+
+    if (error && /schema cache|column .* does not exist|Could not find/i.test(error.message)) {
+      const retry = await supabase
+        .from("meetings")
+        .update(baseUpdates)
+        .eq("id", meetingId)
+
+      error = retry.error
+    }
 
     if (error) {
       console.error("[ERROR] Error updating meeting:", error)

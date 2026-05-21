@@ -10,6 +10,24 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+function detectMeetingResponse(replyText: string, subject?: string): "accepted" | "declined" | "canceled" | null {
+  const normalized = `${replyText || ""} ${subject || ""}`.toLowerCase();
+
+  if (/\b(cancel|cancelled|canceled|reschedule|can't make it|cannot make it)\b/.test(normalized)) {
+    return "canceled";
+  }
+
+  if (/\b(decline|declined|reject|rejected|no\b|not attending|cannot attend|can't attend)\b/.test(normalized)) {
+    return "declined";
+  }
+
+  if (/\b(accept|accepted|confirm|confirmed|yes\b|i'?ll be there|we'?ll be there|sounds good)\b/.test(normalized)) {
+    return "accepted";
+  }
+
+  return null;
+}
+
 // Webhook to receive inbound email replies from Resend
 export async function POST(request: NextRequest) {
   try {
@@ -291,10 +309,48 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ Reply saved successfully for officiant:", couple.user_id);
 
+    const meetingResponse = detectMeetingResponse(replyText, subject);
+
+    if (meetingResponse) {
+      const today = new Date().toISOString().split("T")[0];
+      const { data: upcomingMeetings, error: meetingLookupError } = await supabase
+        .from("meetings")
+        .select("id,date,time")
+        .eq("couple_id", couple.id)
+        .eq("user_id", couple.user_id)
+        .gte("date", today)
+        .order("date", { ascending: true })
+        .order("time", { ascending: true })
+        .limit(1);
+
+      if (meetingLookupError) {
+        console.warn("Could not find meeting to update from email reply:", meetingLookupError.message);
+      } else if (upcomingMeetings?.[0]?.id) {
+        const statusUpdate: Record<string, string> = { status: meetingResponse };
+
+        if (meetingResponse === "canceled") {
+          statusUpdate.canceled_at = new Date().toISOString();
+          statusUpdate.canceled_by = senderName || "couple";
+        }
+
+        const { error: statusError } = await supabase
+          .from("meetings")
+          .update(statusUpdate)
+          .eq("id", upcomingMeetings[0].id);
+
+        if (statusError) {
+          console.warn("Meeting reply was captured, but meeting status could not be updated:", statusError.message);
+        } else {
+          console.log("Meeting status updated from email reply:", meetingResponse);
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "Reply processed and saved",
       messageId: savedMessage?.[0]?.id,
+      meetingResponse,
       from: senderEmail,
       coupleName: `${couple.bride_name} & ${couple.groom_name}`,
       officiantId: couple.user_id,
