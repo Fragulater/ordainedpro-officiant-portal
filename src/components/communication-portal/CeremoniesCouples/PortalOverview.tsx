@@ -4,7 +4,6 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -214,15 +213,6 @@ export function PortalOverview() {
                           id="editEmergencyContact"
                           value={editCoupleInfo?.emergencyContact || ''}
                           onChange={(e) => setEditCoupleInfo({...editCoupleInfo, emergencyContact: e.target.value})}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="editSpecialRequests">Special Requests & Preferences</Label>
-                        <Textarea
-                          id="editSpecialRequests"
-                          value={editCoupleInfo?.specialRequests || ''}
-                          onChange={(e) => setEditCoupleInfo({...editCoupleInfo, specialRequests: e.target.value})}
-                          rows={3}
                         />
                       </div>
                     </div>
