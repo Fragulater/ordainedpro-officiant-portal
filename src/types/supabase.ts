@@ -17,6 +17,8 @@ export interface Database {
           business_name: string | null
           city: string | null
           state: string | null
+          travel_radius_miles: number | null
+          travel_state: string | null
           phone: string | null
           email: string
           website: string | null
@@ -43,6 +45,8 @@ export interface Database {
           business_name?: string | null
           city?: string | null
           state?: string | null
+          travel_radius_miles?: number | null
+          travel_state?: string | null
           phone?: string | null
           email: string
           website?: string | null
@@ -69,6 +73,8 @@ export interface Database {
           business_name?: string | null
           city?: string | null
           state?: string | null
+          travel_radius_miles?: number | null
+          travel_state?: string | null
           phone?: string | null
           email?: string
           website?: string | null

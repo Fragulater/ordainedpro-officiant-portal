@@ -141,6 +141,8 @@ interface OfficiantProfile {
   headshot: string;
   city: string;
   state: string;
+  travelRadiusMiles: number;
+  travelState: string;
 
   // Experience & Rating
   yearsExperience: number;
@@ -261,6 +263,8 @@ export function OfficiantDashboardDialog({
     headshot: "",
     city: "",
     state: "",
+    travelRadiusMiles: 50,
+    travelState: "",
     yearsExperience: 0,
     rating: 4.8,
     totalReviews: 0,
@@ -471,6 +475,8 @@ export function OfficiantDashboardDialog({
             businessName: data.business_name || "",
             city: data.city || "",
             state: data.state || "",
+            travelRadiusMiles: data.travel_radius_miles || 50,
+            travelState: data.travel_state || data.state || "",
             phone: data.phone || "",
             email: data.email || "",
             website: data.website || "",
@@ -735,6 +741,8 @@ export function OfficiantDashboardDialog({
         business_name: profile.businessName || null,
         city: profile.city || null,
         state: profile.state || null,
+        travel_radius_miles: profile.travelRadiusMiles || 0,
+        travel_state: profile.travelState || profile.state || null,
         phone: profile.phone || null,
         email: profile.email,
         website: profile.website || null,
@@ -1680,6 +1688,39 @@ export function OfficiantDashboardDialog({
                             placeholder="Number of years officiating"
                           />
                         </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="travelRadiusMiles">Travel Radius (Miles)</Label>
+                            <Input
+                              id="travelRadiusMiles"
+                              type="number"
+                              value={profile.travelRadiusMiles}
+                              onChange={(e) =>
+                                handleProfileUpdate(
+                                  "travelRadiusMiles",
+                                  parseInt(e.target.value) || 0
+                                )
+                              }
+                              placeholder="50"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="travelState">Travel State</Label>
+                            <Input
+                              id="travelState"
+                              value={profile.travelState}
+                              onChange={(e) =>
+                                handleProfileUpdate("travelState", e.target.value)
+                              }
+                              placeholder={profile.state || "AZ"}
+                              maxLength={2}
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          This appears on your public officiant page so couples know how far you are willing to travel.
+                        </p>
                       </CardContent>
                     </Card>
 
