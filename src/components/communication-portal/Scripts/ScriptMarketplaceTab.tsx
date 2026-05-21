@@ -682,8 +682,8 @@ export function ScriptMarketplaceTab() {
                           )}
                         </div>
                       )}
-                      <Separator />
-                      <div>
+                      <Separator className="hidden" />
+                      <div className="hidden">
                         <h4 className="font-semibold mb-3 text-blue-900">Popular Categories</h4>
                         <div className="space-y-2 text-sm">
                           <p className="text-gray-600">• Traditional Religious</p>
