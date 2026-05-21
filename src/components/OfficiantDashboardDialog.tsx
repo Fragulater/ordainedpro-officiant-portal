@@ -106,6 +106,29 @@ interface Couple {
   };
 }
 
+interface DashboardMeeting {
+  id: number;
+  coupleId: number;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  status: string;
+}
+
+interface DashboardCalendarEvent {
+  id: string;
+  type: "wedding" | "meeting";
+  date: string;
+  time: string;
+  title: string;
+  subtitle: string;
+  location: string;
+  coupleId?: string;
+  ceremony?: Ceremony;
+  status?: string;
+}
+
 interface OfficiantDashboardDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -393,6 +416,34 @@ export function OfficiantDashboardDialog({
   };
   const [allCouples, setAllCouples] = useState<any[]>([]);
   const [savedCeremonies, setSavedCeremonies] = useState<any[]>([]);
+  const [dashboardMeetings, setDashboardMeetings] = useState<DashboardMeeting[]>([]);
+
+  const parseDateOnly = (dateString?: string) => {
+    if (!dateString) return null;
+    const [year, month, day] = dateString.split("-").map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day);
+  };
+
+  const formatDateOnly = (dateString?: string) => {
+    const date = parseDateOnly(dateString);
+    if (!date) return "Date TBD";
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const formatTime = (timeString?: string) => {
+    if (!timeString) return "Time TBD";
+    const [hour, minute] = timeString.split(":").map(Number);
+    if (Number.isNaN(hour) || Number.isNaN(minute)) return timeString;
+    return new Date(2000, 0, 1, hour, minute).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
 
   // Transform couples data to ceremonies format
   useEffect(() => {
@@ -404,15 +455,14 @@ export function OfficiantDashboardDialog({
             : "";
 
         const weddingDate = couple.weddingDetails?.weddingDate
-          ? new Date(couple.weddingDetails.weddingDate).toLocaleDateString(
+          ? (parseDateOnly(couple.weddingDetails.weddingDate) || new Date(couple.weddingDetails.weddingDate)).toLocaleDateString(
               "en-US",
               { year: "numeric", month: "long", day: "numeric" }
             )
           : "TBD";
 
-        const isPastDate = couple.weddingDetails?.weddingDate
-          ? new Date(couple.weddingDetails.weddingDate) < new Date()
-          : false;
+        const parsedWeddingDate = parseDateOnly(couple.weddingDetails?.weddingDate);
+        const isPastDate = parsedWeddingDate ? parsedWeddingDate < new Date() : false;
 
         // Use colors from couple object or fallback to defaults
         const coupleColors = (couple as any).colors || {
@@ -472,6 +522,39 @@ export function OfficiantDashboardDialog({
       setCeremonies(defaultCeremonies);
     }
   }, [couples]);
+
+  useEffect(() => {
+    const loadDashboardMeetings = async () => {
+      if (!user?.id || !open) return;
+
+      const { data, error } = await supabase
+        .from("meetings")
+        .select("id,couple_id,title,date,time,location,status")
+        .eq("user_id", user.id)
+        .order("date", { ascending: true })
+        .order("time", { ascending: true });
+
+      if (error) {
+        console.error("Failed to load dashboard meetings:", error);
+        setDashboardMeetings([]);
+        return;
+      }
+
+      setDashboardMeetings(
+        (data || []).map((meeting: any) => ({
+          id: meeting.id,
+          coupleId: Number(meeting.couple_id),
+          title: meeting.title || "Scheduled Meeting",
+          date: meeting.date || "",
+          time: meeting.time || "",
+          location: meeting.location || "",
+          status: meeting.status || "pending",
+        }))
+      );
+    };
+
+    loadDashboardMeetings();
+  }, [user?.id, open, activeView]);
 
   // ✅ Load profile from Supabase (not localStorage)
   useEffect(() => {
@@ -610,6 +693,66 @@ export function OfficiantDashboardDialog({
       (a, b) => new Date(a.rawDate).getTime() - new Date(b.rawDate).getTime()
     )
     .slice(0, 2);
+
+  const coupleById = new Map((couples || []).map((couple) => [couple.id, couple]));
+
+  const upcomingCalendarEvents: DashboardCalendarEvent[] = [
+    ...activeCeremonies
+      .filter((ceremony) => {
+        const ceremonyDate = parseDateOnly(ceremony.rawDate);
+        if (!ceremonyDate) return false;
+        ceremonyDate.setHours(0, 0, 0, 0);
+        return ceremonyDate >= today;
+      })
+      .map((ceremony) => ({
+        id: `wedding-${ceremony.id}`,
+        type: "wedding" as const,
+        date: ceremony.rawDate,
+        time: ceremony.time,
+        title: `${(ceremony.couple1Name || "").split(" ")[0] || "Bride"} & ${
+          (ceremony.couple2Name || "").split(" ")[0] || "Groom"
+        } Wedding`,
+        subtitle: `${ceremony.couple1Name} & ${ceremony.couple2Name}`,
+        location: ceremony.location,
+        coupleId: ceremony.id,
+        ceremony,
+      })),
+    ...dashboardMeetings
+      .filter((meeting) => {
+        const meetingDate = parseDateOnly(meeting.date);
+        if (!meetingDate) return false;
+        meetingDate.setHours(0, 0, 0, 0);
+        return (
+          meetingDate >= today &&
+          !["canceled", "declined", "completed"].includes(meeting.status)
+        );
+      })
+      .map((meeting) => {
+        const couple = coupleById.get(meeting.coupleId);
+        const coupleNames = couple
+          ? `${couple.brideName || "Bride"} & ${couple.groomName || "Groom"}`
+          : "Wedding Couple";
+
+        return {
+          id: `meeting-${meeting.id}`,
+          type: "meeting" as const,
+          date: meeting.date,
+          time: formatTime(meeting.time),
+          title: meeting.title,
+          subtitle: coupleNames,
+          location: meeting.location,
+          coupleId: meeting.coupleId.toString(),
+          status: meeting.status,
+        };
+      }),
+  ]
+    .sort((a, b) => {
+      const aDate = parseDateOnly(a.date)?.getTime() || 0;
+      const bDate = parseDateOnly(b.date)?.getTime() || 0;
+      if (aDate !== bDate) return aDate - bDate;
+      return a.time.localeCompare(b.time);
+    })
+    .slice(0, 8);
 
   const handleCeremonyClick = (ceremonyId: string) => {
     onSelectCouple(ceremonyId);
@@ -1415,7 +1558,12 @@ export function OfficiantDashboardDialog({
                   <div className="col-span-2">
                     <Card>
                       <CardHeader>
-                        <CardTitle>August 2024</CardTitle>
+                        <CardTitle>
+                          {(selectedDate || new Date()).toLocaleDateString("en-US", {
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </CardTitle>
                       </CardHeader>
                       <CardContent>
                         <CalendarComponent
@@ -1432,49 +1580,97 @@ export function OfficiantDashboardDialog({
                   <div>
                     <Card>
                       <CardHeader>
-                        <CardTitle>Upcoming Events</CardTitle>
+                        <CardTitle>Upcoming Dates</CardTitle>
+                        <CardDescription>
+                          Weddings and scheduled meetings
+                        </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        {upcomingCeremonies.map((ceremony) => (
+                        {upcomingCalendarEvents.map((event) => (
                           <div
-                            key={ceremony.id}
-                            className="p-4 bg-purple-50 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors"
-                            onClick={() => handleCeremonyClick(ceremony.id)}
+                            key={event.id}
+                            className={`p-4 rounded-lg transition-colors ${
+                              event.type === "wedding"
+                                ? "bg-purple-50 hover:bg-purple-100 cursor-pointer"
+                                : "bg-blue-50"
+                            }`}
+                            onClick={() =>
+                              event.type === "wedding" && event.coupleId
+                                ? handleCeremonyClick(event.coupleId)
+                                : undefined
+                            }
                           >
                             <div className="flex items-center space-x-2 mb-2">
-                              <CalendarIcon className="w-4 h-4 text-purple-600" />
-                              <p className="text-sm font-medium text-purple-900">
-                                {ceremony.date
-                                  .split(",")[0]
-                                  .replace(/\d+/, (d) => d)}
+                              <CalendarIcon
+                                className={`w-4 h-4 ${
+                                  event.type === "wedding"
+                                    ? "text-purple-600"
+                                    : "text-blue-600"
+                                }`}
+                              />
+                              <p
+                                className={`text-sm font-medium ${
+                                  event.type === "wedding"
+                                    ? "text-purple-900"
+                                    : "text-blue-900"
+                                }`}
+                              >
+                                {formatDateOnly(event.date)}
                               </p>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  event.type === "wedding"
+                                    ? "border-purple-200 text-purple-700"
+                                    : "border-blue-200 text-blue-700"
+                                }
+                              >
+                                {event.type === "wedding" ? "Wedding" : "Meeting"}
+                              </Badge>
                             </div>
-                            <div className="flex -space-x-2 mb-2">
-                              <Avatar className="border-2 border-white w-8 h-8">
-                                <AvatarFallback
-                                  className={ceremony.couple1Color}
-                                >
-                                  {ceremony.couple1Initial}
-                                </AvatarFallback>
-                              </Avatar>
-                              <Avatar className="border-2 border-white w-8 h-8">
-                                <AvatarFallback
-                                  className={ceremony.couple2Color}
-                                >
-                                  {ceremony.couple2Initial}
-                                </AvatarFallback>
-                              </Avatar>
-                            </div>
+                            {event.type === "wedding" && event.ceremony && (
+                              <div className="flex -space-x-2 mb-2">
+                                <Avatar className="border-2 border-white w-8 h-8">
+                                  <AvatarFallback
+                                    className={event.ceremony.couple1Color}
+                                  >
+                                    {event.ceremony.couple1Initial}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <Avatar className="border-2 border-white w-8 h-8">
+                                  <AvatarFallback
+                                    className={event.ceremony.couple2Color}
+                                  >
+                                    {event.ceremony.couple2Initial}
+                                  </AvatarFallback>
+                                </Avatar>
+                              </div>
+                            )}
                             <p className="text-sm font-semibold text-gray-900">
-                              {(ceremony.couple1Name || "").split(" ")[0] || "Bride"} &{" "}
-                              {(ceremony.couple2Name || "").split(" ")[0] || "Groom"}
+                              {event.title}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {event.subtitle}
                             </p>
                             <p className="text-xs text-gray-600 flex items-center mt-1">
                               <Clock className="w-3 h-3 mr-1" />
-                              {ceremony.time}
+                              {event.time || "Time TBD"}
                             </p>
+                            {event.location && event.location !== "TBD" && (
+                              <p className="text-xs text-gray-600 flex items-center mt-1">
+                                <MapPin className="w-3 h-3 mr-1" />
+                                {event.location}
+                              </p>
+                            )}
                           </div>
                         ))}
+                        {upcomingCalendarEvents.length === 0 && (
+                          <div className="p-4 bg-gray-50 rounded-lg text-center">
+                            <p className="text-sm text-gray-500">
+                              No upcoming weddings or meetings.
+                            </p>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
