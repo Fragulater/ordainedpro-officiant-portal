@@ -227,36 +227,39 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
           </div>
         </header>
 
-        <div className="grid flex-1 gap-0 overflow-hidden lg:grid-cols-[300px_1fr_360px]">
-          <aside className="border-b bg-slate-50 p-4 lg:overflow-y-auto lg:border-b-0 lg:border-r">
-            <div className="space-y-5">
+        <div className="grid flex-1 gap-0 overflow-hidden lg:grid-cols-[320px_1fr_360px]">
+          <aside className="border-b bg-slate-50 p-5 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+            <div className="space-y-7">
               <section>
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Contact</h2>
-                <div className="space-y-3 text-sm">
+                <h2 className="mb-4 text-base font-semibold uppercase tracking-wide text-gray-500">Contact</h2>
+                <div className="space-y-5 text-base">
                   {profile.phone ? (
-                    <a className="flex items-center text-gray-700 hover:text-blue-700" href={`tel:${profile.phone}`}>
-                      <Phone className="mr-2 h-4 w-4" />
+                    <a className="flex items-center rounded-md py-1 text-gray-700 hover:text-blue-700" href={`tel:${profile.phone}`}>
+                      <Phone className="mr-3 h-5 w-5 shrink-0" />
                       {profile.phone}
                     </a>
                   ) : null}
                   {profile.email ? (
-                    <a className="flex items-center text-gray-700 hover:text-blue-700" href={`mailto:${profile.email}`}>
-                      <Mail className="mr-2 h-4 w-4" />
-                      {profile.email}
+                    <a className="flex items-center rounded-md py-1 text-gray-700 hover:text-blue-700" href={`mailto:${profile.email}`}>
+                      <Mail className="mr-3 h-5 w-5 shrink-0" />
+                      <span className="break-all">{profile.email}</span>
                     </a>
                   ) : null}
                   {profile.website ? (
-                    <a className="flex items-center text-gray-700 hover:text-blue-700" href={normalizeUrl(profile.website)} target="_blank" rel="noreferrer">
-                      <Globe className="mr-2 h-4 w-4" />
+                    <a className="flex items-center rounded-md py-1 text-gray-700 hover:text-blue-700" href={normalizeUrl(profile.website)} target="_blank" rel="noreferrer">
+                      <Globe className="mr-3 h-5 w-5 shrink-0" />
                       Website
                     </a>
                   ) : null}
                 </div>
-                <div className="mt-4 flex gap-3">
-                  {profile.social_facebook ? <SocialLink href={profile.social_facebook} label="Facebook" icon={<Facebook className="h-5 w-5" />} /> : null}
-                  {profile.social_instagram ? <SocialLink href={profile.social_instagram} label="Instagram" icon={<Instagram className="h-5 w-5" />} /> : null}
-                  {profile.social_linkedin ? <SocialLink href={profile.social_linkedin} label="LinkedIn" icon={<Linkedin className="h-5 w-5" />} /> : null}
-                  {profile.social_youtube ? <SocialLink href={profile.social_youtube} label="YouTube" icon={<Youtube className="h-5 w-5" />} /> : null}
+                <div className="mt-8">
+                  <h2 className="mb-4 text-base font-semibold uppercase tracking-wide text-gray-500">Social Media</h2>
+                  <div className="grid grid-cols-2 gap-3">
+                    {profile.social_facebook ? <SocialLink href={profile.social_facebook} label="Facebook" icon={<Facebook className="h-5 w-5" />} /> : null}
+                    {profile.social_instagram ? <SocialLink href={profile.social_instagram} label="Instagram" icon={<Instagram className="h-5 w-5" />} /> : null}
+                    {profile.social_linkedin ? <SocialLink href={profile.social_linkedin} label="LinkedIn" icon={<Linkedin className="h-5 w-5" />} /> : null}
+                    {profile.social_youtube ? <SocialLink href={profile.social_youtube} label="YouTube" icon={<Youtube className="h-5 w-5" />} /> : null}
+                  </div>
                 </div>
               </section>
             </div>
@@ -276,7 +279,11 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
                   <Play className="h-5 w-5 text-blue-700" />
                   <h2 className="text-lg font-bold text-gray-950">Introduction Video</h2>
                 </div>
-                <video className="aspect-video max-h-[320px] w-full rounded-lg border bg-black object-contain shadow-sm" src={profile.video_url} controls />
+                <video className="aspect-video max-h-[320px] w-full rounded-lg border bg-black object-contain shadow-sm" controls preload="metadata" playsInline>
+                  <source src={profile.video_url} type="video/mp4" />
+                  <source src={profile.video_url} />
+                  Your browser does not support the video tag.
+                </video>
               </div>
             ) : null}
 
@@ -341,7 +348,7 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
 function SocialLink({ href, label, icon }: { href: string; label: string; icon: ReactNode }) {
   return (
     <a
-      className="rounded-md border border-blue-100 p-2 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+      className="flex items-center justify-center rounded-md border border-blue-100 bg-white p-3 text-gray-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
       href={normalizeUrl(href)}
       target="_blank"
       rel="noreferrer"
