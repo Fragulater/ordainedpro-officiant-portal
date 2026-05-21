@@ -895,7 +895,6 @@ export function OfficiantDashboardDialog({
         ...prev,
         photoGallery: [...prev.photoGallery, ...urls],
       }));
-      alert(`✅ ${urls.length} gallery photos uploaded! Click 'Save Profile' to save permanently.`);
     } catch (err: any) {
       console.error("❌ Gallery upload error:", err);
       const errorMsg = err?.message || err?.error || "Unknown error";
