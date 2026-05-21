@@ -775,7 +775,6 @@ export function OfficiantDashboardDialog({
 
       if (error) throw error;
 
-      alert("✅ Profile saved successfully!");
       console.log("✅ Supabase response:", data);
     } catch (err) {
       console.error("❌ Error saving profile:", err);
@@ -939,7 +938,6 @@ export function OfficiantDashboardDialog({
 
       const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
       handleProfileUpdate("videoUrl", data.publicUrl);
-      alert("✅ Video uploaded successfully! Click 'Save Profile' to save permanently.");
       console.log("✅ Video URL:", data.publicUrl);
     } catch (err: any) {
       console.error("❌ Video upload error:", err);
