@@ -3671,17 +3671,49 @@ Note: This is an initial draft. Further development needed to incorporate specif
   }
 
   const handleOpenEditWeddingDialog = () => {
-    // Load saved data for current couple when opening the form
-    const coupleId = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
-    if (savedWeddingDetails[coupleId]) {
-      setEditWeddingDetails(savedWeddingDetails[coupleId])
-      console.log("Loading saved wedding details for:", coupleId, savedWeddingDetails[coupleId])
+    const currentDetails = editCoupleInfo?.weddingDetails || allCouples[activeCoupleIndex]?.weddingDetails
+
+    if (currentDetails) {
+      setEditWeddingDetails({
+        venueName: currentDetails.venueName || "",
+        venueAddress: currentDetails.venueAddress || "",
+        weddingDate: currentDetails.weddingDate || "",
+        startTime: currentDetails.startTime || "",
+        endTime: currentDetails.endTime || "",
+        expectedGuests: currentDetails.expectedGuests || "",
+        officiantNotes: currentDetails.officiantNotes || ""
+      })
     }
+
     setShowEditWeddingDialog(true)
   }
 
-  const handleEditWeddingDetails = () => {
+  const handleEditWeddingDetails = async () => {
+    const activeCoupleId = editCoupleInfo?.id || allCouples[activeCoupleIndex]?.id
+
+    if (!activeCoupleId) {
+      console.error("Cannot save wedding details: no active couple selected")
+      return
+    }
+
     const coupleId = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
+    const updates = {
+      venue_name: editWeddingDetails.venueName || null,
+      venue_address: editWeddingDetails.venueAddress || null,
+      wedding_date: editWeddingDetails.weddingDate || null,
+      start_time: editWeddingDetails.startTime || null,
+      end_time: editWeddingDetails.endTime || null,
+      expected_guests: editWeddingDetails.expectedGuests ? Number.parseInt(editWeddingDetails.expectedGuests, 10) : null,
+      notes: editWeddingDetails.officiantNotes || null
+    }
+
+    const result = await updateCoupleInDB(activeCoupleId, updates)
+
+    if (!result.ok) {
+      console.error("Failed to save wedding details:", result.error)
+      alert("Failed to save wedding details. Please try again.")
+      return
+    }
 
     // Save the updated wedding details for the current couple
     setSavedWeddingDetails(prev => ({
@@ -3691,8 +3723,19 @@ Note: This is an initial draft. Further development needed to incorporate specif
 
     // Update the wedding details in allCouples array
     const updatedCouples = [...allCouples]
-    updatedCouples[activeCoupleIndex].weddingDetails = { ...editWeddingDetails }
+    updatedCouples[activeCoupleIndex] = {
+      ...updatedCouples[activeCoupleIndex],
+      weddingDetails: { ...editWeddingDetails },
+      address: editWeddingDetails.venueAddress || "",
+      specialRequests: editWeddingDetails.officiantNotes || ""
+    }
     setAllCouples(updatedCouples)
+    setEditCoupleInfo((prev: any) => ({
+      ...prev,
+      weddingDetails: { ...editWeddingDetails },
+      address: editWeddingDetails.venueAddress || "",
+      specialRequests: editWeddingDetails.officiantNotes || ""
+    }))
 
     console.log("Saving wedding details for:", coupleId, editWeddingDetails)
     setShowEditWeddingDialog(false)

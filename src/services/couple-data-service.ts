@@ -40,9 +40,9 @@ export interface Couple {
   venue_address?: string | null
   wedding_date?: string | null
   start_time?: string | null
-  end_time?: string
-  expected_guests?: number
-  notes?: string
+  end_time?: string | null
+  expected_guests?: number | null
+  notes?: string | null
   is_active?: boolean
   created_at?: string
 }
