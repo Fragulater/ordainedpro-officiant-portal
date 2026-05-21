@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { CalendarDays, DollarSign, FileText, Users, Clock, MapPin, Phone, Mail, User, Star, Edit, Save, LayoutDashboard, Plus } from "lucide-react"
+import { CalendarDays, DollarSign, FileText, Users, Clock, MapPin, Phone, Mail, User, Star, Edit, Save, LayoutDashboard, Plus, WalletCards } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 // Helper to safely get initials from a name
@@ -82,6 +82,7 @@ export function PortalOverview() {
     return couple?.isActive !== false && Boolean(date && date >= today)
   }).length
   const monthlyIncome = Number(financialReport?.monthIncome || 0)
+  const outstandingBalance = Number(financialReport?.outstanding || 0)
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(amount)
 
@@ -357,6 +358,13 @@ export function PortalOverview() {
                       Income This Month
                     </div>
                     <span className="font-semibold text-emerald-900">{formatCurrency(monthlyIncome)}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
+                    <div className="flex items-center text-amber-800">
+                      <WalletCards className="w-4 h-4 mr-2" />
+                      Outstanding Balance
+                    </div>
+                    <span className="font-semibold text-amber-900">{formatCurrency(outstandingBalance)}</span>
                   </div>
                 </div>
               </div>
