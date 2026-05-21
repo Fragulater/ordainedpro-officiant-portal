@@ -20,7 +20,6 @@ import {
   addFile as addFileToDB,
   deleteFile as deleteFileFromDB,
   loadMeetings as loadMeetingsFromDB,
-  addMeeting as addMeetingToDB,
   updateMeeting as updateMeetingInDB,
   deleteMeeting as deleteMeetingFromDB,
   loadContracts as loadContractsFromDB,
@@ -952,7 +951,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       // Transform database format to component format
       const transformedMeetings: Meeting[] = result.data.map((m: any) => ({
         id: m.id,
-        subject: m.subject,
+        subject: m.title || m.subject || "Scheduled Meeting",
         body: m.notes || "",
         date: m.date || "",
         time: m.time || "",
@@ -4088,45 +4087,23 @@ OrdainedPro Wedding Portal
 
   const handleScheduleMeeting = async (meetingData: Omit<Meeting, 'id' | 'createdDate' | 'status' | 'reminderSent' | 'calendarInviteSent'>) => {
     if (!currentUser?.id || !editCoupleInfo?.id) {
-      console.error("âŒ Cannot schedule meeting: No user or couple selected")
+      console.error("Cannot schedule meeting: No user or couple selected")
       return
     }
 
-    console.log("[SCRIPT]… Scheduling meeting for couple:", editCoupleInfo.id)
-
-    // Save to database
-    const result = await addMeetingToDB(currentUser.id, editCoupleInfo.id, {
-      subject: meetingData.subject,
-      date: meetingData.date,
-      time: meetingData.time || "",
-      duration: meetingData.duration,
-      meetingType: meetingData.meetingType,
-      location: meetingData.location || undefined,
-      notes: meetingData.body
-    })
-
-    if (result.ok && result.data) {
-      const newMeeting: Meeting = {
-        ...meetingData,
-        id: result.data.id,
-        createdDate: new Date().toISOString().split('T')[0],
-        status: 'pending',
-        reminderSent: false,
-        calendarInviteSent: true
-      }
-
-      setMeetings(prev => [...prev, newMeeting])
-
-      // Simulate sending calendar invite and email
-      sendMeetingInvitation(newMeeting)
-
-      console.log("âœ… Meeting scheduled:", newMeeting)
-    } else {
-      console.error("âŒ Failed to schedule meeting:", result.error)
-      alert("Failed to schedule meeting. Please try again.")
+    const savedMeeting = meetingData as Meeting
+    const newMeeting: Meeting = {
+      ...meetingData,
+      id: Number(savedMeeting.id) || Date.now(),
+      createdDate: savedMeeting.createdDate || new Date().toISOString().split('T')[0],
+      status: savedMeeting.status || 'pending',
+      reminderSent: savedMeeting.reminderSent || false,
+      calendarInviteSent: savedMeeting.calendarInviteSent || true
     }
-  }
 
+    setMeetings(prev => [...prev.filter(meeting => meeting.id !== newMeeting.id), newMeeting])
+    console.log("Meeting scheduled:", newMeeting)
+  }
   const sendMeetingInvitation = (meeting: Meeting) => {
     // In a real application, this would make API calls to:
     // 1. Send calendar invitation

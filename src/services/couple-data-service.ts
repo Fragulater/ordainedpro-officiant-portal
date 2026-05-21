@@ -70,6 +70,8 @@ export interface Meeting {
   couple_id: number
   user_id: string
   subject: string
+  title?: string
+  body?: string
   date: string
   time: string
   duration?: number
@@ -388,14 +390,11 @@ export async function addMeeting(userId: string, coupleId: number, meetingData: 
       .insert({
         user_id: userId,
         couple_id: coupleId,
-        subject: meetingData.subject,
+        title: meetingData.subject,
         date: meetingData.date,
         time: meetingData.time,
-        duration: meetingData.duration || 60,
-        meeting_type: meetingData.meetingType || "in-person",
         location: meetingData.location || null,
-        notes: meetingData.notes || null,
-        status: "scheduled"
+        notes: meetingData.notes || null
       })
       .select()
       .single()
@@ -415,9 +414,21 @@ export async function addMeeting(userId: string, coupleId: number, meetingData: 
 
 export async function updateMeeting(meetingId: number, updates: Partial<Meeting>): Promise<{ ok: boolean; error?: string }> {
   try {
+    const dbUpdates: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (updates.subject !== undefined) dbUpdates.title = updates.subject
+    if (updates.title !== undefined) dbUpdates.title = updates.title
+    if (updates.date !== undefined) dbUpdates.date = updates.date
+    if (updates.time !== undefined) dbUpdates.time = updates.time
+    if (updates.location !== undefined) dbUpdates.location = updates.location
+    if (updates.body !== undefined) dbUpdates.notes = updates.body
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+
     const { error } = await supabase
       .from("meetings")
-      .update(updates)
+      .update(dbUpdates)
       .eq("id", meetingId)
 
     if (error) {
