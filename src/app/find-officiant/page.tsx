@@ -99,42 +99,47 @@ export default async function FindOfficiantPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-8">
+      <section className="mx-auto max-w-7xl px-6 py-8">
         {profiles.length > 0 ? (
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {profiles.map((profile) => {
               const name = getName(profile)
               const location = [profile.city, profile.state].filter(Boolean).join(", ")
 
               return (
                 <Card key={profile.id} className="border-blue-100 shadow-sm transition-shadow hover:shadow-md">
-                  <CardContent className="flex h-full flex-col p-6">
-                    <div className="flex flex-col items-center text-center">
-                      <Avatar className="h-24 w-24 border-4 border-blue-100">
+                  <CardContent className="flex h-full flex-col p-5">
+                    <div className="flex items-start gap-4">
+                      <Avatar className="h-20 w-20 shrink-0 border-4 border-blue-100">
                         {profile.headshot_url ? <AvatarImage src={profile.headshot_url} alt={name} /> : null}
-                        <AvatarFallback className="bg-blue-600 text-2xl text-white">{getInitials(name)}</AvatarFallback>
+                        <AvatarFallback className="bg-blue-600 text-xl text-white">{getInitials(name)}</AvatarFallback>
                       </Avatar>
-                      <h2 className="mt-4 text-xl font-bold text-gray-950">{name}</h2>
-                      {location ? (
-                        <p className="mt-1 flex items-center text-sm text-gray-600">
-                          <MapPin className="mr-1 h-4 w-4 text-blue-600" />
-                          {location}
-                        </p>
-                      ) : null}
+                      <div className="min-w-0 flex-1">
+                        <h2 className="line-clamp-2 text-xl font-bold text-gray-950">{name}</h2>
+                        {profile.full_name && profile.business_name ? (
+                          <p className="mt-1 truncate text-sm text-gray-600">{profile.full_name}</p>
+                        ) : null}
+                        {location ? (
+                          <p className="mt-2 flex items-center text-sm text-gray-600">
+                            <MapPin className="mr-1 h-4 w-4 shrink-0 text-blue-600" />
+                            <span className="truncate">{location}</span>
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
 
-                    <div className="mt-4 flex flex-wrap justify-center gap-2">
-                      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                        <Award className="mr-1 h-3 w-3" />
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Badge className="px-2.5 py-1.5 bg-blue-100 text-blue-800 hover:bg-blue-100">
+                        <Award className="mr-1 h-3.5 w-3.5" />
                         {Number(profile.years_experience || 0)} years
                       </Badge>
-                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                        <DollarSign className="mr-1 h-3 w-3" />
+                      <Badge className="px-2.5 py-1.5 bg-green-100 text-green-800 hover:bg-green-100">
+                        <DollarSign className="mr-1 h-3.5 w-3.5" />
                         {formatPrice(profile)}
                       </Badge>
                     </div>
 
-                    <p className="mt-4 line-clamp-4 flex-1 text-center text-sm leading-6 text-gray-600">
+                    <p className="mt-4 line-clamp-3 flex-1 text-sm leading-6 text-gray-600">
                       {profile.bio || "Professional wedding officiant ready to help couples create a meaningful ceremony."}
                     </p>
 
