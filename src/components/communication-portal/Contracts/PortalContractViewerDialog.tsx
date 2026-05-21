@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
+import { BasicTextEditor, normalizeTextForEditor } from "@/components/BasicTextEditor"
 import { BookText, Download, Eye, FileText, Save, Trash2 } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 import { supabase } from "@/supabase/utils/client"
@@ -61,8 +61,9 @@ export function PortalContractViewerDialog() {
       try {
         const response = await fetch(fileUrl)
         const text = response.ok ? await response.text() : ""
-        setTextContent(text)
-        setEditedText(text)
+        const editorText = normalizeTextForEditor(text)
+        setTextContent(editorText)
+        setEditedText(editorText)
       } catch (error) {
         console.error("Failed to load contract text:", error)
         setTextContent("")
@@ -120,11 +121,11 @@ export function PortalContractViewerDialog() {
 
     setIsSavingText(true)
     try {
-      const textBlob = new Blob([editedText], { type: "text/plain" })
+      const textBlob = new Blob([editedText], { type: "text/html;charset=utf-8" })
       const { error: uploadError } = await supabase.storage
         .from("contracts")
         .upload(storagePath, textBlob, {
-          contentType: "text/plain",
+          contentType: "text/html;charset=utf-8",
           upsert: true,
         })
 
@@ -147,7 +148,7 @@ export function PortalContractViewerDialog() {
           ? {
               ...viewingContract.file,
               size: textBlob.size,
-              type: "text/plain",
+              type: "text/html",
             }
           : viewingContract.file,
       }
@@ -216,14 +217,18 @@ export function PortalContractViewerDialog() {
             </div>
           </div>
 
-          <Textarea
-            value={editedText}
-            onChange={(event) => setEditedText(event.target.value)}
-            placeholder={isLoadingText ? "Loading contract..." : "Contract text"}
-            disabled={isLoadingText || isSavingText}
-            rows={18}
-            className="min-h-[380px] border-blue-200 font-mono text-sm"
-          />
+          {isLoadingText ? (
+            <div className="rounded-lg border border-blue-100 bg-blue-50 p-6 text-blue-700">
+              Loading contract...
+            </div>
+          ) : (
+            <BasicTextEditor
+              value={editedText}
+              onChange={setEditedText}
+              minHeightClassName="min-h-[360px]"
+              maxCharacters={20000}
+            />
+          )}
         </div>
       )
     }
