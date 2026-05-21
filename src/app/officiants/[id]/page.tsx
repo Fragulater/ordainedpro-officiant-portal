@@ -19,6 +19,7 @@ import {
   Youtube,
 } from "lucide-react"
 
+import { PublicOfficiantGallery } from "@/components/PublicOfficiantGallery"
 import { PublicOfficiantQuoteForm } from "@/components/PublicOfficiantQuoteForm"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -212,16 +213,16 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 lg:max-w-md lg:justify-end">
-              <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                <Award className="mr-1 h-3 w-3" />
+            <div className="flex flex-wrap gap-3 lg:max-w-xl lg:justify-end">
+              <Badge className="px-3 py-2 text-sm font-semibold bg-blue-100 text-blue-800 hover:bg-blue-100">
+                <Award className="mr-1.5 h-4 w-4" />
                 {Number(profile.years_experience || 0)} years
               </Badge>
-              <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                <DollarSign className="mr-1 h-3 w-3" />
+              <Badge className="px-3 py-2 text-sm font-semibold bg-green-100 text-green-800 hover:bg-green-100">
+                <DollarSign className="mr-1.5 h-4 w-4" />
                 {formatPrice(profile)}
               </Badge>
-              <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">{travelDescription}</Badge>
+              <Badge className="px-3 py-2 text-sm font-semibold bg-purple-100 text-purple-800 hover:bg-purple-100">{travelDescription}</Badge>
             </div>
           </div>
         </header>
@@ -229,13 +230,6 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
         <div className="grid flex-1 gap-0 overflow-hidden lg:grid-cols-[300px_1fr_360px]">
           <aside className="border-b bg-slate-50 p-4 lg:overflow-y-auto lg:border-b-0 lg:border-r">
             <div className="space-y-5">
-              <section>
-                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">About</h2>
-                <p className="line-clamp-[10] text-sm leading-6 text-gray-700">
-                  {profile.bio || "Professional wedding officiant ready to help couples create a meaningful ceremony."}
-                </p>
-              </section>
-
               <section>
                 <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Contact</h2>
                 <div className="space-y-3 text-sm">
@@ -269,6 +263,13 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
           </aside>
 
           <section className="space-y-5 overflow-y-auto p-4 sm:p-5">
+            <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
+              <h2 className="mb-2 text-lg font-bold text-gray-950">About</h2>
+              <div className="max-h-48 overflow-y-auto pr-2 text-sm leading-6 text-gray-700">
+                {profile.bio || "Professional wedding officiant ready to help couples create a meaningful ceremony."}
+              </div>
+            </div>
+
             {profile.video_url ? (
               <div>
                 <div className="mb-3 flex items-center gap-2">
@@ -282,16 +283,7 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
             {profile.photo_gallery && profile.photo_gallery.length > 0 ? (
               <div>
                 <h2 className="mb-3 text-lg font-bold text-gray-950">Photo Gallery</h2>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {profile.photo_gallery.slice(0, 9).map((photo, index) => (
-                    <img
-                      key={`${photo}-${index}`}
-                      src={photo}
-                      alt={`${name} wedding ceremony photo ${index + 1}`}
-                      className="aspect-[4/3] w-full rounded-lg border object-cover shadow-sm"
-                    />
-                  ))}
-                </div>
+                <PublicOfficiantGallery photos={profile.photo_gallery} name={name} />
               </div>
             ) : null}
 
