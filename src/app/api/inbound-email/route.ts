@@ -138,6 +138,8 @@ export async function POST(request: NextRequest) {
       const htmlText = html
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style tags
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(p|div|li|tr|blockquote)>/gi, '\n')
         .replace(/<[^>]+>/g, ' ') // Remove HTML tags
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
@@ -315,10 +317,14 @@ function extractReplyText(fullText: string): string {
 
   // Step 1: Cut at common reply separators (find the EARLIEST one)
   const separatorPatterns = [
-    /On [A-Za-z]{3,9},? [A-Za-z]{3,9} \d{1,2},? \d{4}[,\s]+(?:at )?\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?[^\n]*wrote:/i,  // Gmail-style: "On Mon, Apr 6, 2026 at 9:22 AM ... wrote:"
+    /\bOn\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s+[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}[,\s]+(?:at\s+)?\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?[^\n]*wrote:/i,  // Gmail-style: "On Mon, Apr 6, 2026 at 9:22 AM ... wrote:"
+    /\bOn\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s+[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}[,\s]+(?:at\s+)?\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?[^\n]*/i,  // Gmail/Outlook mobile quote without "wrote:"
+    /\bOn\s+[A-Za-z]{3,9},?\s+\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}[,\s]+(?:at\s+)?\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?[^\n]*/i,
     /On \d{1,2}\/\d{1,2}\/\d{2,4}.+wrote:/i,   // "On 4/6/2026 ... wrote:"
+    /On \d{1,2}\/\d{1,2}\/\d{2,4}[^\n]*/i,
     /\d{4}-\d{2}-\d{2}.+wrote:/i,              // "2026-04-06 ... wrote:"
     /<.+@.+\.\w+>\s*wrote:/i,                  // "<email@domain.com> wrote:"
+    /^On\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|[A-Za-z]{3,9},?\s+\d{1,2})[^\n]*$/im, // Fallback for one-line date quote headers
     /^From:\s*.+$/im,                          // "From: ..."
     /^Sent:\s*.+$/im,                          // "Sent: ..."
     /^Date:\s*.+$/im,                          // "Date: ..."
@@ -339,7 +345,7 @@ function extractReplyText(fullText: string): string {
 
   for (const pattern of separatorPatterns) {
     const match = replyText.match(pattern);
-    if (match && match.index !== undefined && match.index > 5 && match.index < earliestIndex) {
+    if (match && match.index !== undefined && match.index < earliestIndex) {
       earliestIndex = match.index;
     }
   }
@@ -357,6 +363,7 @@ function extractReplyText(fullText: string): string {
   replyText = replyText
     .replace(/^\s+|\s+$/g, '')     // Trim whitespace
     .replace(/\r\n/g, '\n')        // Normalize line endings
+    .replace(/\u00a0/g, ' ')
     .replace(/\n{3,}/g, '\n\n')    // Max 2 consecutive newlines
     .replace(/^[\s\n]+|[\s\n]+$/g, ''); // Trim again after filtering
 
