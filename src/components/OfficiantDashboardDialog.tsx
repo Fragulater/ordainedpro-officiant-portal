@@ -1579,10 +1579,10 @@ export function OfficiantDashboardDialog({
                       <CardHeader>
                         <CardTitle className="flex items-center text-blue-900">
                           <LinkIcon className="w-5 h-5 mr-2" />
-                          Public Profile Link
+                          Public Profile Window
                         </CardTitle>
                         <CardDescription className="text-blue-800">
-                          Share this link with couples or add it to your website, email signature, and social media.
+                          Share this compact public profile with couples or add it to your website, email signature, and social media.
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
@@ -1602,7 +1602,7 @@ export function OfficiantDashboardDialog({
                         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
                           Public profile notice: information saved in this profile may be displayed publicly, including your name,
                           business name, contact information, website, social media links, pricing, travel details, bio, photos, and videos.
-                          Only upload or save information and media that you are comfortable sharing with couples and search engines.
+                          The public page is designed as a short profile window, but only upload or save information and media that you are comfortable sharing with couples and search engines.
                         </div>
                       </CardContent>
                     </Card>

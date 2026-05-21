@@ -188,155 +188,159 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
   const storeUrl = `${marketplaceBaseUrl}/store/${profile.user_id}`
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <section className="border-b bg-white">
-        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[1fr_360px]">
-          <div className="flex flex-col gap-6 sm:flex-row">
-            <Avatar className="h-32 w-32 border-4 border-blue-100">
-              {profile.headshot_url ? <AvatarImage src={profile.headshot_url} alt={name} /> : null}
-              <AvatarFallback className="bg-blue-600 text-3xl text-white">{getInitials(name)}</AvatarFallback>
-            </Avatar>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-wide text-blue-700">OrdainedPro Officiant</p>
-                <h1 className="mt-2 text-4xl font-bold tracking-tight text-gray-950">{name}</h1>
+    <main className="min-h-screen bg-slate-100 p-3 sm:p-4">
+      <div className="mx-auto flex min-h-[calc(100vh-1.5rem)] max-w-7xl flex-col overflow-hidden rounded-xl border border-blue-100 bg-white shadow-lg sm:min-h-[calc(100vh-2rem)] lg:h-[calc(100vh-2rem)] lg:min-h-0">
+        <header className="border-b bg-white px-4 py-4 sm:px-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex gap-4">
+              <Avatar className="h-20 w-20 border-4 border-blue-100 sm:h-24 sm:w-24">
+                {profile.headshot_url ? <AvatarImage src={profile.headshot_url} alt={name} /> : null}
+                <AvatarFallback className="bg-blue-600 text-2xl text-white">{getInitials(name)}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">OrdainedPro Officiant</p>
+                <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-950 sm:text-3xl">{name}</h1>
                 {profile.full_name && profile.business_name ? (
-                  <p className="mt-1 text-lg text-gray-600">{profile.full_name}</p>
+                  <p className="mt-1 text-sm text-gray-600">{profile.full_name}</p>
                 ) : null}
                 {location ? (
-                  <p className="mt-3 flex items-center text-gray-600">
+                  <p className="mt-2 flex items-center text-sm text-gray-600">
                     <MapPin className="mr-2 h-4 w-4 text-blue-600" />
                     {location}
                   </p>
                 ) : null}
               </div>
+            </div>
 
-              <div className="flex flex-wrap gap-2">
-                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                  <Award className="mr-1 h-3 w-3" />
-                  {Number(profile.years_experience || 0)} years experience
-                </Badge>
-                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                  <DollarSign className="mr-1 h-3 w-3" />
-                  {formatPrice(profile)}
-                </Badge>
-                <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">{travelDescription}</Badge>
-              </div>
-
-              <p className="max-w-3xl text-base leading-7 text-gray-700">
-                {profile.bio || "Professional wedding officiant ready to help couples create a meaningful ceremony."}
-              </p>
+            <div className="flex flex-wrap gap-2 lg:max-w-md lg:justify-end">
+              <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                <Award className="mr-1 h-3 w-3" />
+                {Number(profile.years_experience || 0)} years
+              </Badge>
+              <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                <DollarSign className="mr-1 h-3 w-3" />
+                {formatPrice(profile)}
+              </Badge>
+              <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">{travelDescription}</Badge>
             </div>
           </div>
+        </header>
 
-          <Card className="border-blue-100 shadow-sm">
-            <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
-              <CardDescription>Reach out directly or request a quote below.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {profile.phone ? (
-                <a className="flex items-center text-gray-700 hover:text-blue-700" href={`tel:${profile.phone}`}>
-                  <Phone className="mr-2 h-4 w-4" />
-                  {profile.phone}
-                </a>
-              ) : null}
-              {profile.email ? (
-                <a className="flex items-center text-gray-700 hover:text-blue-700" href={`mailto:${profile.email}`}>
-                  <Mail className="mr-2 h-4 w-4" />
-                  {profile.email}
-                </a>
-              ) : null}
-              {profile.website ? (
-                <a className="flex items-center text-gray-700 hover:text-blue-700" href={normalizeUrl(profile.website)} target="_blank" rel="noreferrer">
-                  <Globe className="mr-2 h-4 w-4" />
-                  Website
-                </a>
-              ) : null}
-              <div className="flex gap-3 pt-2">
-                {profile.social_facebook ? <SocialLink href={profile.social_facebook} label="Facebook" icon={<Facebook className="h-5 w-5" />} /> : null}
-                {profile.social_instagram ? <SocialLink href={profile.social_instagram} label="Instagram" icon={<Instagram className="h-5 w-5" />} /> : null}
-                {profile.social_linkedin ? <SocialLink href={profile.social_linkedin} label="LinkedIn" icon={<Linkedin className="h-5 w-5" />} /> : null}
-                {profile.social_youtube ? <SocialLink href={profile.social_youtube} label="YouTube" icon={<Youtube className="h-5 w-5" />} /> : null}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+        <div className="grid flex-1 gap-0 overflow-hidden lg:grid-cols-[300px_1fr_360px]">
+          <aside className="border-b bg-slate-50 p-4 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+            <div className="space-y-5">
+              <section>
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">About</h2>
+                <p className="line-clamp-[10] text-sm leading-6 text-gray-700">
+                  {profile.bio || "Professional wedding officiant ready to help couples create a meaningful ceremony."}
+                </p>
+              </section>
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-8">
-          {profile.video_url ? (
-            <section>
-              <div className="mb-3 flex items-center gap-2">
-                <Play className="h-5 w-5 text-blue-700" />
-                <h2 className="text-2xl font-bold text-gray-950">Introduction Video</h2>
-              </div>
-              <video className="aspect-video w-full rounded-lg border bg-black shadow-sm" src={profile.video_url} controls />
-            </section>
-          ) : null}
-
-          {profile.photo_gallery && profile.photo_gallery.length > 0 ? (
-            <section>
-              <h2 className="mb-4 text-2xl font-bold text-gray-950">Photo Gallery</h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {profile.photo_gallery.map((photo, index) => (
-                  <img
-                    key={`${photo}-${index}`}
-                    src={photo}
-                    alt={`${name} wedding ceremony photo ${index + 1}`}
-                    className="aspect-[4/3] w-full rounded-lg border object-cover shadow-sm"
-                  />
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          <section>
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-950">Wedding Scripts</h2>
-                <p className="text-gray-600">Browse scripts sold directly by this officiant.</p>
-              </div>
-              <Button asChild variant="outline">
-                <a href={storeUrl} target="_blank" rel="noreferrer">
-                  View Full Script Store
-                  <ExternalLink className="ml-2 h-4 w-4" />
-                </a>
-              </Button>
+              <section>
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Contact</h2>
+                <div className="space-y-3 text-sm">
+                  {profile.phone ? (
+                    <a className="flex items-center text-gray-700 hover:text-blue-700" href={`tel:${profile.phone}`}>
+                      <Phone className="mr-2 h-4 w-4" />
+                      {profile.phone}
+                    </a>
+                  ) : null}
+                  {profile.email ? (
+                    <a className="flex items-center text-gray-700 hover:text-blue-700" href={`mailto:${profile.email}`}>
+                      <Mail className="mr-2 h-4 w-4" />
+                      {profile.email}
+                    </a>
+                  ) : null}
+                  {profile.website ? (
+                    <a className="flex items-center text-gray-700 hover:text-blue-700" href={normalizeUrl(profile.website)} target="_blank" rel="noreferrer">
+                      <Globe className="mr-2 h-4 w-4" />
+                      Website
+                    </a>
+                  ) : null}
+                </div>
+                <div className="mt-4 flex gap-3">
+                  {profile.social_facebook ? <SocialLink href={profile.social_facebook} label="Facebook" icon={<Facebook className="h-5 w-5" />} /> : null}
+                  {profile.social_instagram ? <SocialLink href={profile.social_instagram} label="Instagram" icon={<Instagram className="h-5 w-5" />} /> : null}
+                  {profile.social_linkedin ? <SocialLink href={profile.social_linkedin} label="LinkedIn" icon={<Linkedin className="h-5 w-5" />} /> : null}
+                  {profile.social_youtube ? <SocialLink href={profile.social_youtube} label="YouTube" icon={<Youtube className="h-5 w-5" />} /> : null}
+                </div>
+              </section>
             </div>
+          </aside>
 
-            {scripts.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {scripts.map((script) => (
-                  <Card key={script.id} className="border-blue-100">
-                    <CardHeader>
-                      <CardTitle className="line-clamp-2 text-lg">{script.title}</CardTitle>
-                      <CardDescription>{script.category || "Wedding Ceremony Script"}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between gap-3">
-                      <p className="text-xl font-bold text-gray-950">${Number(script.price || 0).toFixed(2)}</p>
-                      <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                        <a href={`${marketplaceBaseUrl}/script/${script.id}`} target="_blank" rel="noreferrer">
-                          <ShoppingCart className="mr-2 h-4 w-4" />
-                          View Script
-                        </a>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+          <section className="space-y-5 overflow-y-auto p-4 sm:p-5">
+            {profile.video_url ? (
+              <div>
+                <div className="mb-3 flex items-center gap-2">
+                  <Play className="h-5 w-5 text-blue-700" />
+                  <h2 className="text-lg font-bold text-gray-950">Introduction Video</h2>
+                </div>
+                <video className="aspect-video max-h-[320px] w-full rounded-lg border bg-black object-contain shadow-sm" src={profile.video_url} controls />
               </div>
-            ) : (
-              <Card className="border-dashed">
-                <CardContent className="p-6 text-gray-600">This officiant has not published scripts for sale yet.</CardContent>
-              </Card>
-            )}
-          </section>
-        </div>
+            ) : null}
 
-        <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
-          <PublicOfficiantQuoteForm officiantId={profile.id} officiantName={name} />
-        </aside>
+            {profile.photo_gallery && profile.photo_gallery.length > 0 ? (
+              <div>
+                <h2 className="mb-3 text-lg font-bold text-gray-950">Photo Gallery</h2>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {profile.photo_gallery.slice(0, 9).map((photo, index) => (
+                    <img
+                      key={`${photo}-${index}`}
+                      src={photo}
+                      alt={`${name} wedding ceremony photo ${index + 1}`}
+                      className="aspect-[4/3] w-full rounded-lg border object-cover shadow-sm"
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div>
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-950">Wedding Scripts</h2>
+                  <p className="text-sm text-gray-600">Scripts sold directly by this officiant.</p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <a href={storeUrl} target="_blank" rel="noreferrer">
+                    Full Store
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
+              </div>
+
+              {scripts.length > 0 ? (
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {scripts.map((script) => (
+                    <Card key={script.id} className="border-blue-100">
+                      <CardContent className="flex items-center justify-between gap-3 p-4">
+                        <div className="min-w-0">
+                          <h3 className="line-clamp-2 font-semibold text-gray-950">{script.title}</h3>
+                          <p className="mt-1 text-sm text-gray-600">{script.category || "Wedding Ceremony Script"}</p>
+                          <p className="mt-2 text-lg font-bold text-gray-950">${Number(script.price || 0).toFixed(2)}</p>
+                        </div>
+                        <Button asChild className="shrink-0 bg-blue-600 hover:bg-blue-700" size="sm">
+                          <a href={`${marketplaceBaseUrl}/script/${script.id}`} target="_blank" rel="noreferrer">
+                            <ShoppingCart className="mr-2 h-4 w-4" />
+                            View
+                          </a>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="border-dashed">
+                  <CardContent className="p-5 text-sm text-gray-600">This officiant has not published scripts for sale yet.</CardContent>
+                </Card>
+              )}
+            </div>
+          </section>
+
+          <aside className="border-t bg-slate-50 p-4 lg:overflow-y-auto lg:border-l lg:border-t-0">
+            <PublicOfficiantQuoteForm officiantId={profile.id} officiantName={name} />
+          </aside>
+        </div>
       </div>
     </main>
   )
