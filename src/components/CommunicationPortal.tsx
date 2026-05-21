@@ -3563,9 +3563,6 @@ Note: This is an initial draft. Further development needed to incorporate specif
 
     console.log("Updating couple info:", editCoupleInfo)
     setShowEditCoupleDialog(false)
-
-    // Show success message
-    alert("Couple information updated successfully!")
   }
 
   const handleOpenEditWeddingDialog = () => {
