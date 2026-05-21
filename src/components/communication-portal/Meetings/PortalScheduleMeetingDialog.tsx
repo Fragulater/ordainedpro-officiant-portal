@@ -43,6 +43,7 @@ export function PortalScheduleMeetingDialog() {
         isOpen={showScheduleMeetingDialog}
         onOpenChange={setShowScheduleMeetingDialog}
         onScheduleMeeting={handleScheduleMeeting}
+        coupleId={editCoupleInfo.id}
         coupleEmails={coupleEmails}
         coupleName={`${editCoupleInfo.brideName?.split(' ')[0] || 'Bride'} & ${editCoupleInfo.groomName?.split(' ')[0] || 'Groom'}`}
         officiantName={officiantName}

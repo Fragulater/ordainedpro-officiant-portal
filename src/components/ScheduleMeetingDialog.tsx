@@ -54,6 +54,7 @@ export interface ScheduleMeetingDialogProps {
   onScheduleMeeting: (meeting: Omit<Meeting, 'id' | 'createdDate' | 'status' | 'reminderSent' | 'calendarInviteSent'>) => void
   isOpen: boolean
   onOpenChange: (open: boolean) => void
+  coupleId?: number
   coupleEmails?: string[]
   coupleName?: string
   officiantName?: string
@@ -65,6 +66,7 @@ export function ScheduleMeetingDialog({
   onScheduleMeeting,
   isOpen,
   onOpenChange,
+  coupleId,
   coupleEmails = ["ganuactivate@gmail.com", "ganuactivate@gmail.com"],
   coupleName = "Sarah & David",
   officiantName = "Officiant",
@@ -334,24 +336,43 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
     }
   }
 
+  const escapeICalText = (value: string) =>
+    String(value || "")
+      .replace(/\\/g, "\\\\")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,")
+      .replace(/\r?\n/g, "\\n")
+
+  const formatICalDate = (value: string) =>
+    new Date(value).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")
+
   const generateICalContent = (event: any) => {
-    // Simplified iCal format for calendar invitations
-    return `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//OrdainedPro//Wedding Planning//EN
-BEGIN:VEVENT
-DTSTART:${event.start.replace(/[-:]/g, '').replace(/\.\d{3}/, '')}
-DTEND:${event.end.replace(/[-:]/g, '').replace(/\.\d{3}/, '')}
-SUMMARY:${event.title}
-DESCRIPTION:${event.description.replace(/\n/g, '\\n')}
-LOCATION:${event.location}
-ORGANIZER:mailto:${event.organizer}
-ATTENDEE:mailto:${event.attendees[0]}
-ATTENDEE:mailto:${event.attendees[1]}
-STATUS:TENTATIVE
-SEQUENCE:0
-END:VEVENT
-END:VCALENDAR`
+    const attendees = (event.attendees || [])
+      .filter(Boolean)
+      .map((email: string) => `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${email}`)
+      .join("\r\n")
+
+    return [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//OrdainedPro//Wedding Planning//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:REQUEST",
+      "BEGIN:VEVENT",
+      `UID:${crypto.randomUUID()}@ordainedpro.com`,
+      `DTSTAMP:${formatICalDate(new Date().toISOString())}`,
+      `DTSTART:${formatICalDate(event.start)}`,
+      `DTEND:${formatICalDate(event.end)}`,
+      `SUMMARY:${escapeICalText(event.title)}`,
+      `DESCRIPTION:${escapeICalText(event.description)}`,
+      `LOCATION:${escapeICalText(event.location || "")}`,
+      `ORGANIZER;CN=${escapeICalText(officiantLabel)}:mailto:${event.organizer}`,
+      attendees,
+      "STATUS:CONFIRMED",
+      "SEQUENCE:0",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].filter(Boolean).join("\r\n")
   }
 
 
@@ -459,7 +480,7 @@ END:VCALENDAR`
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const coupleId = 1;
+      const activeCoupleId = coupleId || 1;
       let meetingLocation = formData.location
 
       if (formData.meetingType === "video" && formData.includeMeetingLink && !meetingLocation) {
@@ -497,7 +518,7 @@ END:VCALENDAR`
 
       // 1️⃣ Save meeting to Supabase
       const meetingData = {
-        couple_id: coupleId,
+        couple_id: activeCoupleId,
         user_id: user.id,
         title: formData.subject,
         date: formData.date,
@@ -531,22 +552,28 @@ END:VCALENDAR`
         month: 'long',
         day: 'numeric'
       });
-
-      const meetingEmailBody = `${formData.body}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📅 MEETING DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📆 Date: ${formattedDate}
-⏰ Time: ${formData.time}
-⏱️ Duration: ${formData.duration} minutes
-📍 Type: ${meetingTypeLabels[formData.meetingType]}
-${meetingLocation ? `${formData.meetingType === 'video' ? '🔗 Google Meet' : '📌 Location'}: ${meetingLocation}` : ''}
-${formData.responseDeadline ? `📩 Please respond by: ${new Date(formData.responseDeadline).toLocaleDateString()}` : ''}
-
-Please reply to this email to confirm your attendance.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+      const cleanMeetingEmailBody = [
+        formData.body,
+        "",
+        "Meeting details",
+        `Date: ${formattedDate}`,
+        `Time: ${formData.time}`,
+        `Duration: ${formData.duration} minutes`,
+        `Type: ${meetingTypeLabels[formData.meetingType]}`,
+        meetingLocation ? `${formData.meetingType === "video" ? "Google Meet" : "Location"}: ${meetingLocation}` : "",
+        formData.responseDeadline ? `Please respond by: ${new Date(formData.responseDeadline).toLocaleDateString()}` : "",
+        "",
+        "A calendar invitation is attached. You can accept it from your email or calendar app, or reply directly to this email.",
+      ].filter(Boolean).join("\n")
+      const calendarInviteContent = generateICalContent({
+        title: formData.subject,
+        start: new Date(`${formData.date}T${formData.time}`).toISOString(),
+        end: new Date(new Date(`${formData.date}T${formData.time}`).getTime() + Number(formData.duration) * 60_000).toISOString(),
+        description: cleanMeetingEmailBody,
+        location: meetingLocation || "",
+        attendees: formData.attendees,
+        organizer: officiantEmail || "info@ordainedpro.com",
+      })
 
       // Send to each attendee
       let emailsSent = 0;
@@ -560,9 +587,19 @@ Please reply to this email to confirm your attendance.
             body: JSON.stringify({
               to: email,
               subject: `📅 Meeting Invitation: ${formData.subject}`,
-              message: meetingEmailBody,
+              message: cleanMeetingEmailBody,
               fromName: officiantLabel,
-              coupleName: coupleName
+              coupleName: coupleName,
+              coupleId: activeCoupleId,
+              officiantId: user.id,
+              attachments: formData.sendCalendarInvite ? [
+                {
+                  filename: `meeting-invite-${formData.date}.ics`,
+                  content: calendarInviteContent,
+                  contentType: "text",
+                  mimeType: "text/calendar; method=REQUEST; charset=UTF-8",
+                },
+              ] : [],
             }),
           });
 
@@ -580,7 +617,7 @@ Please reply to this email to confirm your attendance.
       // 3️⃣ Create local meeting object for UI
       const newMeeting: Meeting = {
         id: meetingInsert?.id || Date.now(),
-        couple_id: meetingInsert?.couple_id || coupleId,
+        couple_id: meetingInsert?.couple_id || activeCoupleId,
         user_id: meetingInsert?.user_id || user.id,
         title: meetingInsert?.title || formData.subject,
         date: meetingInsert?.date || formData.date,
@@ -619,13 +656,10 @@ Please reply to this email to confirm your attendance.
       });
 
       setErrors({});
-      onOpenChange(false);
+      onOpenChange(false)
 
-      // Show appropriate success message
-      if (emailsSent > 0) {
-        alert(`✅ Meeting scheduled successfully!\n\n📧 Email invitations sent to ${emailsSent} attendee(s).`);
-      } else {
-        alert(`✅ Meeting scheduled and saved!\n\n⚠️ Email invitations could not be sent. You may want to notify attendees manually.`);
+      if (emailsSent === 0) {
+        console.warn("Meeting was saved, but no email invitations were sent.")
       }
     } catch (err) {
       console.error("❌ Error saving/sending meeting:", err);

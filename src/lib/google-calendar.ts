@@ -189,7 +189,7 @@ export const createGoogleMeetEvent = async ({
     throw new Error("Google Calendar is not connected")
   }
 
-  const response = await fetch(`${GOOGLE_CALENDAR_EVENTS_URL}?conferenceDataVersion=1&sendUpdates=none`, {
+  const response = await fetch(`${GOOGLE_CALENDAR_EVENTS_URL}?conferenceDataVersion=1&sendUpdates=all`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,

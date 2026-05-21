@@ -9,6 +9,7 @@ interface EmailAttachment {
   filename: string;
   content: string; // Text content or base64 encoded content
   contentType?: 'text' | 'base64'; // Type of content
+  mimeType?: string;
 }
 
 // Email sending API route
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
         return {
           filename: att.filename,
           content: base64Content,
+          content_type: att.mimeType,
         };
       });
 
