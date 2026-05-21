@@ -166,6 +166,16 @@ export function ScheduleMeetingDialog({
       alert(`Google Calendar connection failed: ${error}`)
     }
   }, [isOpen, coupleEmails])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    setFormData((prev) => ({
+      ...prev,
+      attendees: coupleEmails,
+    }))
+  }, [coupleEmails, isOpen])
+
   const meetingTemplates = [
     {
       name: "Initial Consultation",
