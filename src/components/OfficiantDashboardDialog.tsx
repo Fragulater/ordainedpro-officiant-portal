@@ -319,6 +319,11 @@ export function OfficiantDashboardDialog({
     officiantFullName === "Officiant"
       ? "Officiant"
       : `Officiant ${officiantFirstName}`;
+  const publicProfilePath = user?.id ? `/officiants/${user.id}` : "/find-officiant";
+  const publicProfileUrl =
+    typeof window !== "undefined" && user?.id
+      ? `${window.location.origin}${publicProfilePath}`
+      : publicProfilePath;
   const [showPreview, setShowPreview] = useState(false);
   const getCoupleColors = (coupleId: number) => {
     const colorPairs = [
@@ -1570,6 +1575,38 @@ export function OfficiantDashboardDialog({
 
                   {/* Right Column - Profile Edit Forms */}
                   <div className="lg:col-span-2 space-y-6">
+                    <Card className="border-blue-200 bg-blue-50/70">
+                      <CardHeader>
+                        <CardTitle className="flex items-center text-blue-900">
+                          <LinkIcon className="w-5 h-5 mr-2" />
+                          Public Profile Link
+                        </CardTitle>
+                        <CardDescription className="text-blue-800">
+                          Share this link with couples or add it to your website, email signature, and social media.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Input readOnly value={publicProfileUrl} className="bg-white" />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="border-blue-300 bg-white text-blue-700 hover:bg-blue-100"
+                            onClick={() => window.open(publicProfilePath, "_blank", "noopener,noreferrer")}
+                            disabled={!user?.id}
+                          >
+                            <Globe className="w-4 h-4 mr-2" />
+                            View
+                          </Button>
+                        </div>
+                        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+                          Public profile notice: information saved in this profile may be displayed publicly, including your name,
+                          business name, contact information, website, social media links, pricing, travel details, bio, photos, and videos.
+                          Only upload or save information and media that you are comfortable sharing with couples and search engines.
+                        </div>
+                      </CardContent>
+                    </Card>
+
                     {/* Basic Information */}
                     <Card>
                       <CardHeader>
