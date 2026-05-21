@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { FileText, Users, Clock, MapPin, Phone, Mail, User, Star, Edit, Save, LayoutDashboard, Plus } from "lucide-react"
+import { CalendarDays, DollarSign, FileText, Users, Clock, MapPin, Phone, Mail, User, Star, Edit, Save, LayoutDashboard, Plus } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 // Helper to safely get initials from a name
@@ -36,6 +36,7 @@ export function PortalOverview() {
     currentUser,
     setShowDashboardDialog,
     setShowAddCeremonyDialog,
+    financialReport,
   } = useCommunicationPortal()
 
   // Guard against null/undefined editCoupleInfo
@@ -63,10 +64,27 @@ export function PortalOverview() {
       .find((name) => name && !name.includes("@")) || "Officiant"
   const officiantFirstName = officiantName === "Officiant" ? "Officiant" : officiantName.split(/\s+/)[0]
   const officiantLabel = officiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
-  const officiantEmail = officiantProfile?.email || currentUser?.email || "No email"
-  const officiantPhone = officiantProfile?.phone || "No phone"
   const privateNotes = editWeddingDetails?.officiantNotes?.trim() || ""
   const hasPrivateNotes = privateNotes.length > 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const getWeddingDate = (couple: any) => {
+    const rawDate = couple?.weddingDetails?.weddingDate || couple?.weddingDate
+    if (!rawDate) return null
+    const date = new Date(rawDate)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  const weddingsCompleted = allCouples.filter((couple: any) => {
+    const date = getWeddingDate(couple)
+    return Boolean(date && date < today)
+  }).length
+  const pendingEvents = allCouples.filter((couple: any) => {
+    const date = getWeddingDate(couple)
+    return couple?.isActive !== false && Boolean(date && date >= today)
+  }).length
+  const monthlyIncome = Number(financialReport?.monthIncome || 0)
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(amount)
 
   return (
     <>
@@ -328,14 +346,27 @@ export function PortalOverview() {
                   </div>
                 </div>
                 <Separator />
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center text-gray-600 hover:text-blue-600 transition-colors">
-                    <Phone className="w-4 h-4 mr-2" />
-                    {officiantPhone}
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <div className="flex items-center justify-between rounded-lg border border-green-100 bg-green-50 px-3 py-2">
+                    <div className="flex items-center text-green-800">
+                      <Users className="w-4 h-4 mr-2" />
+                      Weddings Completed
+                    </div>
+                    <span className="font-semibold text-green-900">{weddingsCompleted}</span>
                   </div>
-                  <div className="flex items-center text-gray-600 hover:text-blue-600 transition-colors">
-                    <Mail className="w-4 h-4 mr-2" />
-                    {officiantEmail}
+                  <div className="flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+                    <div className="flex items-center text-blue-800">
+                      <CalendarDays className="w-4 h-4 mr-2" />
+                      Pending Events
+                    </div>
+                    <span className="font-semibold text-blue-900">{pendingEvents}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
+                    <div className="flex items-center text-emerald-800">
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      Income This Month
+                    </div>
+                    <span className="font-semibold text-emerald-900">{formatCurrency(monthlyIncome)}</span>
                   </div>
                 </div>
               </div>
