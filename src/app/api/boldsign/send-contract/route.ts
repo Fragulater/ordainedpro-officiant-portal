@@ -21,6 +21,40 @@ function getFileExtension(fileNameOrUrl: string) {
   return dotIndex >= 0 ? cleanValue.slice(dotIndex) : ""
 }
 
+function getPublicSiteUrl() {
+  return (process.env.NEXT_PUBLIC_SITE_URL || process.env.URL || process.env.DEPLOY_PRIME_URL || "").replace(/\/$/, "")
+}
+
+function normalizeContractUrl(contractUrl: string) {
+  const publicSiteUrl = getPublicSiteUrl()
+
+  if (contractUrl.startsWith("/contracts/") && publicSiteUrl) {
+    return `${publicSiteUrl}${contractUrl}`
+  }
+
+  try {
+    const parsedUrl = new URL(contractUrl)
+    const isLocalUrl = ["localhost", "127.0.0.1", "0.0.0.0"].includes(parsedUrl.hostname)
+
+    if (isLocalUrl && publicSiteUrl && parsedUrl.pathname.startsWith("/contracts/")) {
+      return `${publicSiteUrl}${parsedUrl.pathname}${parsedUrl.search}`
+    }
+  } catch {
+    return contractUrl
+  }
+
+  return contractUrl
+}
+
+function isLocalContractUrl(contractUrl: string) {
+  try {
+    const parsedUrl = new URL(contractUrl)
+    return ["localhost", "127.0.0.1", "0.0.0.0"].includes(parsedUrl.hostname)
+  } catch {
+    return false
+  }
+}
+
 function sanitizeSigners(signers: Signer[]) {
   return signers
     .map((signer) => ({
@@ -56,7 +90,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing request body." }, { status: 400 })
   }
 
-  const contractUrl = String(body.contractUrl || "")
+  const originalContractUrl = String(body.contractUrl || "")
+  const contractUrl = normalizeContractUrl(originalContractUrl)
   const contractName = String(body.contractName || "Wedding Contract")
   const contractId = String(body.contractId || "")
   const coupleId = String(body.coupleId || "")
@@ -66,8 +101,18 @@ export async function POST(request: NextRequest) {
   const prefillFields = sanitizePrefillFields(body.prefillFields)
   const fileExtension = getFileExtension(contractUrl || contractName)
 
-  if (!contractUrl) {
+  if (!originalContractUrl) {
     return NextResponse.json({ error: "Contract file URL is required." }, { status: 400 })
+  }
+
+  if (isLocalContractUrl(contractUrl)) {
+    return NextResponse.json(
+      {
+        error:
+          "BoldSign cannot access a contract file from localhost. Test this from the deployed portal or set NEXT_PUBLIC_SITE_URL to https://portal.ordainedpro.com and redeploy.",
+      },
+      { status: 400 }
+    )
   }
 
   if (!SUPPORTED_BOLDSIGN_FILE_EXTENSIONS.includes(fileExtension)) {

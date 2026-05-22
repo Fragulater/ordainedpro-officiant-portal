@@ -124,6 +124,11 @@ const DEFAULT_CONTRACT_PREFILL_DEFAULTS = {
 }
 
 const getDefaultContractUrl = () => {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "")
+  if (configuredSiteUrl) {
+    return `${configuredSiteUrl}${DEFAULT_CONTRACT_ASSET_PATH}`
+  }
+
   if (typeof window !== "undefined") {
     return `${window.location.origin}${DEFAULT_CONTRACT_ASSET_PATH}`
   }
@@ -1479,6 +1484,29 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     )
 
     if (existingDefault) {
+      const currentDefaultUrl = getDefaultContractUrl()
+      const existingUrl = getContractFileUrl(existingDefault)
+
+      if (existingUrl && existingUrl !== currentDefaultUrl && existingUrl.includes("localhost")) {
+        const updateResult = await updateContractInDB(existingDefault.id, {
+          file_url: currentDefaultUrl,
+        } as any)
+
+        if (updateResult.ok) {
+          const updatedContract = {
+            ...existingDefault,
+            fileUrl: currentDefaultUrl,
+            file: existingDefault.file ? { ...existingDefault.file, url: currentDefaultUrl } : existingDefault.file,
+          }
+
+          setContracts((prev) => prev.map((contract) =>
+            contract.id === existingDefault.id ? updatedContract : contract
+          ))
+
+          return { ok: true, data: updatedContract, alreadyExists: true }
+        }
+      }
+
       return { ok: true, data: existingDefault, alreadyExists: true }
     }
 
@@ -3402,7 +3430,15 @@ ${shareScriptForm.body}`)
 
       if (!response.ok) {
         const error = await response.json().catch(() => null)
-        throw new Error(error?.error || "Failed to send contract with BoldSign.")
+        const detailMessage =
+          error?.details?.message ||
+          error?.details?.error?.message ||
+          error?.details?.errors?.[0]?.message ||
+          error?.details?.title ||
+          error?.details?.raw ||
+          ""
+        const message = [error?.error, detailMessage].filter(Boolean).join(" ")
+        throw new Error(message || "Failed to send contract with BoldSign.")
       }
 
       const boldSignResult = await response.json().catch(() => null)
