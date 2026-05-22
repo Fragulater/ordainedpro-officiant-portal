@@ -3218,15 +3218,22 @@ ${shareScriptForm.body}`)
     try {
       const contractUrl = await createPersonalizedContractUrl(sendingContract)
       const signers = [
-        ...recipients.map((email) => ({
-          emailAddress: email,
-          name:
-            email === editCoupleInfo?.brideEmail
-              ? editCoupleInfo?.brideName || "Partner 1"
-              : email === editCoupleInfo?.groomEmail
-              ? editCoupleInfo?.groomName || "Partner 2"
-              : "Wedding Client",
-        })),
+        ...(editCoupleInfo?.brideEmail
+          ? [
+              {
+                emailAddress: editCoupleInfo.brideEmail,
+                name: editCoupleInfo?.brideName || "Partner 1",
+              },
+            ]
+          : []),
+        ...(editCoupleInfo?.groomEmail
+          ? [
+              {
+                emailAddress: editCoupleInfo.groomEmail,
+                name: editCoupleInfo?.groomName || "Partner 2",
+              },
+            ]
+          : []),
         ...(officiantEmail
           ? [
               {

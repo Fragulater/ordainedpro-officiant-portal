@@ -17,19 +17,12 @@ function getFileExtension(fileNameOrUrl: string) {
 }
 
 function sanitizeSigners(signers: Signer[]) {
-  const seen = new Set<string>()
   return signers
     .map((signer) => ({
       name: signer.name?.trim(),
       emailAddress: signer.emailAddress?.trim(),
     }))
     .filter((signer) => signer.name && signer.emailAddress)
-    .filter((signer) => {
-      const key = signer.emailAddress.toLowerCase()
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
 }
 
 export async function POST(request: NextRequest) {
