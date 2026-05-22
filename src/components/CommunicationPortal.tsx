@@ -108,6 +108,21 @@ const deriveContractStoragePath = (fileUrl: string | null | undefined) => {
 
 const getContractFileUrl = (contract: any) => contract?.fileUrl || contract?.file_url || contract?.file?.url || ""
 
+const getUniqueContractSigners = (signers: Array<{ emailAddress?: string; name?: string }>) => {
+  const seenEmails = new Set<string>()
+
+  return signers.filter((signer) => {
+    const email = signer.emailAddress?.trim()
+    if (!email) return false
+
+    const normalizedEmail = email.toLowerCase()
+    if (seenEmails.has(normalizedEmail)) return false
+
+    seenEmails.add(normalizedEmail)
+    return true
+  })
+}
+
 const DEFAULT_CONTRACT_NAME = "OrdainedPro Default Wedding Contract"
 const DEFAULT_CONTRACT_ASSET_PATH = "/contracts/ordainedpro-default-contract.docx"
 const DEFAULT_CONTRACT_PREFILL_DEFAULTS = {
@@ -3384,7 +3399,7 @@ ${shareScriptForm.body}`)
 
     try {
       const contractUrl = await createPersonalizedContractUrl(sendingContract)
-      const signers = [
+      const signers = getUniqueContractSigners([
         ...(editCoupleInfo?.brideEmail
           ? [
               {
@@ -3409,7 +3424,7 @@ ${shareScriptForm.body}`)
               },
             ]
           : []),
-      ]
+      ])
 
       const response = await fetch("/api/boldsign/send-contract", {
         method: "POST",
