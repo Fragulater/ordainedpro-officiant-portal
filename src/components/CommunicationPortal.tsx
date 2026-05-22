@@ -2910,7 +2910,7 @@ ${shareScriptForm.body}`)
           to: '',
           customEmail: '',
           subject: "Wedding Contract",
-          body: "Wedding Contract"
+          body: `Hi,\n\nThank you for trusting me with your wedding ceremony. Please review and sign the wedding contract using the secure link from BoldSign.\n\nIf anything looks incorrect or you have questions before signing, reply to this message and I will be happy to help.\n\nThank you,\n${officiantLabel}`
         })
         setShowSendContractDialog(true)
         console.log('Opening send dialog for contract:', contract.name)
