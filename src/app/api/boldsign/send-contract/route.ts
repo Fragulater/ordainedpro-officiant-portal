@@ -56,22 +56,12 @@ function isLocalContractUrl(contractUrl: string) {
 }
 
 function sanitizeSigners(signers: Signer[]) {
-  const seenEmails = new Set<string>()
-
   return signers
     .map((signer) => ({
       name: signer.name?.trim(),
       emailAddress: signer.emailAddress?.trim(),
     }))
     .filter((signer) => signer.name && signer.emailAddress)
-    .filter((signer) => {
-      const normalizedEmail = signer.emailAddress.toLowerCase()
-      if (seenEmails.has(normalizedEmail)) {
-        return false
-      }
-      seenEmails.add(normalizedEmail)
-      return true
-    })
 }
 
 function sanitizePrefillFields(prefillFields: unknown): PrefillField[] {
@@ -186,10 +176,11 @@ export async function POST(request: NextRequest) {
       Name: signer.name,
       EmailAddress: signer.emailAddress,
       SignerType: "Signer",
+      DeliveryMode: "Email",
       Locale: "EN",
       SignerOrder: index + 1,
     })),
-    EnableSigningOrder: false,
+    EnableSigningOrder: true,
     AutoDetectFields: true,
     UseTextTags: true,
     DisableEmails: false,
