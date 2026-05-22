@@ -2909,8 +2909,8 @@ ${shareScriptForm.body}`)
         setEmailForm({
           to: '',
           customEmail: '',
-          subject: `Contract: ${contract.name}`,
-          body: `Hi,\n\nI've prepared your "${contract.name}" for review and signature. Please use the document link below to take a look, and let me know if you have any questions.\n\nBest regards,\n${officiantLabel}`
+          subject: "Wedding Contract",
+          body: "Wedding Contract"
         })
         setShowSendContractDialog(true)
         console.log('Opening send dialog for contract:', contract.name)
