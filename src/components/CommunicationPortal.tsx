@@ -649,6 +649,41 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     return { ok: true }
   }, [currentUser?.id])
 
+  const acceptUploadedContractLegalAcknowledgment = useCallback(async (details: { contractName: string; fileName: string }) => {
+    if (!currentUser?.id) {
+      return { ok: false, error: "Please sign in before uploading a contract." }
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = sessionData.session?.access_token
+
+    if (!accessToken) {
+      return { ok: false, error: "Your session expired. Please sign in again before uploading a contract." }
+    }
+
+    const response = await fetch("/api/legal/contract-template-acknowledgment", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "uploaded_contract",
+        contractName: details.contractName,
+        fileName: details.fileName,
+      }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null)
+      const message = error?.error || "Unable to save the uploaded contract legal acknowledgment."
+      console.error("Failed to save uploaded contract legal acknowledgment:", message)
+      return { ok: false, error: message }
+    }
+
+    return { ok: true }
+  }, [currentUser?.id])
+
   const [paymentReminderForm, setPaymentReminderForm] = useState({
     to: '',
     customEmail: '',
@@ -5838,6 +5873,7 @@ ${invoiceContent}`)
     setContractPrefillDefaults,
     hasAcceptedDefaultContractLegal,
     acceptDefaultContractLegalAcknowledgment,
+    acceptUploadedContractLegalAcknowledgment,
     paymentReminderForm,
     setPaymentReminderForm,
     invoiceForm,

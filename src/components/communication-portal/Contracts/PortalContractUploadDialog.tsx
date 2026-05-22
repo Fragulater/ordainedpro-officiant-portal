@@ -13,6 +13,7 @@ export function PortalContractUploadDialog() {
     setContractPrefillDefaults,
     hasAcceptedDefaultContractLegal,
     acceptDefaultContractLegalAcknowledgment,
+    acceptUploadedContractLegalAcknowledgment,
   } = useCommunicationPortal()
 
   return (
@@ -27,6 +28,7 @@ export function PortalContractUploadDialog() {
         setContractPrefillDefaults={setContractPrefillDefaults}
         hasAcceptedDefaultContractLegal={hasAcceptedDefaultContractLegal}
         onAcceptDefaultContractLegal={acceptDefaultContractLegalAcknowledgment}
+        onAcceptUploadedContractLegal={acceptUploadedContractLegalAcknowledgment}
       />
     </>
   )

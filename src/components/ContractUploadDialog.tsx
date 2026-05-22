@@ -23,6 +23,9 @@ import {
   DEFAULT_CONTRACT_ACKNOWLEDGMENT_LABEL,
   DEFAULT_CONTRACT_ACKNOWLEDGMENT_TEXT,
   DEFAULT_CONTRACT_ACKNOWLEDGMENT_TITLE,
+  UPLOADED_CONTRACT_ACKNOWLEDGMENT_LABEL,
+  UPLOADED_CONTRACT_ACKNOWLEDGMENT_TEXT,
+  UPLOADED_CONTRACT_ACKNOWLEDGMENT_TITLE,
 } from "@/lib/contract-legal-acknowledgment"
 
 const BOLDSIGN_CONTRACT_TAGS = [
@@ -79,6 +82,7 @@ interface ContractUploadDialogProps {
   setContractPrefillDefaults?: (defaults: Record<string, string>) => void
   hasAcceptedDefaultContractLegal?: boolean
   onAcceptDefaultContractLegal?: () => Promise<{ ok: boolean; error?: string } | void>
+  onAcceptUploadedContractLegal?: (details: { contractName: string; fileName: string }) => Promise<{ ok: boolean; error?: string } | void>
 }
 
 export function ContractUploadDialog({
@@ -90,6 +94,7 @@ export function ContractUploadDialog({
   setContractPrefillDefaults,
   hasAcceptedDefaultContractLegal = false,
   onAcceptDefaultContractLegal,
+  onAcceptUploadedContractLegal,
 }: ContractUploadDialogProps) {
   const [formData, setFormData] = useState({
     name: "",
@@ -105,7 +110,9 @@ export function ContractUploadDialog({
   const [miscTextSigner, setMiscTextSigner] = useState("3")
   const [contractMode, setContractMode] = useState<"default" | "custom">("default")
   const [isAddingDefaultContract, setIsAddingDefaultContract] = useState(false)
+  const [isSavingUploadedContractAcknowledgment, setIsSavingUploadedContractAcknowledgment] = useState(false)
   const [attorneyReviewChecked, setAttorneyReviewChecked] = useState(false)
+  const [uploadedAttorneyReviewChecked, setUploadedAttorneyReviewChecked] = useState(false)
 
   const updateContractDefault = (field: string, value: string) => {
     setContractPrefillDefaults?.({
@@ -141,7 +148,9 @@ export function ContractUploadDialog({
     setMiscTextSigner("3")
     setContractMode("default")
     setIsAddingDefaultContract(false)
+    setIsSavingUploadedContractAcknowledgment(false)
     setAttorneyReviewChecked(false)
+    setUploadedAttorneyReviewChecked(false)
   }
 
   const validateForm = () => {
@@ -247,6 +256,29 @@ export function ContractUploadDialog({
     }
 
     if (!validateForm()) return
+
+    if (!uploadedAttorneyReviewChecked) {
+      setErrors((prev) => ({
+        ...prev,
+        uploadedContractLegal: "Please acknowledge responsibility for the uploaded contract before saving it.",
+      }))
+      return
+    }
+
+    setIsSavingUploadedContractAcknowledgment(true)
+    const uploadedAcceptanceResult = await onAcceptUploadedContractLegal?.({
+      contractName: formData.name,
+      fileName: uploadedFiles[0]?.name || formData.name,
+    })
+    setIsSavingUploadedContractAcknowledgment(false)
+
+    if (uploadedAcceptanceResult && !uploadedAcceptanceResult.ok) {
+      setErrors((prev) => ({
+        ...prev,
+        uploadedContractLegal: uploadedAcceptanceResult.error || "Unable to save the uploaded contract legal acknowledgment.",
+      }))
+      return
+    }
 
     onContractUploaded({
       ...formData,
@@ -537,6 +569,35 @@ export function ContractUploadDialog({
           )}
 
           {contractMode === "custom" && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+              <h4 className="font-semibold text-amber-950">{UPLOADED_CONTRACT_ACKNOWLEDGMENT_TITLE}</h4>
+              <p className="mt-2 text-sm leading-6 text-amber-900">
+                {UPLOADED_CONTRACT_ACKNOWLEDGMENT_TEXT}
+              </p>
+              <label className="mt-4 flex items-start gap-3 rounded-md border border-amber-200 bg-white p-3 text-sm font-medium text-slate-900">
+                <input
+                  type="checkbox"
+                  checked={uploadedAttorneyReviewChecked}
+                  onChange={(event) => {
+                    setUploadedAttorneyReviewChecked(event.target.checked)
+                    if (event.target.checked && errors.uploadedContractLegal) {
+                      setErrors((prev) => ({ ...prev, uploadedContractLegal: "" }))
+                    }
+                  }}
+                  className="mt-1 h-4 w-4 shrink-0 accent-blue-600"
+                />
+                <span>{UPLOADED_CONTRACT_ACKNOWLEDGMENT_LABEL}</span>
+              </label>
+              {errors.uploadedContractLegal && (
+                <p className="mt-2 flex items-center text-sm text-red-600">
+                  <AlertCircle className="mr-1 h-3 w-3" />
+                  {errors.uploadedContractLegal}
+                </p>
+              )}
+            </div>
+          )}
+
+          {contractMode === "custom" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
@@ -684,14 +745,15 @@ export function ContractUploadDialog({
             className="bg-blue-500 hover:bg-blue-600"
             disabled={
               isAddingDefaultContract ||
+              isSavingUploadedContractAcknowledgment ||
               (contractMode === "default" && !hasAcceptedDefaultContractLegal && !attorneyReviewChecked) ||
-              (contractMode === "custom" && (!formData.name || !formData.type || uploadedFiles.length === 0))
+              (contractMode === "custom" && (!formData.name || !formData.type || uploadedFiles.length === 0 || !uploadedAttorneyReviewChecked))
             }
           >
             <Save className="w-4 h-4 mr-2" />
             {contractMode === "default"
               ? isAddingDefaultContract ? "Adding..." : "Use Default Contract"
-              : "Upload Contract"}
+              : isSavingUploadedContractAcknowledgment ? "Saving..." : "Upload Contract"}
           </Button>
         </div>
       </DialogContent>

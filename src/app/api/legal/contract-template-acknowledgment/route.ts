@@ -5,6 +5,10 @@ import {
   DEFAULT_CONTRACT_ACKNOWLEDGMENT_SLUG,
   DEFAULT_CONTRACT_ACKNOWLEDGMENT_TEXT,
   DEFAULT_CONTRACT_TEMPLATE_VERSION,
+  UPLOADED_CONTRACT_ACKNOWLEDGMENT_LABEL,
+  UPLOADED_CONTRACT_ACKNOWLEDGMENT_SLUG,
+  UPLOADED_CONTRACT_ACKNOWLEDGMENT_TEXT,
+  UPLOADED_CONTRACT_ACKNOWLEDGMENT_VERSION,
 } from "@/lib/contract-legal-acknowledgment"
 
 export const runtime = "nodejs"
@@ -33,6 +37,29 @@ function getClientIp(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => null)
+  const acknowledgmentType = body?.type === "uploaded_contract" ? "uploaded_contract" : "default_contract"
+  const uploadedFileName = typeof body?.fileName === "string" ? body.fileName : null
+  const uploadedContractName = typeof body?.contractName === "string" ? body.contractName : null
+  const acknowledgment =
+    acknowledgmentType === "uploaded_contract"
+      ? {
+          slug: UPLOADED_CONTRACT_ACKNOWLEDGMENT_SLUG,
+          version: UPLOADED_CONTRACT_ACKNOWLEDGMENT_VERSION,
+          label: UPLOADED_CONTRACT_ACKNOWLEDGMENT_LABEL,
+          text: UPLOADED_CONTRACT_ACKNOWLEDGMENT_TEXT,
+          context: "uploaded_contract_use",
+          contractTemplateVersion: uploadedFileName || uploadedContractName || UPLOADED_CONTRACT_ACKNOWLEDGMENT_VERSION,
+        }
+      : {
+          slug: DEFAULT_CONTRACT_ACKNOWLEDGMENT_SLUG,
+          version: DEFAULT_CONTRACT_TEMPLATE_VERSION,
+          label: DEFAULT_CONTRACT_ACKNOWLEDGMENT_LABEL,
+          text: DEFAULT_CONTRACT_ACKNOWLEDGMENT_TEXT,
+          context: "default_contract_use",
+          contractTemplateVersion: DEFAULT_CONTRACT_TEMPLATE_VERSION,
+        }
+
   const authHeader = request.headers.get("authorization") || ""
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : ""
 
@@ -55,35 +82,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unable to verify the signed-in user." }, { status: 401 })
   }
 
-  const { data: existingAcceptance, error: existingError } = await supabase
+  let existingQuery = supabase
     .from("legal_acceptances")
-    .select("id")
+    .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
-    .eq("document_slug", DEFAULT_CONTRACT_ACKNOWLEDGMENT_SLUG)
-    .eq("document_version", DEFAULT_CONTRACT_TEMPLATE_VERSION)
-    .limit(1)
+    .eq("document_slug", acknowledgment.slug)
+    .eq("document_version", acknowledgment.version)
+
+  if (acknowledgmentType === "uploaded_contract" && uploadedFileName) {
+    existingQuery = existingQuery.contains("metadata", { uploaded_file_name: uploadedFileName })
+  }
+
+  const { count: existingCount, error: existingError } = await existingQuery
     .maybeSingle()
 
   if (existingError) {
     return NextResponse.json({ error: existingError.message }, { status: 500 })
   }
 
-  if (existingAcceptance) {
+  if (existingCount && existingCount > 0) {
     return NextResponse.json({ ok: true, alreadyAccepted: true })
   }
 
   const { error: insertError } = await supabase.from("legal_acceptances").insert({
     user_id: user.id,
-    document_slug: DEFAULT_CONTRACT_ACKNOWLEDGMENT_SLUG,
-    document_version: DEFAULT_CONTRACT_TEMPLATE_VERSION,
-    context: "default_contract_use",
+    document_slug: acknowledgment.slug,
+    document_version: acknowledgment.version,
+    context: acknowledgment.context,
     ip_address: getClientIp(request),
     user_agent: request.headers.get("user-agent"),
     metadata: {
       checked: true,
-      contract_template_version: DEFAULT_CONTRACT_TEMPLATE_VERSION,
-      acknowledgment_label: DEFAULT_CONTRACT_ACKNOWLEDGMENT_LABEL,
-      acknowledgment_language: DEFAULT_CONTRACT_ACKNOWLEDGMENT_TEXT,
+      contract_template_version: acknowledgment.contractTemplateVersion,
+      uploaded_file_name: uploadedFileName,
+      uploaded_contract_name: uploadedContractName,
+      acknowledgment_label: acknowledgment.label,
+      acknowledgment_language: acknowledgment.text,
     },
   })
 
