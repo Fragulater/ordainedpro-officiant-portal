@@ -75,6 +75,60 @@ function sanitizePrefillFields(prefillFields: unknown): PrefillField[] {
     .filter((field) => field.id && field.value)
 }
 
+function findDuplicateSignerEmails(signers: ReturnType<typeof sanitizeSigners>) {
+  const seen = new Set<string>()
+  const duplicates = new Set<string>()
+
+  signers.forEach((signer) => {
+    const email = signer.emailAddress.toLowerCase()
+    if (seen.has(email)) {
+      duplicates.add(signer.emailAddress)
+    }
+    seen.add(email)
+  })
+
+  return Array.from(duplicates)
+}
+
+function extractBoldSignErrorMessages(details: any): string[] {
+  const messages = new Set<string>()
+
+  const visit = (value: any) => {
+    if (!value) return
+
+    if (typeof value === "string") {
+      messages.add(value)
+      return
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(visit)
+      return
+    }
+
+    if (typeof value === "object") {
+      ;["message", "Message", "error", "Error", "title", "Title", "detail", "Detail"].forEach((key) => {
+        if (typeof value[key] === "string") {
+          messages.add(value[key])
+        }
+      })
+
+      if (value.errors || value.Errors || value.validationErrors || value.ValidationErrors) {
+        visit(value.errors || value.Errors || value.validationErrors || value.ValidationErrors)
+      }
+
+      Object.values(value).forEach((nestedValue) => {
+        if (nestedValue && typeof nestedValue === "object") {
+          visit(nestedValue)
+        }
+      })
+    }
+  }
+
+  visit(details)
+  return Array.from(messages).filter(Boolean)
+}
+
 export async function POST(request: NextRequest) {
   const boldSignApiKey = process.env.BOLDSIGN_API_KEY
 
@@ -129,16 +183,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "At least one signer email is required." }, { status: 400 })
   }
 
+  const duplicateEmails = findDuplicateSignerEmails(signers)
+  if (duplicateEmails.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Each BoldSign signing role needs a unique email address. Update the couple/officiant emails before sending this contract.",
+        details: {
+          duplicateEmails,
+        },
+      },
+      { status: 400 }
+    )
+  }
+
   const boldSignPayload = {
     Title: contractName,
     Message: message,
     FileUrls: [contractUrl],
     Signers: signers.map((signer, index) => ({
-      name: signer.name,
-      emailAddress: signer.emailAddress,
-      signerType: "Signer",
-      locale: "EN",
-      signerOrder: index + 1,
+      Name: signer.name,
+      EmailAddress: signer.emailAddress,
+      SignerType: "Signer",
+      Locale: "EN",
+      SignerOrder: index + 1,
     })),
     EnableSigningOrder: false,
     AutoDetectFields: true,
@@ -179,8 +247,16 @@ export async function POST(request: NextRequest) {
 
   if (!response.ok) {
     console.error("BoldSign send contract error:", responseData)
+    const boldSignMessages = extractBoldSignErrorMessages(responseData)
     return NextResponse.json(
-      { error: responseData?.message || responseData?.error || "BoldSign failed to send the contract.", details: responseData },
+      {
+        error:
+          boldSignMessages.join(" ") ||
+          responseData?.message ||
+          responseData?.error ||
+          "BoldSign failed to send the contract.",
+        details: responseData,
+      },
       { status: response.status }
     )
   }
