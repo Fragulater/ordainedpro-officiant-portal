@@ -11,7 +11,7 @@ import { FileUpload, UploadedFile } from "@/components/FileUpload"
 import {
   AlertCircle,
   CalendarDays,
-  CheckCircle2,
+  Clipboard,
   FileBadge,
   FileSignature,
   FileText,
@@ -19,10 +19,34 @@ import {
   Save,
   Upload,
 } from "lucide-react"
-import {
-  DEFAULT_CONTRACT_TEMPLATE_FIELDS,
-  DEFAULT_OFFICIANT_CONTRACT_TEMPLATE,
-} from "@/lib/default-contract-template"
+
+const BOLDSIGN_CONTRACT_TAGS = [
+  { label: "Partner 1 name", tag: "{{text|1|*|Partner 1 full name|partner_1_name}}" },
+  { label: "Partner 2 name", tag: "{{text|2|*|Partner 2 full name|partner_2_name}}" },
+  { label: "Wedding date", tag: "{{editdate|3|*|MM/dd/yyyy|wedding_date}}" },
+  { label: "Wedding time", tag: "{{text|3|*|Wedding time|wedding_time}}" },
+  { label: "Venue name", tag: "{{text|3|*|Venue name|venue_name}}" },
+  { label: "Venue address", tag: "{{text|3|*|Venue address|venue_address}}" },
+  { label: "Total fee", tag: "{{text|3|*|Total fee|total_fee}}" },
+  { label: "Deposit amount", tag: "{{text|3|*|Deposit amount|deposit_amount}}" },
+  { label: "Partner 1 signature", tag: "{{sign|1|*|Partner 1 signature|partner_1_signature}}" },
+  { label: "Partner 2 signature", tag: "{{sign|2|*|Partner 2 signature|partner_2_signature}}" },
+  { label: "Officiant signature", tag: "{{sign|3|*|Officiant signature|officiant_signature}}" },
+]
+
+const BOLDSIGN_SIGNER_OPTIONS = [
+  { value: "1", label: "Partner 1" },
+  { value: "2", label: "Partner 2" },
+  { value: "3", label: "Officiant" },
+]
+
+const createBoldSignFieldId = (label: string) => (
+  label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "misc_text"
+)
 
 export interface Contract {
   id: number
@@ -61,6 +85,9 @@ export function ContractUploadDialog({
   })
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
+  const [copiedTag, setCopiedTag] = useState("")
+  const [miscTextLabel, setMiscTextLabel] = useState("Additional notes")
+  const [miscTextSigner, setMiscTextSigner] = useState("3")
 
   const contractTypes = [
     "Wedding Service Agreement",
@@ -84,6 +111,9 @@ export function ContractUploadDialog({
     })
     setUploadedFiles([])
     setErrors({})
+    setCopiedTag("")
+    setMiscTextLabel("Additional notes")
+    setMiscTextSigner("3")
   }
 
   const validateForm = () => {
@@ -135,36 +165,16 @@ export function ContractUploadDialog({
     }
   }
 
-  const handleUseStarterTemplate = () => {
-    const file = new File(
-      [DEFAULT_OFFICIANT_CONTRACT_TEMPLATE],
-      "OrdainedPro Wedding Service Agreement Template.txt",
-      { type: "text/plain" }
-    )
-
-    const starterTemplate: UploadedFile = {
-      id: `starter_contract_${Date.now()}`,
-      file,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      uploadProgress: 100,
-      status: "completed",
-      textContent: DEFAULT_OFFICIANT_CONTRACT_TEMPLATE,
+  const copyTag = async (tag: string) => {
+    try {
+      await navigator.clipboard.writeText(tag)
+      setCopiedTag(tag)
+    } catch (error) {
+      console.error("Failed to copy contract tag:", error)
     }
-
-    setUploadedFiles([starterTemplate])
-    setFormData((prev) => ({
-      ...prev,
-      name: prev.name || "Wedding Service Agreement Template",
-      description:
-        prev.description ||
-        "Reusable officiant contract template with blank merge fields for each couple's ceremony details, fees, deposit, travel, and signature information.",
-      type: prev.type || "Wedding Service Agreement",
-      status: prev.status || "draft",
-    }))
-    setErrors((prev) => ({ ...prev, file: "", name: "", type: "" }))
   }
+
+  const miscTextTag = `{{text|${miscTextSigner}|*|${miscTextLabel.trim() || "Additional notes"}|${createBoldSignFieldId(miscTextLabel)}}}`
 
   const handleFileRemoved = (fileId: string) => {
     setUploadedFiles((prev) => prev.filter((file) => file.id !== fileId))
@@ -202,38 +212,13 @@ export function ContractUploadDialog({
 
         <div className="space-y-6 py-4">
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h4 className="font-semibold text-blue-900 mb-2 flex items-center">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Contract Document
-                </h4>
-                <p className="text-sm text-blue-800">
-                  Upload your own file, or start with the OrdainedPro template and edit the placeholder fields for each couple.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="border-blue-300 bg-white text-blue-700 hover:bg-blue-50"
-                onClick={handleUseStarterTemplate}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Contracts
-              </Button>
-            </div>
-
-            {uploadedFiles.some((file) => file.id.startsWith("starter_contract_")) && (
-              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3">
-                <p className="flex items-center text-sm font-medium text-green-800">
-                  <CheckCircle2 className="w-4 h-4 mr-2" />
-                  Starter template selected
-                </p>
-                <p className="mt-1 text-xs text-green-700">
-                  Couple-specific fields are blank placeholders and can be filled from the couple profile later.
-                </p>
-              </div>
-            )}
+            <h4 className="font-semibold text-blue-900 mb-2 flex items-center">
+              <Upload className="w-4 h-4 mr-2" />
+              Contract Document
+            </h4>
+            <p className="mb-3 text-sm text-blue-800">
+              Upload a tagged DOCX or PDF contract. Use the setup helper below to copy the fields into the contract before uploading.
+            </p>
 
             <FileUpload
               mode="full"
@@ -241,7 +226,7 @@ export function ContractUploadDialog({
               onFileRemoved={handleFileRemoved}
               maxFiles={1}
               maxFileSize={10}
-              acceptedFileTypes={[".docx", ".pdf", ".odt", ".txt"]}
+              acceptedFileTypes={[".docx", ".pdf"]}
               existingFiles={uploadedFiles}
             />
 
@@ -254,16 +239,87 @@ export function ContractUploadDialog({
           </div>
 
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <h4 className="font-semibold text-amber-900 mb-2">Reusable Template Fields</h4>
-            <p className="text-sm text-amber-800 mb-3">
-              Auto-fill uses these exact placeholders. Uploaded contracts need matching placeholders for the portal to safely place couple, wedding, fee, deposit, and travel details.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {DEFAULT_CONTRACT_TEMPLATE_FIELDS.map((field) => (
-                <span key={field} className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-xs font-medium text-amber-800">
-                  {`{{${field}}}`}
-                </span>
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h4 className="font-semibold text-amber-900 mb-1">Contract Setup Helper</h4>
+                <p className="text-sm text-amber-800">
+                  Copy these tags into a DOCX contract where each field should appear. Partner 1, Partner 2, and Officiant match the signer order used when sending through BoldSign.
+                </p>
+              </div>
+              <span className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-800">
+                DOCX or PDF recommended
+              </span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+              {BOLDSIGN_CONTRACT_TAGS.map((field) => (
+                <div key={field.tag} className="rounded-lg border border-amber-200 bg-white p-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-slate-900">{field.label}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 shrink-0 border-amber-200 text-amber-800 hover:bg-amber-50"
+                      onClick={() => copyTag(field.tag)}
+                    >
+                      <Clipboard className="mr-1 h-3.5 w-3.5" />
+                      {copiedTag === field.tag ? "Copied" : "Copy"}
+                    </Button>
+                  </div>
+                  <code className="block break-all rounded bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                    {field.tag}
+                  </code>
+                </div>
               ))}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <h5 className="mb-2 text-sm font-semibold text-blue-900">Miscellaneous Text Field</h5>
+              <p className="mb-3 text-xs text-blue-800">
+                Use this for custom items like ceremony style, special instructions, rehearsal location, or any one-off field an officiant wants added.
+              </p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_auto] md:items-end">
+                <div>
+                  <Label htmlFor="miscTextLabel" className="text-xs font-medium text-blue-900">
+                    Field label
+                  </Label>
+                  <Input
+                    id="miscTextLabel"
+                    value={miscTextLabel}
+                    onChange={(event) => setMiscTextLabel(event.target.value)}
+                    placeholder="e.g., Ceremony style"
+                    className="mt-1 border-blue-200 bg-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Filled by</Label>
+                  <Select value={miscTextSigner} onValueChange={setMiscTextSigner}>
+                    <SelectTrigger className="mt-1 border-blue-200 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BOLDSIGN_SIGNER_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
+                  onClick={() => copyTag(miscTextTag)}
+                >
+                  <Clipboard className="mr-2 h-4 w-4" />
+                  {copiedTag === miscTextTag ? "Copied" : "Copy Tag"}
+                </Button>
+              </div>
+              <code className="mt-3 block break-all rounded border border-blue-100 bg-white px-2 py-1 text-xs text-blue-900">
+                {miscTextTag}
+              </code>
             </div>
           </div>
 
