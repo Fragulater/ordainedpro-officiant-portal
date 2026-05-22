@@ -32,6 +32,39 @@ function sanitizeSigners(signers: Signer[]) {
     })
 }
 
+function getDefaultSignatureFields(index: number) {
+  const y = 640 + index * 48
+
+  return [
+    {
+      id: `signature_${index + 1}`,
+      name: `signature_${index + 1}`,
+      fieldType: "Signature",
+      pageNumber: 1,
+      bounds: {
+        x: 60,
+        y,
+        width: 180,
+        height: 36,
+      },
+      isRequired: true,
+    },
+    {
+      id: `signed_date_${index + 1}`,
+      name: `signed_date_${index + 1}`,
+      fieldType: "DateSigned",
+      pageNumber: 1,
+      bounds: {
+        x: 265,
+        y,
+        width: 120,
+        height: 24,
+      },
+      isRequired: true,
+    },
+  ]
+}
+
 export async function POST(request: NextRequest) {
   const boldSignApiKey = process.env.BOLDSIGN_API_KEY
 
@@ -82,6 +115,7 @@ export async function POST(request: NextRequest) {
       name: signer.name,
       emailAddress: signer.emailAddress,
       signerType: "Signer",
+      formFields: getDefaultSignatureFields(index),
       locale: "EN",
       signerOrder: index + 1,
     })),
@@ -130,8 +164,20 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const documentId = responseData?.documentId || responseData?.documentID || responseData?.id
+  if (!documentId) {
+    console.error("BoldSign did not return a document id:", responseData)
+    return NextResponse.json(
+      {
+        error: "BoldSign accepted the request but did not return a document id. The contract was not marked as sent.",
+        details: responseData,
+      },
+      { status: 502 }
+    )
+  }
+
   return NextResponse.json({
-    documentId: responseData?.documentId,
+    documentId,
     raw: responseData,
   })
 }
