@@ -17,9 +17,18 @@ export function PortalSendContractEmailDialog() {
     isSendingContractEmail,
     emailForm,
     setEmailForm,
+    contractPrefillDefaults,
+    setContractPrefillDefaults,
     editCoupleInfo,
     handleSendContractEmail,
   } = useCommunicationPortal()
+
+  const updateContractDefault = (field: string, value: string) => {
+    setContractPrefillDefaults({
+      ...contractPrefillDefaults,
+      [field]: value,
+    })
+  }
 
   // Don't render if editCoupleInfo is not available
   if (!editCoupleInfo?.brideName) {
@@ -60,6 +69,55 @@ export function PortalSendContractEmailDialog() {
                 </div>
               </div>
             )}
+
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <h4 className="font-semibold text-blue-900 mb-1">Contract Defaults</h4>
+              <p className="text-sm text-blue-800 mb-4">
+                These values are prefilled into matching contract tags before the contract is sent. They stay saved for this officiant on this device.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Ceremony fee</Label>
+                  <Input value={contractPrefillDefaults.ceremonyFee} onChange={(event) => updateContractDefault("ceremonyFee", event.target.value)} placeholder="e.g., 500" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Deposit amount</Label>
+                  <Input value={contractPrefillDefaults.depositAmount} onChange={(event) => updateContractDefault("depositAmount", event.target.value)} placeholder="e.g., 150" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Included miles</Label>
+                  <Input value={contractPrefillDefaults.includedMiles} onChange={(event) => updateContractDefault("includedMiles", event.target.value)} placeholder="e.g., 30" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Mileage rate</Label>
+                  <Input value={contractPrefillDefaults.mileageRate} onChange={(event) => updateContractDefault("mileageRate", event.target.value)} placeholder="e.g., 1.00" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Arrival minutes</Label>
+                  <Input value={contractPrefillDefaults.arrivalMinutes} onChange={(event) => updateContractDefault("arrivalMinutes", event.target.value)} placeholder="e.g., 20" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Rehearsal arrival minutes</Label>
+                  <Input value={contractPrefillDefaults.rehearsalArrivalMinutes} onChange={(event) => updateContractDefault("rehearsalArrivalMinutes", event.target.value)} placeholder="e.g., 20" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Late grace minutes</Label>
+                  <Input value={contractPrefillDefaults.lateGraceMinutes} onChange={(event) => updateContractDefault("lateGraceMinutes", event.target.value)} placeholder="e.g., 30" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Late fee per half hour</Label>
+                  <Input value={contractPrefillDefaults.lateFeeHalfHour} onChange={(event) => updateContractDefault("lateFeeHalfHour", event.target.value)} placeholder="e.g., 50" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Full day reservation fee</Label>
+                  <Input value={contractPrefillDefaults.fullDayFee} onChange={(event) => updateContractDefault("fullDayFee", event.target.value)} placeholder="e.g., 1000" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Travel origin / officiant address</Label>
+                  <Input value={contractPrefillDefaults.officiantAddress} onChange={(event) => updateContractDefault("officiantAddress", event.target.value)} placeholder="City, State or business address" className="mt-1 bg-white border-blue-200" />
+                </div>
+              </div>
+            </div>
 
             {/* Email Form */}
             <div className="space-y-4">

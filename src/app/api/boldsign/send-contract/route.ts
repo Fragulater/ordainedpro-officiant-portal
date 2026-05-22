@@ -8,6 +8,11 @@ type Signer = {
   emailAddress: string
 }
 
+type PrefillField = {
+  id: string
+  value: string
+}
+
 const SUPPORTED_BOLDSIGN_FILE_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg", ".docx", ".xlsx", ".pptx"]
 
 function getFileExtension(fileNameOrUrl: string) {
@@ -23,6 +28,17 @@ function sanitizeSigners(signers: Signer[]) {
       emailAddress: signer.emailAddress?.trim(),
     }))
     .filter((signer) => signer.name && signer.emailAddress)
+}
+
+function sanitizePrefillFields(prefillFields: unknown): PrefillField[] {
+  if (!prefillFields || typeof prefillFields !== "object" || Array.isArray(prefillFields)) return []
+
+  return Object.entries(prefillFields as Record<string, unknown>)
+    .map(([id, value]) => ({
+      id: id.trim(),
+      value: value == null ? "" : String(value).trim(),
+    }))
+    .filter((field) => field.id && field.value)
 }
 
 export async function POST(request: NextRequest) {
@@ -47,6 +63,7 @@ export async function POST(request: NextRequest) {
   const officiantId = String(body.officiantId || "")
   const message = String(body.message || "")
   const signers = sanitizeSigners(Array.isArray(body.signers) ? body.signers : [])
+  const prefillFields = sanitizePrefillFields(body.prefillFields)
   const fileExtension = getFileExtension(contractUrl || contractName)
 
   if (!contractUrl) {
@@ -133,6 +150,31 @@ export async function POST(request: NextRequest) {
       },
       { status: 502 }
     )
+  }
+
+  if (prefillFields.length > 0) {
+    const prefillResponse = await fetch(
+      `https://api.boldsign.com/v1/document/prefillFields?documentId=${encodeURIComponent(documentId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-API-KEY": boldSignApiKey,
+        },
+        body: JSON.stringify({
+          Fields: prefillFields.map((field) => ({
+            Id: field.id,
+            Value: field.value,
+          })),
+        }),
+      }
+    )
+
+    if (!prefillResponse.ok) {
+      const prefillText = await prefillResponse.text()
+      console.error("BoldSign prefill fields failed:", prefillText)
+    }
   }
 
   return NextResponse.json({

@@ -108,10 +108,35 @@ const deriveContractStoragePath = (fileUrl: string | null | undefined) => {
 
 const getContractFileUrl = (contract: any) => contract?.fileUrl || contract?.file_url || contract?.file?.url || ""
 
+const DEFAULT_CONTRACT_NAME = "OrdainedPro Default Wedding Contract"
+const DEFAULT_CONTRACT_ASSET_PATH = "/contracts/ordainedpro-default-contract.docx"
+const DEFAULT_CONTRACT_PREFILL_DEFAULTS = {
+  ceremonyFee: "",
+  depositAmount: "",
+  arrivalMinutes: "20",
+  rehearsalArrivalMinutes: "20",
+  lateGraceMinutes: "30",
+  lateFeeHalfHour: "",
+  fullDayFee: "",
+  includedMiles: "",
+  officiantAddress: "",
+  mileageRate: "",
+}
+
+const getDefaultContractUrl = () => {
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}${DEFAULT_CONTRACT_ASSET_PATH}`
+  }
+
+  return DEFAULT_CONTRACT_ASSET_PATH
+}
+
 const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`
 
 const formatContractMoney = (amount: number | string | null | undefined) => {
-  const numericAmount = typeof amount === "string" ? Number.parseFloat(amount) : Number(amount || 0)
+  const numericAmount = typeof amount === "string"
+    ? Number.parseFloat(amount.replace(/[^0-9.-]/g, ""))
+    : Number(amount || 0)
   return Number.isFinite(numericAmount) && numericAmount > 0 ? formatCurrency(numericAmount) : ""
 }
 
@@ -495,6 +520,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     officiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
   const officiantEmail = officiantProfile?.email || currentUser?.email || ""
   const officiantPhone = officiantProfile?.phone || ""
+  const [contractPrefillDefaults, setContractPrefillDefaults] = useState(DEFAULT_CONTRACT_PREFILL_DEFAULTS)
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [newMessage, setNewMessage] = useState("")
@@ -520,6 +546,43 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     subject: '',
     body: ''
   })
+
+  useEffect(() => {
+    if (!currentUser?.id) return
+
+    const storageKey = `ordainedpro_contract_defaults_${currentUser.id}`
+    const savedDefaults = localStorage.getItem(storageKey)
+    const profileDefaults = {
+      includedMiles: officiantProfile?.travel_radius_miles ? String(officiantProfile.travel_radius_miles) : "",
+      officiantAddress: [officiantProfile?.city, officiantProfile?.state].filter(Boolean).join(", "),
+    }
+
+    if (savedDefaults) {
+      try {
+        setContractPrefillDefaults({
+          ...DEFAULT_CONTRACT_PREFILL_DEFAULTS,
+          ...profileDefaults,
+          ...JSON.parse(savedDefaults),
+        })
+      } catch {
+        setContractPrefillDefaults({
+          ...DEFAULT_CONTRACT_PREFILL_DEFAULTS,
+          ...profileDefaults,
+        })
+      }
+    } else {
+      setContractPrefillDefaults({
+        ...DEFAULT_CONTRACT_PREFILL_DEFAULTS,
+        ...profileDefaults,
+      })
+    }
+  }, [currentUser?.id, officiantProfile?.city, officiantProfile?.state, officiantProfile?.travel_radius_miles])
+
+  useEffect(() => {
+    if (!currentUser?.id) return
+    localStorage.setItem(`ordainedpro_contract_defaults_${currentUser.id}`, JSON.stringify(contractPrefillDefaults))
+  }, [contractPrefillDefaults, currentUser?.id])
+
   const [paymentReminderForm, setPaymentReminderForm] = useState({
     to: '',
     customEmail: '',
@@ -1055,8 +1118,28 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     const result = await loadContractsFromDB(currentUser.id, editCoupleInfo.id)
 
     if (result.ok && result.data) {
+      let contractRecords = result.data
+
+      if (contractRecords.length === 0) {
+        const defaultContract = await addContractToDB(currentUser.id, editCoupleInfo.id, {
+          name: DEFAULT_CONTRACT_NAME,
+          description: "Preformatted OrdainedPro default wedding contract with BoldSign tags. Download to personalize or send as-is.",
+          type: "Wedding Service Agreement",
+          fileUrl: getDefaultContractUrl(),
+          fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          fileSize: 13568,
+          status: "draft",
+        })
+
+        if (defaultContract.ok && defaultContract.data) {
+          contractRecords = [defaultContract.data]
+        } else {
+          console.error("Failed to add default contract:", defaultContract.error)
+        }
+      }
+
       // Transform database format to component format
-      const transformedContracts = result.data.map((c: any) => ({
+      const transformedContracts = contractRecords.map((c: any) => ({
         id: c.id,
         name: c.name,
         description: c.description || "",
@@ -3070,8 +3153,8 @@ ${shareScriptForm.body}`)
       .filter(Boolean)
       .filter((address, index, all) => all.indexOf(address) === index)
       .join(" / ")
-    const totalAmount = paymentInfo.totalAmount || invoiceForm.total || 0
-    const depositAmount = paymentInfo.depositPaid || invoiceForm.depositPaid || 0
+    const totalAmount = paymentInfo.totalAmount || invoiceForm.total || contractPrefillDefaults.ceremonyFee || 0
+    const depositAmount = paymentInfo.depositPaid || invoiceForm.depositPaid || contractPrefillDefaults.depositAmount || 0
     const balanceDue = paymentInfo.balance || invoiceForm.balanceDue || 0
     const balanceDueDate = paymentInfo.finalPaymentDue || invoiceForm.dueDate || ""
     const venueAddress = editWeddingDetails.venueAddress || editCoupleInfo?.address || ""
@@ -3097,11 +3180,11 @@ ${shareScriptForm.body}`)
         : "",
       cancellation_refund_terms: invoiceForm.terms || "",
       late_fee_terms: "",
-      included_travel_radius: officiantProfile?.travel_radius_miles
-        ? `${officiantProfile.travel_radius_miles} miles`
+      included_travel_radius: contractPrefillDefaults.includedMiles || officiantProfile?.travel_radius_miles
+        ? `${contractPrefillDefaults.includedMiles || officiantProfile.travel_radius_miles} miles`
         : "",
       travel_mileage_fees: "",
-      travel_origin_or_service_area: [officiantProfile?.city, officiantProfile?.state].filter(Boolean).join(", "),
+      travel_origin_or_service_area: contractPrefillDefaults.officiantAddress || [officiantProfile?.city, officiantProfile?.state].filter(Boolean).join(", "),
       additional_travel_terms: "",
       special_requests_deadline: "three weeks prior to the ceremony date",
       officiant_arrival_window: "20 minutes",
@@ -3114,6 +3197,27 @@ ${shareScriptForm.body}`)
       couple_mailing_address: mailingAddress,
       officiant_signature_date: "",
       officiant_signature: "",
+      comp_name: officiantProfile?.business_name || officiantProfile?.company_name || officiantLabel,
+      bride_name: brideName,
+      groom_name: groomName,
+      wed_date: formatContractDate(editWeddingDetails.weddingDate),
+      wed_time: formatContractTime(editWeddingDetails.startTime),
+      venue: editWeddingDetails.venueName || "",
+      venue_addr: venueAddress,
+      ceremony_fee: formatContractMoney(totalAmount).replace(/^\$/, ""),
+      late_grace_minutes: contractPrefillDefaults.lateGraceMinutes,
+      late_fee_half_hour: formatContractMoney(contractPrefillDefaults.lateFeeHalfHour).replace(/^\$/, ""),
+      full_day_fee: formatContractMoney(contractPrefillDefaults.fullDayFee).replace(/^\$/, ""),
+      included_miles: contractPrefillDefaults.includedMiles || (officiantProfile?.travel_radius_miles ? String(officiantProfile.travel_radius_miles) : ""),
+      officiant_addr: contractPrefillDefaults.officiantAddress || [officiantProfile?.city, officiantProfile?.state].filter(Boolean).join(", "),
+      mileage_rate: formatContractMoney(contractPrefillDefaults.mileageRate).replace(/^\$/, ""),
+      arrival_minutes: contractPrefillDefaults.arrivalMinutes,
+      rehearsal_arrival_minutes: contractPrefillDefaults.rehearsalArrivalMinutes,
+      bride_phone: editCoupleInfo?.bridePhone || "",
+      groom_phone: editCoupleInfo?.groomPhone || "",
+      bride_email: editCoupleInfo?.brideEmail || "",
+      groom_email: editCoupleInfo?.groomEmail || "",
+      mailing_addr: mailingAddress,
     }
   }
 
@@ -3257,6 +3361,7 @@ ${shareScriptForm.body}`)
           officiantId: currentUser?.id,
           message: emailForm.body.trim(),
           signers,
+          prefillFields: buildContractMergeValues(),
         }),
       })
 
@@ -5597,6 +5702,8 @@ ${invoiceContent}`)
     isSendingContractEmail,
     emailForm,
     setEmailForm,
+    contractPrefillDefaults,
+    setContractPrefillDefaults,
     paymentReminderForm,
     setPaymentReminderForm,
     invoiceForm,

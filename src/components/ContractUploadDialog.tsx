@@ -88,6 +88,7 @@ export function ContractUploadDialog({
   const [copiedTag, setCopiedTag] = useState("")
   const [miscTextLabel, setMiscTextLabel] = useState("Additional notes")
   const [miscTextSigner, setMiscTextSigner] = useState("3")
+  const [contractMode, setContractMode] = useState<"default" | "custom">("default")
 
   const contractTypes = [
     "Wedding Service Agreement",
@@ -114,6 +115,7 @@ export function ContractUploadDialog({
     setCopiedTag("")
     setMiscTextLabel("Additional notes")
     setMiscTextSigner("3")
+    setContractMode("default")
   }
 
   const validateForm = () => {
@@ -181,6 +183,12 @@ export function ContractUploadDialog({
   }
 
   const handleSave = () => {
+    if (contractMode === "default") {
+      resetForm()
+      onOpenChange(false)
+      return
+    }
+
     if (!validateForm()) return
 
     onContractUploaded({
@@ -211,6 +219,65 @@ export function ContractUploadDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+            <p className="font-semibold text-green-900">
+              You only need to set this up once per contract, not once per couple.
+            </p>
+            <p className="mt-1 text-sm text-green-800">
+              The default OrdainedPro contract is already preloaded for each new couple. Use it as-is, download it to personalize, or upload your own tagged DOCX/PDF contract.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setContractMode("default")}
+              className={`rounded-lg border p-4 text-left transition ${
+                contractMode === "default"
+                  ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100"
+                  : "border-slate-200 bg-white hover:border-blue-200"
+              }`}
+            >
+              <div className="flex items-center gap-2 font-semibold text-slate-900">
+                <FileText className="h-4 w-4 text-blue-600" />
+                Use Default Contract
+              </div>
+              <p className="mt-2 text-sm text-slate-600">
+                Work from the preloaded OrdainedPro contract. It is already tagged for Partner 1, Partner 2, and the officiant.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setContractMode("custom")}
+              className={`rounded-lg border p-4 text-left transition ${
+                contractMode === "custom"
+                  ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100"
+                  : "border-slate-200 bg-white hover:border-blue-200"
+              }`}
+            >
+              <div className="flex items-center gap-2 font-semibold text-slate-900">
+                <Upload className="h-4 w-4 text-blue-600" />
+                Upload / Use Your Own Contract
+              </div>
+              <p className="mt-2 text-sm text-slate-600">
+                Upload a personalized DOCX or PDF and use the helper tags below so BoldSign knows where fields belong.
+              </p>
+            </button>
+          </div>
+
+          {contractMode === "default" && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <h4 className="mb-2 flex items-center font-semibold text-blue-900">
+                <FileText className="mr-2 h-4 w-4" />
+                Default Contract Ready
+              </h4>
+              <p className="text-sm text-blue-800">
+                The default contract is automatically added to this couple's contract list. Download it from the contract card if you want to edit it in Word and upload your personalized version later.
+              </p>
+            </div>
+          )}
+
+          {contractMode === "custom" && (
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
             <h4 className="font-semibold text-blue-900 mb-2 flex items-center">
               <Upload className="w-4 h-4 mr-2" />
@@ -237,7 +304,9 @@ export function ContractUploadDialog({
               </p>
             )}
           </div>
+          )}
 
+          {contractMode === "custom" && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div>
@@ -322,7 +391,9 @@ export function ContractUploadDialog({
               </code>
             </div>
           </div>
+          )}
 
+          {contractMode === "custom" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
@@ -414,8 +485,9 @@ export function ContractUploadDialog({
               </div>
             </div>
           </div>
+          )}
 
-          {(formData.name || formData.type) && (
+          {contractMode === "custom" && (formData.name || formData.type) && (
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
               <h4 className="font-semibold text-gray-900 mb-3">Contract Preview</h4>
               <div className="space-y-2">
@@ -467,10 +539,10 @@ export function ContractUploadDialog({
           <Button
             onClick={handleSave}
             className="bg-blue-500 hover:bg-blue-600"
-            disabled={!formData.name || !formData.type || uploadedFiles.length === 0}
+            disabled={contractMode === "custom" && (!formData.name || !formData.type || uploadedFiles.length === 0)}
           >
             <Save className="w-4 h-4 mr-2" />
-            Upload Contract
+            {contractMode === "default" ? "Done" : "Upload Contract"}
           </Button>
         </div>
       </DialogContent>
