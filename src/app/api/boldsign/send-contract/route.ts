@@ -75,21 +75,6 @@ function sanitizePrefillFields(prefillFields: unknown): PrefillField[] {
     .filter((field) => field.id && field.value)
 }
 
-function findDuplicateSignerEmails(signers: ReturnType<typeof sanitizeSigners>) {
-  const seen = new Set<string>()
-  const duplicates = new Set<string>()
-
-  signers.forEach((signer) => {
-    const email = signer.emailAddress.toLowerCase()
-    if (seen.has(email)) {
-      duplicates.add(signer.emailAddress)
-    }
-    seen.add(email)
-  })
-
-  return Array.from(duplicates)
-}
-
 function extractBoldSignErrorMessages(details: any): string[] {
   const messages = new Set<string>()
 
@@ -181,20 +166,6 @@ export async function POST(request: NextRequest) {
 
   if (signers.length === 0) {
     return NextResponse.json({ error: "At least one signer email is required." }, { status: 400 })
-  }
-
-  const duplicateEmails = findDuplicateSignerEmails(signers)
-  if (duplicateEmails.length > 0) {
-    return NextResponse.json(
-      {
-        error:
-          "Each BoldSign signing role needs a unique email address. Update the couple/officiant emails before sending this contract.",
-        details: {
-          duplicateEmails,
-        },
-      },
-      { status: 400 }
-    )
   }
 
   const boldSignPayload = {
