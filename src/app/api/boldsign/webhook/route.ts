@@ -1,5 +1,6 @@
 import crypto from "crypto"
 import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -42,6 +43,46 @@ function verifyBoldSignSignature(rawBody: string, signatureHeader: string | null
   return withinTolerance && signatureMatches
 }
 
+function getServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) return null
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+function findValueByKey(value: any, key: string): string | null {
+  if (!value || typeof value !== "object") return null
+  if (Object.prototype.hasOwnProperty.call(value, key) && value[key] != null) {
+    return String(value[key])
+  }
+
+  for (const nested of Object.values(value)) {
+    const result = findValueByKey(nested, key)
+    if (result) return result
+  }
+
+  return null
+}
+
+function getContractStatusFromEvent(eventType: string) {
+  const normalizedEvent = eventType.toLowerCase()
+  if (normalizedEvent.includes("completed") || normalizedEvent.includes("signed")) return "signed"
+  if (normalizedEvent.includes("expired")) return "expired"
+  if (
+    normalizedEvent.includes("sent") ||
+    normalizedEvent.includes("viewed") ||
+    normalizedEvent.includes("declined") ||
+    normalizedEvent.includes("revoked")
+  ) {
+    return "sent"
+  }
+  return null
+}
+
 export async function POST(request: NextRequest) {
   const rawBody = await request.text()
   const boldSignEventHeader = request.headers.get("x-boldsign-event")
@@ -81,6 +122,25 @@ export async function POST(request: NextRequest) {
     documentId: payload?.data?.documentId,
     environment: payload?.event?.environment,
   })
+
+  const contractId = findValueByKey(payload, "contractId")
+  const nextStatus = getContractStatusFromEvent(eventType)
+
+  if (contractId && nextStatus) {
+    const supabase = getServiceClient()
+    if (!supabase) {
+      console.error("Cannot update BoldSign contract status: Supabase service env vars are missing.")
+    } else {
+      const { error } = await supabase
+        .from("contracts")
+        .update({ status: nextStatus })
+        .eq("id", Number(contractId))
+
+      if (error) {
+        console.error("Failed to update contract status from BoldSign webhook:", error)
+      }
+    }
+  }
 
   return NextResponse.json({ ok: true })
 }

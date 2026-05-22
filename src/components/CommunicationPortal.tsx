@@ -3217,44 +3217,61 @@ ${shareScriptForm.body}`)
 
     try {
       const contractUrl = await createPersonalizedContractUrl(sendingContract)
-      const messageWithLink = `${emailForm.body.trim()}\n\nView/download contract:\n${contractUrl}`
-      const response = await fetch("/api/send-email", {
+      const signers = [
+        ...recipients.map((email) => ({
+          emailAddress: email,
+          name:
+            email === editCoupleInfo?.brideEmail
+              ? editCoupleInfo?.brideName || "Partner 1"
+              : email === editCoupleInfo?.groomEmail
+              ? editCoupleInfo?.groomName || "Partner 2"
+              : "Wedding Client",
+        })),
+        ...(officiantEmail
+          ? [
+              {
+                emailAddress: officiantEmail,
+                name: officiantName || officiantLabel || "Wedding Officiant",
+              },
+            ]
+          : []),
+      ]
+
+      const response = await fetch("/api/boldsign/send-contract", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          to: recipients,
-          subject: emailForm.subject.trim(),
-          message: messageWithLink,
-          fromName: officiantName,
-          coupleName: `${editCoupleInfo?.brideName || ""} & ${editCoupleInfo?.groomName || ""}`.trim(),
+          contractId: sendingContract.id,
+          contractName: sendingContract.name,
+          contractUrl,
           coupleId: editCoupleInfo?.id,
           officiantId: currentUser?.id,
-          emailTitle: "Wedding Contract",
-          actionUrl: contractUrl,
-          actionLabel: "View contract",
+          message: emailForm.body.trim(),
+          signers,
         }),
       })
 
       if (!response.ok) {
         const error = await response.json().catch(() => null)
-        throw new Error(error?.error || "Failed to send contract email.")
+        throw new Error(error?.error || "Failed to send contract with BoldSign.")
       }
+
+      const boldSignResult = await response.json().catch(() => null)
 
       const sentAt = new Date()
       const updateResult = await updateContractInDB(sendingContract.id, {
         status: "sent",
-        sent_date: sentAt.toISOString(),
       })
 
       if (!updateResult.ok) {
-        console.error("Contract email sent, but status update failed:", updateResult.error)
+        console.error("Contract sent to BoldSign, but status update failed:", updateResult.error)
       }
 
       setContracts(prev => prev.map(c =>
         c.id === sendingContract.id
-          ? { ...c, status: 'sent', sentDate: sentAt.toLocaleDateString(), sent_date: sentAt.toISOString() } as any
+          ? { ...c, status: 'sent', sentDate: sentAt.toLocaleDateString(), boldsignDocumentId: boldSignResult?.documentId } as any
           : c
       ))
 
@@ -3267,10 +3284,10 @@ ${shareScriptForm.body}`)
         body: ''
       })
 
-      console.log(`Contract "${sendingContract.name}" sent to: ${recipients.join(", ")}`)
+      console.log(`Contract "${sendingContract.name}" sent to BoldSign for: ${recipients.join(", ")}`)
     } catch (error) {
-      console.error("Failed to send contract email:", error)
-      alert(error instanceof Error ? error.message : "Failed to send contract email.")
+      console.error("Failed to send contract with BoldSign:", error)
+      alert(error instanceof Error ? error.message : "Failed to send contract with BoldSign.")
     } finally {
       setIsSendingContractEmail(false)
     }

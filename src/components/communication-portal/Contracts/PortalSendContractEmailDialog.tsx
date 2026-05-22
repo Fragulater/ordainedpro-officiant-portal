@@ -34,10 +34,10 @@ export function PortalSendContractEmailDialog() {
           <DialogHeader>
             <DialogTitle className="text-green-900 flex items-center">
               <Send className="w-5 h-5 mr-2" />
-              Send Contract via Email
+              Send Contract for Signature
             </DialogTitle>
             <DialogDescription>
-              {sendingContract ? `Send "${sendingContract.name}" to recipients` : 'Send contract to recipients'}
+              {sendingContract ? `Send "${sendingContract.name}" through BoldSign` : 'Send contract through BoldSign'}
             </DialogDescription>
           </DialogHeader>
 
@@ -47,7 +47,7 @@ export function PortalSendContractEmailDialog() {
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                 <h4 className="font-semibold text-green-900 mb-2 flex items-center">
                   <FileText className="w-4 h-4 mr-2" />
-                  Contract Attachment
+                  Contract for Signature
                 </h4>
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -171,7 +171,8 @@ export function PortalSendContractEmailDialog() {
                     : emailForm.to || emailForm.customEmail || 'No recipient selected'
                 }</p>
                 <p><span className="font-medium">Subject:</span> {emailForm.subject || 'No subject'}</p>
-                <p><span className="font-medium">Document link:</span> {sendingContract?.name || 'No contract'}</p>
+                <p><span className="font-medium">Signature provider:</span> BoldSign</p>
+                <p><span className="font-medium">Document:</span> {sendingContract?.name || 'No contract'}</p>
               </div>
             </div>
           </div>
@@ -197,7 +198,7 @@ export function PortalSendContractEmailDialog() {
               }
             >
               <Send className="w-4 h-4 mr-2" />
-              {isSendingContractEmail ? "Sending..." : "Send Contract"}
+              {isSendingContractEmail ? "Sending..." : "Send for Signature"}
             </Button>
           </div>
         </DialogContent>
