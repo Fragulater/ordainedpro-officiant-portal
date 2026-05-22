@@ -32,39 +32,6 @@ function sanitizeSigners(signers: Signer[]) {
     })
 }
 
-function getDefaultSignatureFields(index: number) {
-  const y = 640 + index * 48
-
-  return [
-    {
-      id: `signature_${index + 1}`,
-      name: `signature_${index + 1}`,
-      fieldType: "Signature",
-      pageNumber: 1,
-      bounds: {
-        x: 60,
-        y,
-        width: 180,
-        height: 36,
-      },
-      isRequired: true,
-    },
-    {
-      id: `signed_date_${index + 1}`,
-      name: `signed_date_${index + 1}`,
-      fieldType: "DateSigned",
-      pageNumber: 1,
-      bounds: {
-        x: 265,
-        y,
-        width: 120,
-        height: 24,
-      },
-      isRequired: true,
-    },
-  ]
-}
-
 export async function POST(request: NextRequest) {
   const boldSignApiKey = process.env.BOLDSIGN_API_KEY
 
@@ -115,7 +82,6 @@ export async function POST(request: NextRequest) {
       name: signer.name,
       emailAddress: signer.emailAddress,
       signerType: "Signer",
-      formFields: getDefaultSignatureFields(index),
       locale: "EN",
       signerOrder: index + 1,
     })),
