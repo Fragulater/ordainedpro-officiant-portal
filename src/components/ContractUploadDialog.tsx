@@ -209,7 +209,7 @@ export function ContractUploadDialog({
                   Contract Document
                 </h4>
                 <p className="text-sm text-blue-800">
-                  Upload your own file, or start with the OrdainedPro template and edit the fields for each couple.
+                  Upload your own file, or start with the OrdainedPro template and edit the placeholder fields for each couple.
                 </p>
               </div>
               <Button
@@ -241,7 +241,7 @@ export function ContractUploadDialog({
               onFileRemoved={handleFileRemoved}
               maxFiles={1}
               maxFileSize={10}
-              acceptedFileTypes={[".pdf", ".doc", ".docx", ".txt"]}
+              acceptedFileTypes={[".docx", ".pdf", ".odt", ".txt"]}
               existingFiles={uploadedFiles}
             />
 
@@ -256,7 +256,7 @@ export function ContractUploadDialog({
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
             <h4 className="font-semibold text-amber-900 mb-2">Reusable Template Fields</h4>
             <p className="text-sm text-amber-800 mb-3">
-              The starter template keeps the service language but leaves these items fluid for each officiant and couple.
+              Auto-fill uses these exact placeholders. Uploaded contracts need matching placeholders for the portal to safely place couple, wedding, fee, deposit, and travel details.
             </p>
             <div className="flex flex-wrap gap-2">
               {DEFAULT_CONTRACT_TEMPLATE_FIELDS.map((field) => (

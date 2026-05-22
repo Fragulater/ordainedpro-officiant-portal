@@ -110,6 +110,39 @@ const getContractFileUrl = (contract: any) => contract?.fileUrl || contract?.fil
 
 const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`
 
+const formatContractMoney = (amount: number | string | null | undefined) => {
+  const numericAmount = typeof amount === "string" ? Number.parseFloat(amount) : Number(amount || 0)
+  return Number.isFinite(numericAmount) && numericAmount > 0 ? formatCurrency(numericAmount) : ""
+}
+
+const formatContractDate = (value: string | null | undefined) => {
+  if (!value) return ""
+  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+}
+
+const formatContractTime = (value: string | null | undefined) => {
+  if (!value) return ""
+  const [hours, minutes] = value.split(":")
+  const date = new Date()
+  date.setHours(Number(hours || 0), Number(minutes || 0), 0, 0)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+}
+
+const isTextContract = (contract: any) => {
+  const fileName = (contract?.file?.name || contract?.name || "").toLowerCase()
+  const fileType = (contract?.file?.type || contract?.fileType || contract?.file_type || "").toLowerCase()
+  return fileType.startsWith("text/") || fileName.endsWith(".txt")
+}
+
+const replaceContractPlaceholders = (template: string, values: Record<string, string>) => (
+  template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key) => values[key] || "")
+)
+
 const getInvoiceItemAmount = (item: { quantity: number; rate: number }) => item.quantity * item.rate
 
 const calculateInvoiceValues = (form: any) => {
@@ -3025,6 +3058,136 @@ ${shareScriptForm.body}`)
     return customEmail && customEmail !== "custom" ? [customEmail] : []
   }
 
+  const buildContractMergeValues = () => {
+    const brideName = editCoupleInfo?.brideName || ""
+    const groomName = editCoupleInfo?.groomName || ""
+    const coupleNames = [brideName, groomName].filter(Boolean).join(" & ")
+    const coupleEmail = [editCoupleInfo?.brideEmail, editCoupleInfo?.groomEmail]
+      .filter(Boolean)
+      .filter((email, index, all) => all.indexOf(email) === index)
+      .join(", ")
+    const mailingAddress = [editCoupleInfo?.brideAddress, editCoupleInfo?.groomAddress]
+      .filter(Boolean)
+      .filter((address, index, all) => all.indexOf(address) === index)
+      .join(" / ")
+    const totalAmount = paymentInfo.totalAmount || invoiceForm.total || 0
+    const depositAmount = paymentInfo.depositPaid || invoiceForm.depositPaid || 0
+    const balanceDue = paymentInfo.balance || invoiceForm.balanceDue || 0
+    const balanceDueDate = paymentInfo.finalPaymentDue || invoiceForm.dueDate || ""
+    const venueAddress = editWeddingDetails.venueAddress || editCoupleInfo?.address || ""
+
+    return {
+      agreement_date: formatContractDate(new Date().toISOString()),
+      officiant_business_name: officiantProfile?.business_name || officiantProfile?.company_name || officiantLabel,
+      officiant_name: officiantProfile?.full_name || officiantProfile?.name || officiantName,
+      couple_names: coupleNames,
+      partner_1_name: brideName,
+      partner_2_name: groomName,
+      wedding_date: formatContractDate(editWeddingDetails.weddingDate),
+      wedding_time: formatContractTime(editWeddingDetails.startTime),
+      venue_name: editWeddingDetails.venueName || "",
+      venue_address: venueAddress,
+      total_fee: formatContractMoney(totalAmount),
+      deposit_amount: formatContractMoney(depositAmount),
+      balance_due: formatContractMoney(balanceDue),
+      balance_due_date: formatContractDate(balanceDueDate),
+      payment_methods: invoiceForm.paymentMethods || "",
+      payment_deadlines: balanceDueDate
+        ? `Final balance is due by ${formatContractDate(balanceDueDate)}.`
+        : "",
+      cancellation_refund_terms: invoiceForm.terms || "",
+      late_fee_terms: "",
+      included_travel_radius: officiantProfile?.travel_radius_miles
+        ? `${officiantProfile.travel_radius_miles} miles`
+        : "",
+      travel_mileage_fees: "",
+      travel_origin_or_service_area: [officiantProfile?.city, officiantProfile?.state].filter(Boolean).join(", "),
+      additional_travel_terms: "",
+      special_requests_deadline: "three weeks prior to the ceremony date",
+      officiant_arrival_window: "20 minutes",
+      photo_video_permission_terms: "",
+      partner_1_signature_date: "",
+      partner_1_signature: "",
+      partner_2_signature_date: "",
+      partner_2_signature: "",
+      couple_email: coupleEmail,
+      couple_mailing_address: mailingAddress,
+      officiant_signature_date: "",
+      officiant_signature: "",
+    }
+  }
+
+  const createPersonalizedContractUrl = async (contract: any) => {
+    const originalUrl = getContractFileUrl(contract)
+    if (!originalUrl || !currentUser?.id || !editCoupleInfo?.id || !isTextContract(contract)) {
+      return originalUrl
+    }
+
+    const response = await fetch(originalUrl)
+    if (!response.ok) {
+      throw new Error("Unable to load the contract template before sending.")
+    }
+
+    const templateText = await response.text()
+    const personalizedText = replaceContractPlaceholders(templateText, buildContractMergeValues())
+    const textBlob = new Blob([personalizedText], { type: "text/plain;charset=utf-8" })
+    const safeName = (contract.name || "contract")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || "contract"
+    const filePath = `${currentUser.id}/${editCoupleInfo.id}/${safeName}-personalized-${Date.now()}.txt`
+
+    const { error: uploadError } = await supabase.storage
+      .from("contracts")
+      .upload(filePath, textBlob, {
+        contentType: "text/plain;charset=utf-8",
+        upsert: true,
+      })
+
+    if (uploadError) {
+      throw uploadError
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("contracts")
+      .getPublicUrl(filePath)
+
+    const personalizedUrl = publicUrlData.publicUrl
+    const updateResult = await updateContractInDB(contract.id, {
+      file_url: personalizedUrl,
+      file_type: "text/plain",
+      file_size: textBlob.size,
+    } as any)
+
+    if (!updateResult.ok) {
+      throw new Error(updateResult.error || "Personalized contract was created, but the contract record was not updated.")
+    }
+
+    setContracts(prev => prev.map(c =>
+      c.id === contract.id
+        ? {
+            ...c,
+            fileUrl: personalizedUrl,
+            file_url: personalizedUrl,
+            fileType: "text/plain",
+            file_type: "text/plain",
+            fileSize: textBlob.size,
+            file_size: textBlob.size,
+            file: c.file
+              ? {
+                  ...c.file,
+                  url: personalizedUrl,
+                  type: "text/plain",
+                  size: textBlob.size,
+                }
+              : c.file,
+          } as any
+        : c
+    ))
+
+    return personalizedUrl
+  }
+
   const handleSendContractRealEmail = async () => {
     if (!sendingContract || isSendingContractEmail) return
 
@@ -3044,8 +3207,8 @@ ${shareScriptForm.body}`)
       return
     }
 
-    const contractUrl = getContractFileUrl(sendingContract)
-    if (!contractUrl) {
+    const originalContractUrl = getContractFileUrl(sendingContract)
+    if (!originalContractUrl) {
       alert("This contract does not have a document link yet.")
       return
     }
@@ -3053,6 +3216,7 @@ ${shareScriptForm.body}`)
     setIsSendingContractEmail(true)
 
     try {
+      const contractUrl = await createPersonalizedContractUrl(sendingContract)
       const messageWithLink = `${emailForm.body.trim()}\n\nView/download contract:\n${contractUrl}`
       const response = await fetch("/api/send-email", {
         method: "POST",
@@ -3067,6 +3231,9 @@ ${shareScriptForm.body}`)
           coupleName: `${editCoupleInfo?.brideName || ""} & ${editCoupleInfo?.groomName || ""}`.trim(),
           coupleId: editCoupleInfo?.id,
           officiantId: currentUser?.id,
+          emailTitle: "Wedding Contract",
+          actionUrl: contractUrl,
+          actionLabel: "View contract",
         }),
       })
 
