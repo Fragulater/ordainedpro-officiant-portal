@@ -44,6 +44,10 @@ import { PortalHeader } from "./communication-portal/CeremoniesCouples/PortalHea
 import { PortalOverview } from "./communication-portal/CeremoniesCouples/PortalOverview"
 import { PortalTabs } from "./communication-portal/PortalTabs"
 import { PortalDialogs } from "./communication-portal/PortalDialogs"
+import {
+  DEFAULT_CONTRACT_ACKNOWLEDGMENT_SLUG,
+  DEFAULT_CONTRACT_TEMPLATE_VERSION,
+} from "@/lib/contract-legal-acknowledgment"
 
 // Safe helper to get first name from a full name (null-safe)
 const getFirstName = (fullName: string | null | undefined): string => {
@@ -526,6 +530,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const officiantEmail = officiantProfile?.email || currentUser?.email || ""
   const officiantPhone = officiantProfile?.phone || ""
   const [contractPrefillDefaults, setContractPrefillDefaults] = useState(DEFAULT_CONTRACT_PREFILL_DEFAULTS)
+  const [hasAcceptedDefaultContractLegal, setHasAcceptedDefaultContractLegal] = useState(false)
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [newMessage, setNewMessage] = useState("")
@@ -587,6 +592,62 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id) return
     localStorage.setItem(`ordainedpro_contract_defaults_${currentUser.id}`, JSON.stringify(contractPrefillDefaults))
   }, [contractPrefillDefaults, currentUser?.id])
+
+  useEffect(() => {
+    const loadDefaultContractAcceptance = async () => {
+      if (!currentUser?.id) {
+        setHasAcceptedDefaultContractLegal(false)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from("legal_acceptances")
+        .select("id")
+        .eq("user_id", currentUser.id)
+        .eq("document_slug", DEFAULT_CONTRACT_ACKNOWLEDGMENT_SLUG)
+        .eq("document_version", DEFAULT_CONTRACT_TEMPLATE_VERSION)
+        .limit(1)
+
+      if (error) {
+        console.warn("Default contract legal acknowledgment tracking is not ready yet:", error.message)
+        return
+      }
+
+      setHasAcceptedDefaultContractLegal(Boolean(data?.length))
+    }
+
+    loadDefaultContractAcceptance()
+  }, [currentUser?.id])
+
+  const acceptDefaultContractLegalAcknowledgment = useCallback(async () => {
+    if (!currentUser?.id) {
+      return { ok: false, error: "Please sign in before using the default contract." }
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = sessionData.session?.access_token
+
+    if (!accessToken) {
+      return { ok: false, error: "Your session expired. Please sign in again before using the default contract." }
+    }
+
+    const response = await fetch("/api/legal/contract-template-acknowledgment", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null)
+      const message = error?.error || "Unable to save the legal acknowledgment."
+      console.error("Failed to save default contract legal acknowledgment:", message)
+      return { ok: false, error: message }
+    }
+
+    setHasAcceptedDefaultContractLegal(true)
+    return { ok: true }
+  }, [currentUser?.id])
 
   const [paymentReminderForm, setPaymentReminderForm] = useState({
     to: '',
@@ -5775,6 +5836,8 @@ ${invoiceContent}`)
     setEmailForm,
     contractPrefillDefaults,
     setContractPrefillDefaults,
+    hasAcceptedDefaultContractLegal,
+    acceptDefaultContractLegalAcknowledgment,
     paymentReminderForm,
     setPaymentReminderForm,
     invoiceForm,

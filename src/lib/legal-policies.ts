@@ -1,3 +1,10 @@
+import {
+  DEFAULT_CONTRACT_ACKNOWLEDGMENT_SLUG,
+  DEFAULT_CONTRACT_ACKNOWLEDGMENT_TEXT,
+  DEFAULT_CONTRACT_ACKNOWLEDGMENT_TITLE,
+  DEFAULT_CONTRACT_TEMPLATE_VERSION,
+} from "@/lib/contract-legal-acknowledgment"
+
 export type LegalPolicy = {
   slug: string
   title: string
@@ -17,7 +24,7 @@ export const LEGAL_POLICIES: LegalPolicy[] = [
     version: LEGAL_VERSION,
     effectiveDate: LEGAL_EFFECTIVE_DATE,
     requiresAcceptance: true,
-    body: "OrdainedPro provides wedding officiant CRM tools, document storage, script creation tools, subscriptions, and a script marketplace. Users must be at least 18, provide accurate account information, follow platform rules, and verify all ceremony and marriage-law requirements for their jurisdiction. OrdainedPro does not provide legal advice. Subscriptions may renew until canceled. Seller marketplace access may require an active Aspirant or Professional subscription. If a subscription ends, marketplace listings may be removed and CRM data may be archived or scheduled for deletion according to the data retention policy.",
+    body: "OrdainedPro provides wedding officiant CRM tools, document storage, script creation tools, subscriptions, and a script marketplace. Users must be at least 18, provide accurate account information, follow platform rules, and verify all ceremony and marriage-law requirements for their jurisdiction. OrdainedPro does not provide legal advice. Contract templates and document tools are provided as general starting points only and should be reviewed by a qualified attorney before use. Subscriptions may renew until canceled. Seller marketplace access may require an active Aspirant or Professional subscription. If a subscription ends, marketplace listings may be removed and CRM data may be archived or scheduled for deletion according to the data retention policy.",
   },
   {
     slug: "privacy-policy",
@@ -66,6 +73,14 @@ export const LEGAL_POLICIES: LegalPolicy[] = [
     effectiveDate: LEGAL_EFFECTIVE_DATE,
     requiresAcceptance: true,
     body: "An active subscription is required for full CRM access, public profile features, and marketplace selling. If a subscription ends, active marketplace listings may be removed, hidden, unpublished, or made unavailable for new purchases. CRM data may become inactive and may be scheduled for permanent deletion unless the user chooses an Archive Plan. OrdainedPro should use a grace period before permanent deletion where operationally possible, while preserving records required for business, tax, legal, fraud, chargeback, and backup purposes.",
+  },
+  {
+    slug: DEFAULT_CONTRACT_ACKNOWLEDGMENT_SLUG,
+    title: DEFAULT_CONTRACT_ACKNOWLEDGMENT_TITLE,
+    version: DEFAULT_CONTRACT_TEMPLATE_VERSION,
+    effectiveDate: LEGAL_EFFECTIVE_DATE,
+    requiresAcceptance: true,
+    body: DEFAULT_CONTRACT_ACKNOWLEDGMENT_TEXT,
   },
 ]
 
