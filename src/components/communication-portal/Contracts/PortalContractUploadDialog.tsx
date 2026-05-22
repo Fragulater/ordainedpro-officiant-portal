@@ -8,6 +8,9 @@ export function PortalContractUploadDialog() {
     showContractUploadDialog,
     setShowContractUploadDialog,
     handleContractUploaded,
+    addDefaultContractForCurrentCouple,
+    contractPrefillDefaults,
+    setContractPrefillDefaults,
   } = useCommunicationPortal()
 
   return (
@@ -17,6 +20,9 @@ export function PortalContractUploadDialog() {
         isOpen={showContractUploadDialog}
         onOpenChange={setShowContractUploadDialog}
         onContractUploaded={handleContractUploaded}
+        onUseDefaultContract={addDefaultContractForCurrentCouple}
+        contractPrefillDefaults={contractPrefillDefaults}
+        setContractPrefillDefaults={setContractPrefillDefaults}
       />
     </>
   )

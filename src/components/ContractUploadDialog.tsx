@@ -69,12 +69,18 @@ interface ContractUploadDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   onContractUploaded: (contract: Omit<Contract, "id" | "createdDate">) => void
+  onUseDefaultContract?: () => Promise<{ ok: boolean; error?: string; alreadyExists?: boolean } | void>
+  contractPrefillDefaults?: Record<string, string>
+  setContractPrefillDefaults?: (defaults: Record<string, string>) => void
 }
 
 export function ContractUploadDialog({
   isOpen,
   onOpenChange,
-  onContractUploaded
+  onContractUploaded,
+  onUseDefaultContract,
+  contractPrefillDefaults = {},
+  setContractPrefillDefaults,
 }: ContractUploadDialogProps) {
   const [formData, setFormData] = useState({
     name: "",
@@ -89,6 +95,14 @@ export function ContractUploadDialog({
   const [miscTextLabel, setMiscTextLabel] = useState("Additional notes")
   const [miscTextSigner, setMiscTextSigner] = useState("3")
   const [contractMode, setContractMode] = useState<"default" | "custom">("default")
+  const [isAddingDefaultContract, setIsAddingDefaultContract] = useState(false)
+
+  const updateContractDefault = (field: string, value: string) => {
+    setContractPrefillDefaults?.({
+      ...contractPrefillDefaults,
+      [field]: value,
+    })
+  }
 
   const contractTypes = [
     "Wedding Service Agreement",
@@ -116,6 +130,7 @@ export function ContractUploadDialog({
     setMiscTextLabel("Additional notes")
     setMiscTextSigner("3")
     setContractMode("default")
+    setIsAddingDefaultContract(false)
   }
 
   const validateForm = () => {
@@ -182,8 +197,17 @@ export function ContractUploadDialog({
     setUploadedFiles((prev) => prev.filter((file) => file.id !== fileId))
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (contractMode === "default") {
+      setIsAddingDefaultContract(true)
+      const result = await onUseDefaultContract?.()
+      setIsAddingDefaultContract(false)
+
+      if (result && !result.ok) {
+        setErrors((prev) => ({ ...prev, defaultContract: result.error || "Unable to add the default contract." }))
+        return
+      }
+
       resetForm()
       onOpenChange(false)
       return
@@ -274,6 +298,63 @@ export function ContractUploadDialog({
               <p className="text-sm text-blue-800">
                 The default contract is automatically added to this couple's contract list. Download it from the contract card if you want to edit it in Word and upload your personalized version later.
               </p>
+              {errors.defaultContract && (
+                <p className="mt-2 text-sm text-red-600 flex items-center">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  {errors.defaultContract}
+                </p>
+              )}
+            </div>
+          )}
+
+          {contractMode === "default" && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <h4 className="font-semibold text-blue-900 mb-1">Default Contract Prefill Values</h4>
+              <p className="text-sm text-blue-800 mb-4">
+                These values will be prefilled into matching contract fields before the contract is sent. Most officiants can set these once and leave them alone.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Ceremony fee</Label>
+                  <Input value={contractPrefillDefaults.ceremonyFee || ""} onChange={(event) => updateContractDefault("ceremonyFee", event.target.value)} placeholder="e.g., 500" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Deposit amount</Label>
+                  <Input value={contractPrefillDefaults.depositAmount || ""} onChange={(event) => updateContractDefault("depositAmount", event.target.value)} placeholder="e.g., 150" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Included miles</Label>
+                  <Input value={contractPrefillDefaults.includedMiles || ""} onChange={(event) => updateContractDefault("includedMiles", event.target.value)} placeholder="e.g., 30" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Mileage rate</Label>
+                  <Input value={contractPrefillDefaults.mileageRate || ""} onChange={(event) => updateContractDefault("mileageRate", event.target.value)} placeholder="e.g., 1.00" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Arrival minutes</Label>
+                  <Input value={contractPrefillDefaults.arrivalMinutes || ""} onChange={(event) => updateContractDefault("arrivalMinutes", event.target.value)} placeholder="e.g., 20" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Rehearsal arrival minutes</Label>
+                  <Input value={contractPrefillDefaults.rehearsalArrivalMinutes || ""} onChange={(event) => updateContractDefault("rehearsalArrivalMinutes", event.target.value)} placeholder="e.g., 20" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Late grace minutes</Label>
+                  <Input value={contractPrefillDefaults.lateGraceMinutes || ""} onChange={(event) => updateContractDefault("lateGraceMinutes", event.target.value)} placeholder="e.g., 30" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Late fee per half hour</Label>
+                  <Input value={contractPrefillDefaults.lateFeeHalfHour || ""} onChange={(event) => updateContractDefault("lateFeeHalfHour", event.target.value)} placeholder="e.g., 50" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Full day reservation fee</Label>
+                  <Input value={contractPrefillDefaults.fullDayFee || ""} onChange={(event) => updateContractDefault("fullDayFee", event.target.value)} placeholder="e.g., 1000" className="mt-1 bg-white border-blue-200" />
+                </div>
+                <div>
+                  <Label className="text-xs font-medium text-blue-900">Travel origin / officiant address</Label>
+                  <Input value={contractPrefillDefaults.officiantAddress || ""} onChange={(event) => updateContractDefault("officiantAddress", event.target.value)} placeholder="City, State or business address" className="mt-1 bg-white border-blue-200" />
+                </div>
+              </div>
             </div>
           )}
 
@@ -539,10 +620,15 @@ export function ContractUploadDialog({
           <Button
             onClick={handleSave}
             className="bg-blue-500 hover:bg-blue-600"
-            disabled={contractMode === "custom" && (!formData.name || !formData.type || uploadedFiles.length === 0)}
+            disabled={
+              isAddingDefaultContract ||
+              (contractMode === "custom" && (!formData.name || !formData.type || uploadedFiles.length === 0))
+            }
           >
             <Save className="w-4 h-4 mr-2" />
-            {contractMode === "default" ? "Done" : "Upload Contract"}
+            {contractMode === "default"
+              ? isAddingDefaultContract ? "Adding..." : "Use Default Contract"
+              : "Upload Contract"}
           </Button>
         </div>
       </DialogContent>

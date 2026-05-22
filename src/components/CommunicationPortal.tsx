@@ -1139,30 +1139,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       }
 
       // Transform database format to component format
-      const transformedContracts = contractRecords.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        description: c.description || "",
-        status: c.status || "draft",
-        signedDate: c.signed_date ? new Date(c.signed_date).toLocaleDateString() : "",
-        sentDate: c.sent_date ? new Date(c.sent_date).toLocaleDateString() : "",
-        createdDate: c.created_at ? new Date(c.created_at).toLocaleDateString() : "",
-        expiryDate: c.expiry_date || "",
-        type: c.type || "Custom Contract",
-        fileUrl: c.file_url,
-        fileType: c.file_type || "application/octet-stream",
-        fileSize: c.file_size || 0,
-        file: c.file_url ? {
-          id: `contract-file-${c.id}`,
-          file: new File([], c.name, { type: c.file_type || "application/octet-stream" }),
-          name: c.name,
-          size: c.file_size || 0,
-          type: c.file_type || "application/octet-stream",
-          url: c.file_url,
-          uploadProgress: 100,
-          status: "completed" as const,
-        } : undefined
-      }))
+      const transformedContracts = contractRecords.map(transformContractRecord)
       setContracts(transformedContracts)
       console.log("âœ… Loaded", transformedContracts.length, "contracts for couple", editCoupleInfo.id)
     } else {
@@ -1465,6 +1442,64 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   // Contracts are now loaded per couple from the database
   const [contracts, setContracts] = useState<any[]>([])
   const [isLoadingContracts, setIsLoadingContracts] = useState(false)
+
+  const transformContractRecord = (c: any) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description || "",
+    status: c.status || "draft",
+    signedDate: c.signed_date ? new Date(c.signed_date).toLocaleDateString() : "",
+    sentDate: c.sent_date ? new Date(c.sent_date).toLocaleDateString() : "",
+    createdDate: c.created_at ? new Date(c.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+    expiryDate: c.expiry_date || "",
+    type: c.type || "Custom Contract",
+    fileUrl: c.file_url,
+    fileType: c.file_type || "application/octet-stream",
+    fileSize: c.file_size || 0,
+    file: c.file_url ? {
+      id: `contract-file-${c.id}`,
+      file: new File([], c.name, { type: c.file_type || "application/octet-stream" }),
+      name: c.name,
+      size: c.file_size || 0,
+      type: c.file_type || "application/octet-stream",
+      url: c.file_url,
+      uploadProgress: 100,
+      status: "completed" as const,
+    } : undefined
+  })
+
+  const addDefaultContractForCurrentCouple = useCallback(async () => {
+    if (!currentUser?.id || !editCoupleInfo?.id) {
+      return { ok: false, error: "No user or couple selected." }
+    }
+
+    const existingDefault = contracts.find((contract) =>
+      contract.name === DEFAULT_CONTRACT_NAME ||
+      getContractFileUrl(contract).includes(DEFAULT_CONTRACT_ASSET_PATH)
+    )
+
+    if (existingDefault) {
+      return { ok: true, data: existingDefault, alreadyExists: true }
+    }
+
+    const defaultContract = await addContractToDB(currentUser.id, editCoupleInfo.id, {
+      name: DEFAULT_CONTRACT_NAME,
+      description: "Preformatted OrdainedPro default wedding contract with BoldSign tags. Download to personalize or send as-is.",
+      type: "Wedding Service Agreement",
+      fileUrl: getDefaultContractUrl(),
+      fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      fileSize: 13568,
+      status: "draft",
+    })
+
+    if (defaultContract.ok && defaultContract.data) {
+      const transformedContract = transformContractRecord(defaultContract.data)
+      setContracts((prev) => [transformedContract, ...prev])
+      return { ok: true, data: transformedContract, alreadyExists: false }
+    }
+
+    return { ok: false, error: defaultContract.error || "Failed to add the default contract." }
+  }, [contracts, currentUser?.id, editCoupleInfo?.id])
 
   // AI Script Builder Functions
   const handleAiMessage = () => {
@@ -5863,6 +5898,7 @@ ${invoiceContent}`)
     handleSendScript,
     handleContractAction,
     handleSendContractEmail: handleSendContractRealEmail,
+    addDefaultContractForCurrentCouple,
     handleOpenPaymentReminderDialog,
     handleSendPaymentReminderEmail,
     handleContractUploaded,
