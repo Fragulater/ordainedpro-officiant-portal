@@ -3538,10 +3538,19 @@ ${shareScriptForm.body}`)
       }
 
       const boldSignResult = await response.json().catch(() => null)
+      const normalizedBoldSignStatus = String(boldSignResult?.boldSignStatus || "").toLowerCase()
+      const contractWasSent = ["sent", "waiting for me", "waiting for others", "completed", "signed"].some((status) =>
+        normalizedBoldSignStatus.includes(status)
+      )
+      console.log("BoldSign send result:", {
+        documentId: boldSignResult?.documentId,
+        status: boldSignResult?.boldSignStatus,
+        details: boldSignResult?.statusCheck,
+      })
 
       const sentAt = new Date()
       const updateResult = await updateContractInDB(sendingContract.id, {
-        status: "sent",
+        status: contractWasSent ? "sent" : "pending",
       })
 
       if (!updateResult.ok) {
@@ -3550,7 +3559,7 @@ ${shareScriptForm.body}`)
 
       setContracts(prev => prev.map(c =>
         c.id === sendingContract.id
-          ? { ...c, status: 'sent', sentDate: sentAt.toLocaleDateString(), boldsignDocumentId: boldSignResult?.documentId } as any
+          ? { ...c, status: contractWasSent ? 'sent' : 'pending', sentDate: sentAt.toLocaleDateString(), boldsignDocumentId: boldSignResult?.documentId } as any
           : c
       ))
 

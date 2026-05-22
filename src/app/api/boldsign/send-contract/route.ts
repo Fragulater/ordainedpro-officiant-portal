@@ -114,6 +114,48 @@ function extractBoldSignErrorMessages(details: any): string[] {
   return Array.from(messages).filter(Boolean)
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function getBoldSignDocumentProperties(documentId: string, apiKey: string) {
+  const response = await fetch(
+    `https://api.boldsign.com/v1/document/properties?documentId=${encodeURIComponent(documentId)}`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-API-KEY": apiKey,
+      },
+    }
+  )
+
+  const responseText = await response.text()
+  let data: any = null
+  try {
+    data = responseText ? JSON.parse(responseText) : null
+  } catch {
+    data = { raw: responseText }
+  }
+
+  return { ok: response.ok, status: response.status, data }
+}
+
+async function waitForBoldSignProcessing(documentId: string, apiKey: string) {
+  const checks = [2000, 4000, 6000]
+  let lastCheck: Awaited<ReturnType<typeof getBoldSignDocumentProperties>> | null = null
+
+  for (const delay of checks) {
+    await sleep(delay)
+    lastCheck = await getBoldSignDocumentProperties(documentId, apiKey)
+
+    const status = String(lastCheck.data?.status || "").toLowerCase()
+    if (lastCheck.ok && status && !["draft", "processing", "queued"].includes(status)) {
+      return lastCheck
+    }
+  }
+
+  return lastCheck
+}
+
 export async function POST(request: NextRequest) {
   const boldSignApiKey = process.env.BOLDSIGN_API_KEY
 
@@ -270,8 +312,33 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const statusCheck = await waitForBoldSignProcessing(documentId, boldSignApiKey)
+  const boldSignStatus = statusCheck?.data?.status || null
+  const statusMessages = extractBoldSignErrorMessages(statusCheck?.data)
+
+  console.log("BoldSign document processing check:", {
+    documentId,
+    boldSignStatus,
+    statusCheckOk: statusCheck?.ok,
+    statusCheckHttpStatus: statusCheck?.status,
+  })
+
+  if (boldSignStatus && String(boldSignStatus).toLowerCase().includes("failed")) {
+    return NextResponse.json(
+      {
+        error: statusMessages.join(" ") || "BoldSign accepted the document but failed during background processing.",
+        documentId,
+        boldSignStatus,
+        details: statusCheck?.data,
+      },
+      { status: 422 }
+    )
+  }
+
   return NextResponse.json({
     documentId,
+    boldSignStatus,
+    statusCheck: statusCheck?.data || null,
     raw: responseData,
   })
 }
