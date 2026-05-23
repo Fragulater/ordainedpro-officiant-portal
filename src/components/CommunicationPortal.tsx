@@ -113,8 +113,8 @@ const deriveContractStoragePath = (fileUrl: string | null | undefined) => {
 const getContractFileUrl = (contract: any) => contract?.fileUrl || contract?.file_url || contract?.file?.url || ""
 
 const DEFAULT_CONTRACT_NAME = "OrdainedPro Default Wedding Contract"
-const DEFAULT_CONTRACT_ASSET_PATH = "/contracts/ordainedpro-default-contract.pdf"
-const DEFAULT_CONTRACT_FILE_SIZE = 2555
+const DEFAULT_CONTRACT_ASSET_PATH = "/contracts/ordainedpro-default-contract.pdf?v=20260522-clean"
+const DEFAULT_CONTRACT_FILE_SIZE = 10830
 const PDF_CONTRACT_FILE_TYPE = "application/pdf"
 const DEFAULT_CONTRACT_PREFILL_DEFAULTS = {
   ceremonyFee: "",

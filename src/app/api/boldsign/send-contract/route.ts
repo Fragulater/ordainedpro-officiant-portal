@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic"
 type Signer = {
   name: string
   emailAddress: string
+  roleIndices?: number[]
 }
 
 type PrefillField = {
@@ -63,42 +64,48 @@ function isDefaultContractUrl(contractUrl: string) {
   }
 }
 
-function getDefaultContractFormFields(index: number) {
-  const rows = [
-    { signatureY: 365, dateY: 365 },
-    { signatureY: 397, dateY: 397 },
-    { signatureY: 429, dateY: 429 },
-  ]
-  const row = rows[index] || rows[rows.length - 1]
+const DEFAULT_CONTRACT_SIGNATURE_PAGE = 5
 
-  return [
-    {
-      id: `signature_${index + 1}`,
-      name: `Signature ${index + 1}`,
-      fieldType: "Signature",
-      pageNumber: 1,
-      bounds: {
-        x: 190,
-        y: row.signatureY,
-        width: 210,
-        height: 28,
-      },
-      isRequired: true,
-    },
-    {
-      id: `signed_date_${index + 1}`,
-      name: `Signed Date ${index + 1}`,
-      fieldType: "DateSigned",
-      pageNumber: 1,
-      bounds: {
-        x: 455,
-        y: row.dateY,
-        width: 95,
-        height: 24,
-      },
-      isRequired: true,
-    },
+function getDefaultContractFormFields(roleIndices: number[]) {
+  const rows = [
+    { signatureY: 168, dateY: 168 },
+    { signatureY: 268, dateY: 268 },
+    { signatureY: 368, dateY: 368 },
   ]
+
+  return roleIndices.flatMap((roleIndex) => {
+    const row = rows[roleIndex] || rows[rows.length - 1]
+    const roleNumber = roleIndex + 1
+
+    return [
+      {
+        id: `signature_${roleNumber}`,
+        name: `Signature ${roleNumber}`,
+        fieldType: "Signature",
+        pageNumber: DEFAULT_CONTRACT_SIGNATURE_PAGE,
+        bounds: {
+          x: 168,
+          y: row.signatureY,
+          width: 245,
+          height: 28,
+        },
+        isRequired: true,
+      },
+      {
+        id: `signed_date_${roleNumber}`,
+        name: `Signed Date ${roleNumber}`,
+        fieldType: "DateSigned",
+        pageNumber: DEFAULT_CONTRACT_SIGNATURE_PAGE,
+        bounds: {
+          x: 455,
+          y: row.dateY,
+          width: 95,
+          height: 24,
+        },
+        isRequired: true,
+      },
+    ]
+  })
 }
 
 function sanitizeSigners(signers: Signer[]) {
@@ -110,34 +117,25 @@ function sanitizeSigners(signers: Signer[]) {
     .filter((signer) => signer.name && signer.emailAddress)
 }
 
-function createEmailAlias(emailAddress: string, index: number) {
-  const [localPart, domainPart] = emailAddress.split("@")
-  if (!localPart || !domainPart) return emailAddress
+function mergeSignerRolesByEmail(signers: Signer[]) {
+  const merged = new Map<string, Signer & { roleIndices: number[] }>()
 
-  const baseLocalPart = localPart.split("+")[0]
-  return `${baseLocalPart}+op${index}@${domainPart}`
-}
+  signers.forEach((signer, index) => {
+    const key = signer.emailAddress.toLowerCase()
+    const existing = merged.get(key)
 
-function makeSignerEmailsUnique(signers: Signer[]) {
-  const usedEmails = new Set<string>()
-  const sourceCounts = new Map<string, number>()
-
-  return signers.map((signer) => {
-    const originalEmail = signer.emailAddress
-    const originalKey = originalEmail.toLowerCase()
-    const count = (sourceCounts.get(originalKey) || 0) + 1
-    sourceCounts.set(originalKey, count)
-
-    let candidateEmail = originalEmail
-    let aliasIndex = count
-    while (usedEmails.has(candidateEmail.toLowerCase())) {
-      candidateEmail = createEmailAlias(originalEmail, aliasIndex)
-      aliasIndex += 1
+    if (existing) {
+      existing.roleIndices.push(index)
+      return
     }
 
-    usedEmails.add(candidateEmail.toLowerCase())
-    return { ...signer, emailAddress: candidateEmail }
+    merged.set(key, {
+      ...signer,
+      roleIndices: [index],
+    })
   })
+
+  return Array.from(merged.values())
 }
 
 function sanitizePrefillFields(prefillFields: unknown): PrefillField[] {
@@ -212,7 +210,7 @@ export async function POST(request: NextRequest) {
   const coupleId = String(body.coupleId || "")
   const officiantId = String(body.officiantId || "")
   const message = String(body.message || "")
-  const signers = makeSignerEmailsUnique(sanitizeSigners(Array.isArray(body.signers) ? body.signers : []))
+  const signers = mergeSignerRolesByEmail(sanitizeSigners(Array.isArray(body.signers) ? body.signers : []))
   const prefillFields = sanitizePrefillFields(body.prefillFields)
   const fileExtension = getFileExtension(contractUrl || contractName)
   const shouldUseManualFields = isDefaultContractUrl(contractUrl)
@@ -255,7 +253,7 @@ export async function POST(request: NextRequest) {
       signerType: "Signer",
       locale: "EN",
       signerOrder: index + 1,
-      ...(shouldUseManualFields ? { formFields: getDefaultContractFormFields(index) } : {}),
+      ...(shouldUseManualFields ? { formFields: getDefaultContractFormFields(signer.roleIndices || [index]) } : {}),
     })),
     EnableSigningOrder: false,
     AutoDetectFields: !shouldUseManualFields,
