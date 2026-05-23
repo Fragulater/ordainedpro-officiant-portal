@@ -30,6 +30,12 @@ export function PortalSendContractEmailDialog() {
     })
   }
 
+  const contractFileUrl = sendingContract?.fileUrl || sendingContract?.file_url || sendingContract?.file?.url || ""
+  const isDefaultContract = Boolean(
+    sendingContract?.name === "OrdainedPro Default Wedding Contract" ||
+    contractFileUrl.includes("/contracts/ordainedpro-default-contract")
+  )
+
   // Don't render if editCoupleInfo is not available
   if (!editCoupleInfo?.brideName) {
     return null
@@ -73,7 +79,7 @@ export function PortalSendContractEmailDialog() {
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
               <h4 className="font-semibold text-blue-900 mb-1">Contract Defaults</h4>
               <p className="text-sm text-blue-800 mb-4">
-                These values are prefilled into matching contract tags before the contract is sent. They stay saved for this officiant on this device.
+                For the OrdainedPro default contract, these values are written into the PDF before sending. For uploaded PDFs, OrdainedPro will prefill matching BoldSign text/date tags when those tag IDs exist in the file.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
@@ -118,6 +124,15 @@ export function PortalSendContractEmailDialog() {
                 </div>
               </div>
             </div>
+
+            {sendingContract && !isDefaultContract && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-semibold">Custom PDF tag mode</p>
+                <p className="mt-1">
+                  This contract will use the BoldSign tags already placed inside the uploaded PDF. OrdainedPro will not reformat custom PDFs, so signer fields appear exactly where the tags were placed.
+                </p>
+              </div>
+            )}
 
             {/* Email Form */}
             <div className="space-y-4">

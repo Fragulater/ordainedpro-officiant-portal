@@ -29,17 +29,29 @@ import {
 } from "@/lib/contract-legal-acknowledgment"
 
 const BOLDSIGN_CONTRACT_TAGS = [
-  { label: "Partner 1 name", tag: "{{text|1|*|Partner 1 full name|partner_1_name}}" },
-  { label: "Partner 2 name", tag: "{{text|2|*|Partner 2 full name|partner_2_name}}" },
-  { label: "Wedding date", tag: "{{editdate|3|*|MM/dd/yyyy|wedding_date}}" },
+  { label: "Agreement date", tag: "{{editdate|3|*|Agreement date|agreement_date}}" },
+  { label: "Officiant business", tag: "{{text|3|*|Officiant business|officiant_business_name}}" },
+  { label: "Partner 1 name", tag: "{{text|1|*|Partner 1 name|partner_1_name}}" },
+  { label: "Partner 2 name", tag: "{{text|2|*|Partner 2 name|partner_2_name}}" },
+  { label: "Wedding date", tag: "{{editdate|3|*|Wedding date|wedding_date}}" },
   { label: "Wedding time", tag: "{{text|3|*|Wedding time|wedding_time}}" },
   { label: "Venue name", tag: "{{text|3|*|Venue name|venue_name}}" },
   { label: "Venue address", tag: "{{text|3|*|Venue address|venue_address}}" },
   { label: "Total fee", tag: "{{text|3|*|Total fee|total_fee}}" },
   { label: "Deposit amount", tag: "{{text|3|*|Deposit amount|deposit_amount}}" },
+  { label: "Balance due", tag: "{{text|3|*|Balance due|balance_due}}" },
+  { label: "Travel origin", tag: "{{text|3|*|Travel origin|travel_origin_or_service_area}}" },
+  { label: "Partner 1 phone", tag: "{{text|1|*|Partner 1 phone|bride_phone}}" },
+  { label: "Partner 2 phone", tag: "{{text|2|*|Partner 2 phone|groom_phone}}" },
+  { label: "Partner 1 email", tag: "{{text|1|*|Partner 1 email|bride_email}}" },
+  { label: "Partner 2 email", tag: "{{text|2|*|Partner 2 email|groom_email}}" },
+  { label: "Mailing address", tag: "{{text|1|*|Mailing address|mailing_addr}}" },
   { label: "Partner 1 signature", tag: "{{sign|1|*|Partner 1 signature|partner_1_signature}}" },
+  { label: "Partner 1 signed date", tag: "{{date|1|*|Partner 1 signed date|partner_1_signature_date}}" },
   { label: "Partner 2 signature", tag: "{{sign|2|*|Partner 2 signature|partner_2_signature}}" },
+  { label: "Partner 2 signed date", tag: "{{date|2|*|Partner 2 signed date|partner_2_signature_date}}" },
   { label: "Officiant signature", tag: "{{sign|3|*|Officiant signature|officiant_signature}}" },
+  { label: "Officiant signed date", tag: "{{date|3|*|Officiant signed date|officiant_signature_date}}" },
 ]
 
 const BOLDSIGN_SIGNER_OPTIONS = [
@@ -487,7 +499,7 @@ export function ContractUploadDialog({
               <div>
                 <h4 className="font-semibold text-amber-900 mb-1">Contract Setup Helper</h4>
                 <p className="text-sm text-amber-800">
-                  Copy these tags into the contract where each field should appear, then export the finished file as a PDF before uploading. Partner 1, Partner 2, and Officiant match the signer order used when sending through BoldSign.
+                  Copy these tags into the contract where each field should appear, then export the finished file as a PDF before uploading. OrdainedPro will ask BoldSign to read the tags and prefill matching text/date fields from the couple profile, wedding details, and default contract values when possible.
                 </p>
               </div>
               <span className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-800">
@@ -519,6 +531,9 @@ export function ContractUploadDialog({
             </div>
 
             <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <p className="mb-3 text-xs text-blue-900">
+                Layout tip: place each tag on its own line where the final field should appear. The system will not move fields on custom PDFs, so the PDF layout you upload is the layout BoldSign uses.
+              </p>
               <h5 className="mb-2 text-sm font-semibold text-blue-900">Miscellaneous Text Field</h5>
               <p className="mb-3 text-xs text-blue-800">
                 Use this for custom items like ceremony style, special instructions, rehearsal location, or any one-off field an officiant wants added.

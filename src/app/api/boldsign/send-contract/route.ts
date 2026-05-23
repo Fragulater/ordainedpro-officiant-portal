@@ -20,6 +20,36 @@ type PrefillField = {
 type PrefillMap = Record<string, string>
 
 const SUPPORTED_BOLDSIGN_FILE_EXTENSIONS = [".pdf"]
+const CUSTOM_CONTRACT_PREFILL_FIELD_IDS = new Set([
+  "agreement_date",
+  "officiant_business_name",
+  "officiant_name",
+  "couple_names",
+  "partner_1_name",
+  "partner_2_name",
+  "wedding_date",
+  "wedding_time",
+  "venue_name",
+  "venue_address",
+  "total_fee",
+  "deposit_amount",
+  "balance_due",
+  "balance_due_date",
+  "included_travel_radius",
+  "travel_mileage_fees",
+  "travel_origin_or_service_area",
+  "additional_travel_terms",
+  "couple_email",
+  "couple_mailing_address",
+  "bride_phone",
+  "groom_phone",
+  "bride_email",
+  "groom_email",
+  "mailing_addr",
+])
+
+const CUSTOM_CONTRACT_TAG_GUIDANCE =
+  "Uploaded PDFs must contain BoldSign text tags with matching field IDs, such as partner_1_name, partner_2_name, wedding_date, venue_name, total_fee, deposit_amount, partner_1_signature, partner_2_signature, and officiant_signature."
 
 function getFileExtension(fileNameOrUrl: string) {
   const cleanValue = fileNameOrUrl.split("?")[0].toLowerCase()
@@ -156,6 +186,10 @@ function sanitizePrefillFields(prefillFields: unknown): PrefillField[] {
       value: value == null ? "" : String(value).trim(),
     }))
     .filter((field) => field.id && field.value)
+}
+
+function getCustomContractPrefillFields(prefillFields: PrefillField[]) {
+  return prefillFields.filter((field) => CUSTOM_CONTRACT_PREFILL_FIELD_IDS.has(field.id))
 }
 
 function prefillFieldsToMap(prefillFields: PrefillField[]): PrefillMap {
@@ -314,6 +348,65 @@ function extractBoldSignErrorMessages(details: any): string[] {
   return Array.from(messages).filter(Boolean)
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function prefillBoldSignDocumentFields(
+  documentId: string,
+  fields: PrefillField[],
+  boldSignApiKey: string
+) {
+  if (!fields.length) {
+    return { ok: true, skipped: true, fieldCount: 0 }
+  }
+
+  let lastResponseData: any = null
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const response = await fetch(
+      `https://api.boldsign.com/v1/document/prefillFields?documentId=${encodeURIComponent(documentId)}`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-API-KEY": boldSignApiKey,
+        },
+        body: JSON.stringify({
+          Fields: fields.map((field) => ({
+            Id: field.id,
+            Value: field.value,
+          })),
+        }),
+      }
+    )
+
+    const responseText = await response.text()
+    try {
+      lastResponseData = responseText ? JSON.parse(responseText) : null
+    } catch {
+      lastResponseData = { raw: responseText }
+    }
+
+    if (response.ok) {
+      return { ok: true, skipped: false, fieldCount: fields.length, details: lastResponseData }
+    }
+
+    if (attempt < 3) {
+      await sleep(750 * attempt)
+    }
+  }
+
+  return {
+    ok: false,
+    skipped: false,
+    fieldCount: fields.length,
+    error: extractBoldSignErrorMessages(lastResponseData).join(" ") || "BoldSign could not prefill custom contract tags.",
+    details: lastResponseData,
+  }
+}
+
 export async function POST(request: NextRequest) {
   const boldSignApiKey = process.env.BOLDSIGN_API_KEY
 
@@ -397,7 +490,7 @@ export async function POST(request: NextRequest) {
       ...(shouldUseManualFields ? { formFields: getDefaultContractFormFields(signer.roleIndices || [index]) } : {}),
     })),
     EnableSigningOrder: false,
-    AutoDetectFields: !shouldUseManualFields,
+    AutoDetectFields: false,
     UseTextTags: !shouldUseManualFields,
     DisableEmails: false,
     ReminderSettings: {
@@ -436,13 +529,14 @@ export async function POST(request: NextRequest) {
   if (!response.ok) {
     console.error("BoldSign send contract error:", responseData)
     const boldSignMessages = extractBoldSignErrorMessages(responseData)
+    const customContractSuffix = shouldUseManualFields ? "" : ` ${CUSTOM_CONTRACT_TAG_GUIDANCE}`
     return NextResponse.json(
       {
         error:
-          boldSignMessages.join(" ") ||
+          `${boldSignMessages.join(" ") ||
           responseData?.message ||
           responseData?.error ||
-          "BoldSign failed to send the contract.",
+          "BoldSign failed to send the contract."}${customContractSuffix}`,
         details: responseData,
       },
       { status: response.status }
@@ -461,18 +555,21 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (prefillFields.length > 0) {
-    console.log("BoldSign prefill skipped while send flow is being validated.", {
-      documentId,
-      fieldCount: prefillFields.length,
-    })
+  const customPrefillFields = shouldUseManualFields ? [] : getCustomContractPrefillFields(prefillFields)
+  const prefillResult = shouldUseManualFields
+    ? { ok: true, skipped: true, fieldCount: 0 }
+    : await prefillBoldSignDocumentFields(documentId, customPrefillFields, boldSignApiKey)
+
+  if (!prefillResult.ok) {
+    console.warn("BoldSign custom contract prefill did not complete. The signature request was still sent.", prefillResult)
   }
 
   return NextResponse.json({
     documentId,
     boldSignStatus: responseData?.status || "accepted",
     statusCheck: null,
-    prefillSkipped: prefillFields.length > 0,
+    prefillSkipped: Boolean(prefillResult.skipped),
+    prefillResult,
     raw: responseData,
   })
 }
