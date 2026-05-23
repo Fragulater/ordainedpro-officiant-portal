@@ -253,9 +253,7 @@ export function OfficiantDashboardDialog({
   >("Active");
   const [searchQuery, setSearchQuery] = useState("");
   const [ceremonies, setCeremonies] = useState<Ceremony[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    new Date()
-  );
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [showAddCeremonyDialog, setShowAddCeremonyDialog] = useState(false);
   const [documentToAssign, setDocumentToAssign] = useState<string | null>(null);
   const [assignCoupleId, setAssignCoupleId] = useState("");
@@ -541,6 +539,14 @@ ${officiantFullName}`;
     return new Date(year, month - 1, day);
   };
 
+  const getDateKey = (date?: Date | null) => {
+    if (!date) return "";
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const formatDateOnly = (dateString?: string) => {
     const date = parseDateOnly(dateString);
     if (!date) return "Date TBD";
@@ -812,7 +818,7 @@ ${officiantFullName}`;
 
   const coupleById = new Map((couples || []).map((couple) => [couple.id, couple]));
 
-  const upcomingCalendarEvents: DashboardCalendarEvent[] = [
+  const allCalendarEvents: DashboardCalendarEvent[] = [
     ...activeCeremonies
       .filter((ceremony) => {
         const ceremonyDate = parseDateOnly(ceremony.rawDate);
@@ -867,8 +873,15 @@ ${officiantFullName}`;
       const bDate = parseDateOnly(b.date)?.getTime() || 0;
       if (aDate !== bDate) return aDate - bDate;
       return a.time.localeCompare(b.time);
-    })
-    .slice(0, 8);
+    });
+
+  const selectedDateKey = selectedDate ? getDateKey(selectedDate) : "";
+  const selectedCalendarEvents = selectedDateKey
+    ? allCalendarEvents.filter((event) => getDateKey(parseDateOnly(event.date)) === selectedDateKey)
+    : allCalendarEvents.slice(0, 8);
+  const calendarEventDates = allCalendarEvents
+    .map((event) => parseDateOnly(event.date))
+    .filter((date): date is Date => Boolean(date));
 
   const handleCeremonyClick = (ceremonyId: string) => {
     onSelectCouple(ceremonyId);
@@ -1316,7 +1329,7 @@ ${officiantFullName}`;
                 onClick={() => setActiveView("settings")}
               >
                 <Settings className="w-4 h-4 mr-3" />
-                Settings
+                Subscription
               </Button>
             </nav>
 
@@ -1683,7 +1696,7 @@ ${officiantFullName}`;
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
                   {/* Calendar */}
                   <div>
-                    <Card className="min-h-[640px]">
+                    <Card>
                       <CardHeader>
                         <CardTitle>
                           {(selectedDate || new Date()).toLocaleDateString("en-US", {
@@ -1697,16 +1710,25 @@ ${officiantFullName}`;
                           mode="single"
                           selected={selectedDate}
                           onSelect={setSelectedDate}
-                          className="rounded-md border p-6 [--cell-size:4rem]"
+                          modifiers={{
+                            hasEvent: calendarEventDates,
+                          }}
+                          modifiersClassNames={{
+                            hasEvent:
+                              "[&_button]:relative [&_button]:bg-pink-50 [&_button]:text-pink-700 [&_button]:ring-1 [&_button]:ring-pink-200 [&_button]:hover:bg-pink-100 [&_button]:after:absolute [&_button]:after:bottom-1 [&_button]:after:left-1/2 [&_button]:after:h-1.5 [&_button]:after:w-1.5 [&_button]:after:-translate-x-1/2 [&_button]:after:rounded-full [&_button]:after:bg-pink-500 [&_button[data-selected-single=true]]:after:bg-white",
+                          }}
+                          className="rounded-md border p-4 [--cell-size:2.35rem]"
                           classNames={{
-                            root: "w-full max-w-[640px]",
-                            caption_label: "text-xl font-semibold",
+                            root: "w-fit max-w-full",
+                            caption_label: "text-base font-semibold",
                             month_caption: "h-[--cell-size]",
-                            nav: "top-6 px-6",
-                            button_previous: "h-12 w-12",
-                            button_next: "h-12 w-12",
-                            weekday: "text-base font-medium",
-                            week: "mt-3",
+                            nav: "top-4 px-4",
+                            button_previous: "h-[--cell-size] w-[--cell-size]",
+                            button_next: "h-[--cell-size] w-[--cell-size]",
+                            weekdays: "grid grid-cols-7",
+                            weekday: "flex h-8 w-[--cell-size] items-center justify-center text-xs font-medium",
+                            week: "mt-1.5 grid grid-cols-7",
+                            day: "h-[--cell-size] w-[--cell-size]",
                           }}
                         />
                       </CardContent>
@@ -1717,13 +1739,23 @@ ${officiantFullName}`;
                   <div>
                     <Card>
                       <CardHeader>
-                        <CardTitle>Upcoming Dates</CardTitle>
+                        <CardTitle>
+                          {selectedDateKey
+                            ? selectedDate!.toLocaleDateString("en-US", {
+                                month: "long",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                            : "Upcoming Dates"}
+                        </CardTitle>
                         <CardDescription>
-                          Weddings and scheduled meetings
+                          {selectedDateKey
+                            ? "Weddings and scheduled meetings for this date"
+                            : "Weddings and scheduled meetings"}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        {upcomingCalendarEvents.map((event) => (
+                        {selectedCalendarEvents.map((event) => (
                           <div
                             key={event.id}
                             className={`p-4 rounded-lg transition-colors ${
@@ -1801,12 +1833,23 @@ ${officiantFullName}`;
                             )}
                           </div>
                         ))}
-                        {upcomingCalendarEvents.length === 0 && (
+                        {selectedCalendarEvents.length === 0 && (
                           <div className="p-4 bg-gray-50 rounded-lg text-center">
                             <p className="text-sm text-gray-500">
-                              No upcoming weddings or meetings.
+                              {selectedDateKey
+                                ? "No weddings or meetings scheduled for this date."
+                                : "No upcoming weddings or meetings."}
                             </p>
                           </div>
+                        )}
+                        {selectedDateKey && (
+                          <Button
+                            variant="outline"
+                            className="w-full border-pink-200 text-pink-700 hover:bg-pink-50"
+                            onClick={() => setSelectedDate(undefined)}
+                          >
+                            Show All Upcoming Dates
+                          </Button>
                         )}
                       </CardContent>
                     </Card>
@@ -2749,7 +2792,7 @@ ${officiantFullName}`;
             {activeView === "settings" && (
               <div className="p-8">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">
-                  Settings
+                  Subscription
                 </h2>
                 <p className="text-gray-600 mb-6">
                   Manage your subscription and account preferences
