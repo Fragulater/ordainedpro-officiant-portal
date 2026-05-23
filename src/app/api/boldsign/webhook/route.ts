@@ -70,6 +70,7 @@ function findValueByKey(value: any, key: string): string | null {
 
 function getContractStatusFromEvent(eventType: string) {
   const normalizedEvent = eventType.toLowerCase()
+  if (normalizedEvent.includes("sendfailed") || normalizedEvent.includes("send failed")) return "failed"
   if (normalizedEvent.includes("completed") || normalizedEvent.includes("signed")) return "signed"
   if (normalizedEvent.includes("expired")) return "expired"
   if (
@@ -121,6 +122,7 @@ export async function POST(request: NextRequest) {
     eventType,
     documentId: payload?.data?.documentId,
     environment: payload?.event?.environment,
+    errorMessage: findValueByKey(payload, "errorMessage") || findValueByKey(payload, "message"),
   })
 
   const contractId = findValueByKey(payload, "contractId")

@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     documentId,
-    boldSignStatus: "accepted",
+    boldSignStatus: responseData?.status || "accepted",
     statusCheck: null,
     prefillSkipped: prefillFields.length > 0,
     raw: responseData,
