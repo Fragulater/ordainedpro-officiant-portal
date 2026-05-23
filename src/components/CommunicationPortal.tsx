@@ -3506,6 +3506,7 @@ ${shareScriptForm.body}`)
             ]
           : []),
       ]
+      console.log("BoldSign signer roles before server cleanup:", signers)
 
       const response = await fetch("/api/boldsign/send-contract", {
         method: "POST",

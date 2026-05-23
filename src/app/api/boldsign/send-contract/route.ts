@@ -56,12 +56,20 @@ function isLocalContractUrl(contractUrl: string) {
 }
 
 function sanitizeSigners(signers: Signer[]) {
+  const seen = new Set<string>()
+
   return signers
     .map((signer) => ({
       name: signer.name?.trim(),
       emailAddress: signer.emailAddress?.trim(),
     }))
     .filter((signer) => signer.name && signer.emailAddress)
+    .filter((signer) => {
+      const emailKey = signer.emailAddress.toLowerCase()
+      if (seen.has(emailKey)) return false
+      seen.add(emailKey)
+      return true
+    })
 }
 
 function sanitizePrefillFields(prefillFields: unknown): PrefillField[] {
