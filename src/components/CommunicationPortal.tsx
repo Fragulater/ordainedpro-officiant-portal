@@ -147,20 +147,6 @@ const isOrdainedProDefaultContract = (contract: any) => (
   getContractFileUrl(contract).includes("/contracts/ordainedpro-default-contract")
 )
 
-const getDuplicateEmails = (signers: Array<{ emailAddress: string }>) => {
-  const seen = new Set<string>()
-  const duplicates = new Set<string>()
-
-  signers.forEach((signer) => {
-    const email = signer.emailAddress.trim().toLowerCase()
-    if (!email) return
-    if (seen.has(email)) duplicates.add(email)
-    seen.add(email)
-  })
-
-  return Array.from(duplicates)
-}
-
 const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`
 
 const formatContractMoney = (amount: number | string | null | undefined) => {
@@ -3567,12 +3553,6 @@ ${shareScriptForm.body}`)
 
       if (isDefaultContractSend && !officiantEmail) {
         alert("The default PDF contract requires the officiant email before it can be sent for signature.")
-        return
-      }
-
-      const duplicateEmails = getDuplicateEmails(signers)
-      if (duplicateEmails.length > 0) {
-        alert(`Each BoldSign signer needs a unique email address. Please update these duplicate email(s) before sending: ${duplicateEmails.join(", ")}`)
         return
       }
 

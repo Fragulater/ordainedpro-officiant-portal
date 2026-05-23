@@ -64,17 +64,34 @@ function sanitizeSigners(signers: Signer[]) {
     .filter((signer) => signer.name && signer.emailAddress)
 }
 
-function getDuplicateSignerEmails(signers: Array<{ emailAddress: string }>) {
-  const seen = new Set<string>()
-  const duplicates = new Set<string>()
+function createEmailAlias(emailAddress: string, index: number) {
+  const [localPart, domainPart] = emailAddress.split("@")
+  if (!localPart || !domainPart) return emailAddress
 
-  signers.forEach((signer) => {
-    const emailKey = signer.emailAddress.toLowerCase()
-    if (seen.has(emailKey)) duplicates.add(emailKey)
-    seen.add(emailKey)
+  const baseLocalPart = localPart.split("+")[0]
+  return `${baseLocalPart}+op${index}@${domainPart}`
+}
+
+function makeSignerEmailsUnique(signers: Signer[]) {
+  const usedEmails = new Set<string>()
+  const sourceCounts = new Map<string, number>()
+
+  return signers.map((signer) => {
+    const originalEmail = signer.emailAddress
+    const originalKey = originalEmail.toLowerCase()
+    const count = (sourceCounts.get(originalKey) || 0) + 1
+    sourceCounts.set(originalKey, count)
+
+    let candidateEmail = originalEmail
+    let aliasIndex = count
+    while (usedEmails.has(candidateEmail.toLowerCase())) {
+      candidateEmail = createEmailAlias(originalEmail, aliasIndex)
+      aliasIndex += 1
+    }
+
+    usedEmails.add(candidateEmail.toLowerCase())
+    return { ...signer, emailAddress: candidateEmail }
   })
-
-  return Array.from(duplicates)
 }
 
 function sanitizePrefillFields(prefillFields: unknown): PrefillField[] {
@@ -149,7 +166,7 @@ export async function POST(request: NextRequest) {
   const coupleId = String(body.coupleId || "")
   const officiantId = String(body.officiantId || "")
   const message = String(body.message || "")
-  const signers = sanitizeSigners(Array.isArray(body.signers) ? body.signers : [])
+  const signers = makeSignerEmailsUnique(sanitizeSigners(Array.isArray(body.signers) ? body.signers : []))
   const prefillFields = sanitizePrefillFields(body.prefillFields)
   const fileExtension = getFileExtension(contractUrl || contractName)
 
@@ -181,19 +198,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "At least one signer email is required." }, { status: 400 })
   }
 
-  const duplicateSignerEmails = getDuplicateSignerEmails(signers)
-  if (duplicateSignerEmails.length > 0) {
-    return NextResponse.json(
-      {
-        error: `Each BoldSign signer needs a unique email address. Duplicate email(s): ${duplicateSignerEmails.join(", ")}`,
-      },
-      { status: 400 }
-    )
-  }
-
   const boldSignPayload = {
     Title: contractName,
     Message: message,
+    OnBehalfOf: process.env.BOLDSIGN_ON_BEHALF_OF || "info@ordainedpro.com",
     FileUrls: [contractUrl],
     Signers: signers.map((signer, index) => ({
       name: signer.name,
