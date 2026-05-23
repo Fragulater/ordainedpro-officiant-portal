@@ -85,6 +85,25 @@ export function PortalOverview() {
   const outstandingBalance = Number(financialReport?.outstanding || 0)
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(amount)
+  const getWeddingCountdownDays = () => {
+    if (!editWeddingDetails?.weddingDate) return 0
+
+    const [year, month, day] = editWeddingDetails.weddingDate.split("-").map(Number)
+    const weddingDate =
+      year && month && day
+        ? new Date(year, month - 1, day)
+        : new Date(editWeddingDetails.weddingDate)
+
+    if (Number.isNaN(weddingDate.getTime())) return 0
+
+    weddingDate.setHours(0, 0, 0, 0)
+    const diffDays = Math.ceil((weddingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+    return Math.max(0, diffDays)
+  }
+  const weddingCountdownDays = getWeddingCountdownDays()
+  const hasWeddingDate = Boolean(editWeddingDetails?.weddingDate)
+  const isWeddingCountdownUrgent = hasWeddingDate && weddingCountdownDays <= 3
 
   return (
     <>
@@ -402,9 +421,21 @@ export function PortalOverview() {
             </CardHeader>
             <CardContent className="pt-6">
               <div className="space-y-4 text-sm">
-                <div>
-                  <p className="font-semibold text-gray-900">{editWeddingDetails?.venueName || 'Venue TBD'}</p>
-                  <p className="text-gray-600">{editWeddingDetails?.venueAddress || 'Address TBD'}</p>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900">{editWeddingDetails?.venueName || 'Venue TBD'}</p>
+                    <p className="text-gray-600">{editWeddingDetails?.venueAddress || 'Address TBD'}</p>
+                  </div>
+                  <Badge
+                    className={`shrink-0 border-0 shadow-md ${
+                      isWeddingCountdownUrgent
+                        ? "bg-gradient-to-r from-red-500 to-red-600 text-white"
+                        : "bg-gradient-to-r from-blue-500 to-blue-600 text-white"
+                    }`}
+                  >
+                    <Clock className="w-3 h-3 mr-1" />
+                    {weddingCountdownDays} days
+                  </Badge>
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">
@@ -467,12 +498,6 @@ export function PortalOverview() {
                     {hasPrivateNotes ? "View Private Notes" : "Add Private Notes"}
                   </Button>
                 </div>
-                <Badge className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 w-fit shadow-md">
-                  <Clock className="w-3 h-3 mr-1" />
-                  {editWeddingDetails?.weddingDate
-                    ? Math.ceil((new Date(editWeddingDetails.weddingDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-                    : 0} days until wedding
-                </Badge>
               </div>
             </CardContent>
           </Card>
