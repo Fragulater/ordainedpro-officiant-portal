@@ -1568,10 +1568,10 @@ export function OfficiantDashboardDialog({
                   View and manage your ceremony schedule
                 </p>
 
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
                   {/* Calendar */}
-                  <div className="col-span-2">
-                    <Card>
+                  <div>
+                    <Card className="min-h-[640px]">
                       <CardHeader>
                         <CardTitle>
                           {(selectedDate || new Date()).toLocaleDateString("en-US", {
@@ -1580,12 +1580,22 @@ export function OfficiantDashboardDialog({
                           })}
                         </CardTitle>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="flex justify-center pb-8">
                         <CalendarComponent
                           mode="single"
                           selected={selectedDate}
                           onSelect={setSelectedDate}
-                          className="rounded-md border"
+                          className="rounded-md border p-6 [--cell-size:4rem]"
+                          classNames={{
+                            root: "w-full max-w-[640px]",
+                            caption_label: "text-xl font-semibold",
+                            month_caption: "h-[--cell-size]",
+                            nav: "top-6 px-6",
+                            button_previous: "h-12 w-12",
+                            button_next: "h-12 w-12",
+                            weekday: "text-base font-medium",
+                            week: "mt-3",
+                          }}
                         />
                       </CardContent>
                     </Card>
