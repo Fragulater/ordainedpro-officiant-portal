@@ -201,7 +201,6 @@ export async function POST(request: NextRequest) {
   const boldSignPayload = {
     Title: contractName,
     Message: message,
-    OnBehalfOf: process.env.BOLDSIGN_ON_BEHALF_OF || "info@ordainedpro.com",
     FileUrls: [contractUrl],
     Signers: signers.map((signer, index) => ({
       name: signer.name,
