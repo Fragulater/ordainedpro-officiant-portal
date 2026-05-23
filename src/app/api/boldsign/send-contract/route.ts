@@ -108,9 +108,9 @@ const DEFAULT_CONTRACT_SIGNATURE_PAGE = 5
 
 function getDefaultContractFormFields(roleIndices: number[]) {
   const rows = [
-    { signatureY: 236, dateY: 236 },
-    { signatureY: 336, dateY: 336 },
-    { signatureY: 436, dateY: 436 },
+    { signatureY: 240, dateY: 240 },
+    { signatureY: 340, dateY: 340 },
+    { signatureY: 440, dateY: 440 },
   ]
 
   return roleIndices.flatMap((roleIndex) => {
@@ -124,10 +124,10 @@ function getDefaultContractFormFields(roleIndices: number[]) {
         fieldType: "Signature",
         pageNumber: DEFAULT_CONTRACT_SIGNATURE_PAGE,
         bounds: {
-          x: 168,
+          x: 166,
           y: row.signatureY,
           width: 245,
-          height: 20,
+          height: 18,
         },
         isRequired: true,
       },
@@ -137,10 +137,10 @@ function getDefaultContractFormFields(roleIndices: number[]) {
         fieldType: "DateSigned",
         pageNumber: DEFAULT_CONTRACT_SIGNATURE_PAGE,
         bounds: {
-          x: 455,
+          x: 465,
           y: row.dateY,
-          width: 95,
-          height: 18,
+          width: 80,
+          height: 16,
         },
         isRequired: true,
       },
@@ -280,21 +280,21 @@ async function createPersonalizedDefaultContractBase64(contractUrl: string, pref
   draw(0, ["venue", "venue_name"], 84, 544, 250, 8.5, 250)
   draw(0, ["venue_addr", "venue_address"], 118, 532, 350, 8.5, 350)
 
-  draw(1, ["ceremony_fee", "total_fee"], 159, 689, 80, 8.5, 75)
-  draw(1, "deposit_amount", 107, 661, 80, 8.5, 75)
+  draw(1, ["ceremony_fee", "total_fee"], 164, 689, 80, 8.5, 70)
+  draw(1, "deposit_amount", 112, 661, 80, 8.5, 70)
   draw(1, "arrival_minutes", 201, 344, 34, 8.5, 18)
   draw(1, "late_grace_minutes", 182, 328, 34, 8.5, 18)
   draw(1, "late_grace_minutes", 225, 300, 34, 8.5, 18)
-  draw(1, "late_fee_half_hour", 135, 288, 55, 8.5, 42)
+  draw(1, "late_fee_half_hour", 139, 288, 55, 8.5, 38)
   draw(1, "full_day_fee", 360, 215, 70, 8.5, 54)
   draw(1, "included_miles", 105, 178, 40, 8.5, 18)
   draw(1, ["officiant_addr", "travel_origin_or_service_area"], 54, 145, 350, 8.5, 350)
-  draw(1, "mileage_rate", 268, 128, 55, 8.5, 42)
+  draw(1, "mileage_rate", 272, 128, 55, 8.5, 36)
 
   draw(2, "rehearsal_arrival_minutes", 484, 583, 34, 8.5, 18)
 
-  draw(3, ["ceremony_fee", "total_fee"], 143, 598, 80, 8.5, 75)
-  draw(3, "deposit_amount", 153, 586, 80, 8.5, 75)
+  draw(3, ["ceremony_fee", "total_fee"], 148, 598, 80, 8.5, 70)
+  draw(3, "deposit_amount", 158, 586, 80, 8.5, 70)
 
   draw(4, ["bride_name", "partner_1_name"], 180, 642, 205)
   draw(4, ["groom_name", "partner_2_name"], 180, 542, 205)
