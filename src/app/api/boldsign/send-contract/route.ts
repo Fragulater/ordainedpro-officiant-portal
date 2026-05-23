@@ -260,6 +260,7 @@ async function createPersonalizedDefaultContractBase64(contractUrl: string, pref
   const templateBytes = await getDefaultContractTemplateBytes(contractUrl)
   const pdfDocument = await PDFDocument.load(templateBytes)
   const font = await pdfDocument.embedFont(StandardFonts.Helvetica)
+  const boldFont = await pdfDocument.embedFont(StandardFonts.HelveticaBold)
   const prefillValues = prefillFieldsToMap(prefillFields)
   const pages = pdfDocument.getPages()
 
@@ -271,30 +272,79 @@ async function createPersonalizedDefaultContractBase64(contractUrl: string, pref
     drawPrefillValue(page, font, value, { x, y, width, fontSize, clearWidth })
   }
 
-  draw(0, ["agreement_date", "wed_date"], 391, 689, 88, 8.5, 105)
-  draw(0, ["comp_name", "officiant_business_name"], 135, 677, 260, 8.5, 250)
-  draw(0, ["bride_name", "partner_1_name"], 95, 666, 145, 8.5, 145)
-  draw(0, ["groom_name", "partner_2_name"], 292, 666, 145, 8.5, 145)
-  draw(0, ["wed_date", "wedding_date"], 315, 589, 95, 8.5, 105)
-  draw(0, ["wed_time", "wedding_time"], 54, 577, 95, 8.5, 105)
-  draw(0, ["venue", "venue_name"], 84, 544, 250, 8.5, 250)
-  draw(0, ["venue_addr", "venue_address"], 118, 532, 350, 8.5, 350)
+  const drawLabel = (pageIndex: number, text: string, x: number, y: number, size = 9) => {
+    const page = pages[pageIndex]
+    if (!page) return
+    page.drawText(text, { x, y, size, font: boldFont, color: rgb(0, 0, 0) })
+  }
 
-  draw(1, ["ceremony_fee", "total_fee"], 164, 689, 80, 8.5, 70)
-  draw(1, "deposit_amount", 112, 661, 80, 8.5, 70)
+  const clearArea = (pageIndex: number, x: number, y: number, width: number, height: number) => {
+    const page = pages[pageIndex]
+    if (!page) return
+    page.drawRectangle({ x, y, width, height, color: rgb(1, 1, 1) })
+  }
+
+  const drawCleanField = (
+    pageIndex: number,
+    key: string | string[],
+    label: string,
+    x: number,
+    y: number,
+    valueX: number,
+    lineWidth: number,
+    fontSize = 8.5
+  ) => {
+    drawLabel(pageIndex, label, x, y + 1, 8.5)
+    draw(pageIndex, key, valueX, y, lineWidth, fontSize, lineWidth)
+  }
+
+  clearArea(0, 42, 645, 528, 55)
+  pages[0]?.drawText('This Wedding Ceremony Agreement and Confirmation (the "Agreement") is made as of', {
+    x: 54,
+    y: 689,
+    size: 8.5,
+    font,
+    color: rgb(0, 0, 0),
+  })
+  draw(0, ["agreement_date", "wed_date"], 392, 689, 82, 8.5, 82)
+  pages[0]?.drawText("and is between:", {
+    x: 482,
+    y: 689,
+    size: 8.5,
+    font,
+    color: rgb(0, 0, 0),
+  })
+  drawCleanField(0, ["comp_name", "officiant_business_name"], "Officiant / Company:", 54, 674, 145, 170)
+  drawCleanField(0, ["bride_name", "partner_1_name"], "Partner 1:", 54, 660, 112, 150)
+  drawCleanField(0, ["groom_name", "partner_2_name"], "Partner 2:", 285, 660, 343, 150)
+  pages[0]?.drawText('The Officiant and Partner 1 and Partner 2 are collectively referred to as "The Couple" where applicable.', {
+    x: 54,
+    y: 648,
+    size: 8.5,
+    font,
+    color: rgb(0, 0, 0),
+  })
+
+  draw(0, ["wed_date", "wedding_date"], 315, 589, 92, 8.5, 92)
+  draw(0, ["wed_time", "wedding_time"], 54, 577, 90, 8.5, 90)
+  draw(0, ["venue", "venue_name"], 84, 544, 150, 8.5, 150)
+  draw(0, ["venue_addr", "venue_address"], 118, 532, 245, 8.5, 245)
+
+  draw(1, ["ceremony_fee", "total_fee"], 164, 689, 70, 8.5, 54)
+  draw(1, "deposit_amount", 112, 661, 70, 8.5, 54)
   draw(1, "arrival_minutes", 201, 344, 34, 8.5, 18)
   draw(1, "late_grace_minutes", 182, 328, 34, 8.5, 18)
   draw(1, "late_grace_minutes", 225, 300, 34, 8.5, 18)
   draw(1, "late_fee_half_hour", 139, 288, 55, 8.5, 38)
   draw(1, "full_day_fee", 360, 215, 70, 8.5, 54)
   draw(1, "included_miles", 105, 178, 40, 8.5, 18)
-  draw(1, ["officiant_addr", "travel_origin_or_service_area"], 54, 145, 350, 8.5, 350)
+  draw(1, ["officiant_addr", "travel_origin_or_service_area"], 54, 145, 240, 8.5, 240)
   draw(1, "mileage_rate", 272, 128, 55, 8.5, 36)
 
   draw(2, "rehearsal_arrival_minutes", 484, 583, 34, 8.5, 18)
 
-  draw(3, ["ceremony_fee", "total_fee"], 148, 598, 80, 8.5, 70)
-  draw(3, "deposit_amount", 158, 586, 80, 8.5, 70)
+  draw(3, ["ceremony_fee", "total_fee"], 148, 598, 70, 8.5, 54)
+  draw(3, "deposit_amount", 158, 586, 70, 8.5, 54)
 
   draw(4, ["bride_name", "partner_1_name"], 180, 642, 205)
   draw(4, ["groom_name", "partner_2_name"], 180, 542, 205)
