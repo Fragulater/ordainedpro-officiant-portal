@@ -113,7 +113,7 @@ const deriveContractStoragePath = (fileUrl: string | null | undefined) => {
 const getContractFileUrl = (contract: any) => contract?.fileUrl || contract?.file_url || contract?.file?.url || ""
 
 const DEFAULT_CONTRACT_NAME = "OrdainedPro Default Wedding Contract"
-const DEFAULT_CONTRACT_ASSET_PATH = "/contracts/ordainedpro-default-contract.docx"
+const DEFAULT_CONTRACT_ASSET_PATH = "/contracts/ordainedpro-default-contract-v2.docx"
 const DEFAULT_CONTRACT_PREFILL_DEFAULTS = {
   ceremonyFee: "",
   depositAmount: "",
@@ -139,6 +139,11 @@ const getDefaultContractUrl = () => {
 
   return DEFAULT_CONTRACT_ASSET_PATH
 }
+
+const isOrdainedProDefaultContract = (contract: any) => (
+  contract?.name === DEFAULT_CONTRACT_NAME ||
+  getContractFileUrl(contract).includes("/contracts/ordainedpro-default-contract")
+)
 
 const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`
 
@@ -1574,25 +1579,24 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       return { ok: false, error: "No user or couple selected." }
     }
 
-    const existingDefault = contracts.find((contract) =>
-      contract.name === DEFAULT_CONTRACT_NAME ||
-      getContractFileUrl(contract).includes(DEFAULT_CONTRACT_ASSET_PATH)
-    )
+    const existingDefault = contracts.find(isOrdainedProDefaultContract)
 
     if (existingDefault) {
       const currentDefaultUrl = getDefaultContractUrl()
       const existingUrl = getContractFileUrl(existingDefault)
 
-      if (existingUrl && existingUrl !== currentDefaultUrl && existingUrl.includes("localhost")) {
+      if (existingUrl && existingUrl !== currentDefaultUrl) {
         const updateResult = await updateContractInDB(existingDefault.id, {
           file_url: currentDefaultUrl,
+          file_size: 13419,
         } as any)
 
         if (updateResult.ok) {
           const updatedContract = {
             ...existingDefault,
             fileUrl: currentDefaultUrl,
-            file: existingDefault.file ? { ...existingDefault.file, url: currentDefaultUrl } : existingDefault.file,
+            fileSize: 13419,
+            file: existingDefault.file ? { ...existingDefault.file, url: currentDefaultUrl, size: 13419 } : existingDefault.file,
           }
 
           setContracts((prev) => prev.map((contract) =>
@@ -1612,7 +1616,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       type: "Wedding Service Agreement",
       fileUrl: getDefaultContractUrl(),
       fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      fileSize: 13568,
+      fileSize: 13419,
       status: "draft",
     })
 
@@ -3382,6 +3386,35 @@ ${shareScriptForm.body}`)
 
   const createPersonalizedContractUrl = async (contract: any) => {
     const originalUrl = getContractFileUrl(contract)
+    if (isOrdainedProDefaultContract(contract)) {
+      const currentDefaultUrl = getDefaultContractUrl()
+      if (originalUrl && originalUrl !== currentDefaultUrl) {
+        const updateResult = await updateContractInDB(contract.id, {
+          file_url: currentDefaultUrl,
+          file_size: 13419,
+        } as any)
+
+        if (!updateResult.ok) {
+          console.warn("Default contract URL update failed before BoldSign send:", updateResult.error)
+        } else {
+          setContracts(prev => prev.map(c =>
+            c.id === contract.id
+              ? {
+                  ...c,
+                  fileUrl: currentDefaultUrl,
+                  file_url: currentDefaultUrl,
+                  fileSize: 13419,
+                  file_size: 13419,
+                  file: c.file ? { ...c.file, url: currentDefaultUrl, size: 13419 } : c.file,
+                } as any
+              : c
+          ))
+        }
+      }
+
+      return currentDefaultUrl
+    }
+
     if (!originalUrl || !currentUser?.id || !editCoupleInfo?.id || !isTextContract(contract)) {
       return originalUrl
     }
@@ -3480,7 +3513,8 @@ ${shareScriptForm.body}`)
 
     try {
       const contractUrl = await createPersonalizedContractUrl(sendingContract)
-      const signers = [
+      const isDefaultContractSend = isOrdainedProDefaultContract(sendingContract)
+      const coupleSigners = [
         ...(editCoupleInfo?.brideEmail
           ? [
               {
@@ -3497,14 +3531,19 @@ ${shareScriptForm.body}`)
               },
             ]
           : []),
-        ...(officiantEmail
-          ? [
-              {
-                emailAddress: officiantEmail,
-                name: officiantName || officiantLabel || "Wedding Officiant",
-              },
-            ]
-          : []),
+      ]
+      const signers = [
+        ...coupleSigners,
+        ...(isDefaultContractSend
+          ? []
+          : officiantEmail
+            ? [
+                {
+                  emailAddress: officiantEmail,
+                  name: officiantName || officiantLabel || "Wedding Officiant",
+                },
+              ]
+            : []),
       ]
       console.log("BoldSign signer roles before server cleanup:", signers)
 
