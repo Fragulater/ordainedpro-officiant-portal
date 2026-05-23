@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { Select } from "@/components/ui/select"
 import { MessageCircle, FileText, Users, Send, Download, Plus, Check, MapPin, Heart, Edit, FileEdit, Eye, Save, Upload, ChevronRight } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
+import { CeremonyQuestionnaire } from "./CeremonyQuestionnaire"
 
 export function BuildScriptTab() {
   const {
@@ -66,6 +67,8 @@ export function BuildScriptTab() {
   return (
 <TabsContent value="buildscript">
             <div className="space-y-6">
+              <CeremonyQuestionnaire />
+
               {/* Script Writing Mode Toggle */}
               <Card className="border-blue-100 shadow-md">
                 <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700">
