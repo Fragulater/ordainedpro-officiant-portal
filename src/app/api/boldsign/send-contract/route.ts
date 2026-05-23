@@ -282,16 +282,16 @@ async function createPersonalizedDefaultContractBase64(contractUrl: string, pref
 
   draw(1, ["ceremony_fee", "total_fee"], 159, 689, 80, 8.5, 75)
   draw(1, "deposit_amount", 107, 661, 80, 8.5, 75)
-  draw(1, "arrival_minutes", 201, 344, 34, 8.5, 28)
-  draw(1, "late_grace_minutes", 182, 328, 34, 8.5, 28)
-  draw(1, "late_grace_minutes", 225, 300, 34, 8.5, 28)
-  draw(1, "late_fee_half_hour", 135, 288, 55, 8.5, 50)
+  draw(1, "arrival_minutes", 201, 344, 34, 8.5, 18)
+  draw(1, "late_grace_minutes", 182, 328, 34, 8.5, 18)
+  draw(1, "late_grace_minutes", 225, 300, 34, 8.5, 18)
+  draw(1, "late_fee_half_hour", 135, 288, 55, 8.5, 42)
   draw(1, "full_day_fee", 360, 215, 70, 8.5, 54)
-  draw(1, "included_miles", 105, 178, 40, 8.5, 28)
+  draw(1, "included_miles", 105, 178, 40, 8.5, 18)
   draw(1, ["officiant_addr", "travel_origin_or_service_area"], 54, 145, 350, 8.5, 350)
-  draw(1, "mileage_rate", 268, 128, 55, 8.5, 50)
+  draw(1, "mileage_rate", 268, 128, 55, 8.5, 42)
 
-  draw(2, "rehearsal_arrival_minutes", 484, 583, 34, 8.5, 28)
+  draw(2, "rehearsal_arrival_minutes", 484, 583, 34, 8.5, 18)
 
   draw(3, ["ceremony_fee", "total_fee"], 143, 598, 80, 8.5, 75)
   draw(3, "deposit_amount", 153, 586, 80, 8.5, 75)
