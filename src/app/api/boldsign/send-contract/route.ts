@@ -179,23 +179,31 @@ function drawPrefillValue(
   page: any,
   font: any,
   value: string,
-  options: { x: number; y: number; width: number; fontSize?: number }
+  options: { x: number; y: number; width: number; fontSize?: number; clearWidth?: number; clearHeight?: number }
 ) {
   if (!value.trim()) return
 
   const fontSize = options.fontSize || 8.5
   const text = truncateForPdf(value, Math.max(12, Math.floor(options.width / (fontSize * 0.45))))
+  const clearWidth = options.clearWidth || options.width
+  const clearHeight = options.clearHeight || fontSize + 5
 
   page.drawRectangle({
     x: options.x - 1,
-    y: options.y - 2,
-    width: options.width + 2,
-    height: fontSize + 5,
+    y: options.y - 3,
+    width: clearWidth + 2,
+    height: clearHeight,
     color: rgb(1, 1, 1),
+  })
+  page.drawLine({
+    start: { x: options.x, y: options.y - 1.5 },
+    end: { x: options.x + clearWidth, y: options.y - 1.5 },
+    thickness: 0.45,
+    color: rgb(0.15, 0.15, 0.15),
   })
   page.drawText(text, {
     x: options.x,
-    y: options.y,
+    y: options.y + 1.2,
     size: fontSize,
     font,
     color: rgb(0, 0, 0),
@@ -222,46 +230,46 @@ async function createPersonalizedDefaultContractBase64(contractUrl: string, pref
   const prefillValues = prefillFieldsToMap(prefillFields)
   const pages = pdfDocument.getPages()
 
-  const draw = (pageIndex: number, key: string | string[], x: number, y: number, width: number, fontSize?: number) => {
+  const draw = (pageIndex: number, key: string | string[], x: number, y: number, width: number, fontSize?: number, clearWidth?: number) => {
     const keys = Array.isArray(key) ? key : [key]
     const value = getPrefillValue(prefillValues, ...keys)
     const page = pages[pageIndex]
     if (!page) return
-    drawPrefillValue(page, font, value, { x, y, width, fontSize })
+    drawPrefillValue(page, font, value, { x, y, width, fontSize, clearWidth })
   }
 
-  draw(0, ["agreement_date", "wed_date"], 391, 689, 88)
-  draw(0, ["comp_name", "officiant_business_name"], 54, 677, 250)
-  draw(0, ["bride_name", "partner_1_name"], 312, 677, 90)
-  draw(0, ["groom_name", "partner_2_name"], 408, 677, 95)
-  draw(0, ["wed_date", "wedding_date"], 315, 600, 90)
-  draw(0, ["wed_time", "wedding_time"], 461, 600, 80)
-  draw(0, ["venue", "venue_name"], 84, 567, 220)
-  draw(0, ["venue_addr", "venue_address"], 118, 556, 360)
+  draw(0, ["agreement_date", "wed_date"], 391, 689, 88, 8.5, 105)
+  draw(0, ["comp_name", "officiant_business_name"], 135, 677, 260, 8.5, 250)
+  draw(0, ["bride_name", "partner_1_name"], 95, 666, 145, 8.5, 145)
+  draw(0, ["groom_name", "partner_2_name"], 292, 666, 145, 8.5, 145)
+  draw(0, ["wed_date", "wedding_date"], 315, 589, 95, 8.5, 105)
+  draw(0, ["wed_time", "wedding_time"], 54, 577, 95, 8.5, 105)
+  draw(0, ["venue", "venue_name"], 84, 544, 250, 8.5, 250)
+  draw(0, ["venue_addr", "venue_address"], 118, 532, 350, 8.5, 350)
 
-  draw(1, ["ceremony_fee", "total_fee"], 159, 719, 80)
-  draw(1, "deposit_amount", 107, 691, 80)
-  draw(1, "arrival_minutes", 201, 375, 40)
-  draw(1, "late_grace_minutes", 182, 358, 40)
-  draw(1, "late_grace_minutes", 225, 330, 40)
-  draw(1, "late_fee_half_hour", 190, 318, 55)
-  draw(1, "full_day_fee", 360, 245, 70)
-  draw(1, "included_miles", 105, 208, 50)
-  draw(1, ["officiant_addr", "travel_origin_or_service_area"], 54, 175, 350)
-  draw(1, "mileage_rate", 268, 158, 55)
+  draw(1, ["ceremony_fee", "total_fee"], 159, 689, 80, 8.5, 75)
+  draw(1, "deposit_amount", 107, 661, 80, 8.5, 75)
+  draw(1, "arrival_minutes", 201, 344, 34, 8.5, 46)
+  draw(1, "late_grace_minutes", 182, 328, 34, 8.5, 46)
+  draw(1, "late_grace_minutes", 225, 300, 34, 8.5, 46)
+  draw(1, "late_fee_half_hour", 135, 288, 55, 8.5, 72)
+  draw(1, "full_day_fee", 360, 215, 70, 8.5, 74)
+  draw(1, "included_miles", 105, 178, 40, 8.5, 46)
+  draw(1, ["officiant_addr", "travel_origin_or_service_area"], 54, 145, 350, 8.5, 350)
+  draw(1, "mileage_rate", 268, 128, 55, 8.5, 72)
 
-  draw(2, "rehearsal_arrival_minutes", 54, 616, 45)
+  draw(2, "rehearsal_arrival_minutes", 484, 583, 34, 8.5, 46)
 
-  draw(3, ["ceremony_fee", "total_fee"], 143, 633, 80)
-  draw(3, "deposit_amount", 153, 621, 80)
+  draw(3, ["ceremony_fee", "total_fee"], 143, 598, 80, 8.5, 75)
+  draw(3, "deposit_amount", 153, 586, 80, 8.5, 75)
 
   draw(4, ["bride_name", "partner_1_name"], 180, 642, 205)
   draw(4, ["groom_name", "partner_2_name"], 180, 542, 205)
   draw(4, ["comp_name", "officiant_business_name"], 180, 442, 205)
-  draw(4, "bride_phone", 128, 340, 145)
-  draw(4, "groom_phone", 392, 340, 145)
-  draw(4, "bride_email", 125, 322, 150, 8)
-  draw(4, "groom_email", 390, 322, 150, 8)
+  draw(4, "bride_phone", 127, 340, 95, 8.2, 96)
+  draw(4, "groom_phone", 314, 340, 95, 8.2, 96)
+  draw(4, "bride_email", 123, 322, 115, 7.5, 100)
+  draw(4, "groom_email", 306, 322, 115, 7.5, 100)
   draw(4, ["mailing_addr", "couple_mailing_address"], 125, 304, 390, 8)
 
   const personalizedBytes = await pdfDocument.save()

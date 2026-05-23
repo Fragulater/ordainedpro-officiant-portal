@@ -114,7 +114,7 @@ const getContractFileUrl = (contract: any) => contract?.fileUrl || contract?.fil
 
 const DEFAULT_CONTRACT_NAME = "OrdainedPro Default Wedding Contract"
 const DEFAULT_CONTRACT_ASSET_PATH = "/contracts/ordainedpro-default-contract.pdf?v=20260522-clean"
-const DEFAULT_CONTRACT_FILE_SIZE = 10830
+const DEFAULT_CONTRACT_FILE_SIZE = 10909
 const PDF_CONTRACT_FILE_TYPE = "application/pdf"
 const DEFAULT_CONTRACT_PREFILL_DEFAULTS = {
   ceremonyFee: "",
