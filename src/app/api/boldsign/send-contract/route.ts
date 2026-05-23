@@ -13,7 +13,7 @@ type PrefillField = {
   value: string
 }
 
-const SUPPORTED_BOLDSIGN_FILE_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg", ".docx", ".xlsx", ".pptx"]
+const SUPPORTED_BOLDSIGN_FILE_EXTENSIONS = [".pdf"]
 
 function getFileExtension(fileNameOrUrl: string) {
   const cleanValue = fileNameOrUrl.split("?")[0].toLowerCase()
@@ -56,20 +56,25 @@ function isLocalContractUrl(contractUrl: string) {
 }
 
 function sanitizeSigners(signers: Signer[]) {
-  const seen = new Set<string>()
-
   return signers
     .map((signer) => ({
       name: signer.name?.trim(),
       emailAddress: signer.emailAddress?.trim(),
     }))
     .filter((signer) => signer.name && signer.emailAddress)
-    .filter((signer) => {
-      const emailKey = signer.emailAddress.toLowerCase()
-      if (seen.has(emailKey)) return false
-      seen.add(emailKey)
-      return true
-    })
+}
+
+function getDuplicateSignerEmails(signers: Array<{ emailAddress: string }>) {
+  const seen = new Set<string>()
+  const duplicates = new Set<string>()
+
+  signers.forEach((signer) => {
+    const emailKey = signer.emailAddress.toLowerCase()
+    if (seen.has(emailKey)) duplicates.add(emailKey)
+    seen.add(emailKey)
+  })
+
+  return Array.from(duplicates)
 }
 
 function sanitizePrefillFields(prefillFields: unknown): PrefillField[] {
@@ -166,7 +171,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "BoldSign can send .pdf, .docx, .png, .jpg, .xlsx, and .pptx files. Please upload a PDF or DOCX contract for signature.",
+          "BoldSign contract sending is PDF-only. Please upload or use a PDF contract for signature.",
       },
       { status: 400 }
     )
@@ -174,6 +179,16 @@ export async function POST(request: NextRequest) {
 
   if (signers.length === 0) {
     return NextResponse.json({ error: "At least one signer email is required." }, { status: 400 })
+  }
+
+  const duplicateSignerEmails = getDuplicateSignerEmails(signers)
+  if (duplicateSignerEmails.length > 0) {
+    return NextResponse.json(
+      {
+        error: `Each BoldSign signer needs a unique email address. Duplicate email(s): ${duplicateSignerEmails.join(", ")}`,
+      },
+      { status: 400 }
+    )
   }
 
   const boldSignPayload = {

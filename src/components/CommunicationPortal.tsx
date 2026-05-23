@@ -113,8 +113,9 @@ const deriveContractStoragePath = (fileUrl: string | null | undefined) => {
 const getContractFileUrl = (contract: any) => contract?.fileUrl || contract?.file_url || contract?.file?.url || ""
 
 const DEFAULT_CONTRACT_NAME = "OrdainedPro Default Wedding Contract"
-const DEFAULT_CONTRACT_ASSET_PATH = "/contracts/ordainedpro-default-contract-v3.docx"
-const DEFAULT_CONTRACT_FILE_SIZE = 3268
+const DEFAULT_CONTRACT_ASSET_PATH = "/contracts/ordainedpro-default-contract.pdf"
+const DEFAULT_CONTRACT_FILE_SIZE = 170691
+const PDF_CONTRACT_FILE_TYPE = "application/pdf"
 const DEFAULT_CONTRACT_PREFILL_DEFAULTS = {
   ceremonyFee: "",
   depositAmount: "",
@@ -145,6 +146,20 @@ const isOrdainedProDefaultContract = (contract: any) => (
   contract?.name === DEFAULT_CONTRACT_NAME ||
   getContractFileUrl(contract).includes("/contracts/ordainedpro-default-contract")
 )
+
+const getDuplicateEmails = (signers: Array<{ emailAddress: string }>) => {
+  const seen = new Set<string>()
+  const duplicates = new Set<string>()
+
+  signers.forEach((signer) => {
+    const email = signer.emailAddress.trim().toLowerCase()
+    if (!email) return
+    if (seen.has(email)) duplicates.add(email)
+    seen.add(email)
+  })
+
+  return Array.from(duplicates)
+}
 
 const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`
 
@@ -1233,8 +1248,8 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
           description: "Preformatted OrdainedPro default wedding contract with BoldSign tags. Download to personalize or send as-is.",
           type: "Wedding Service Agreement",
           fileUrl: getDefaultContractUrl(),
-          fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          fileSize: 13568,
+          fileType: PDF_CONTRACT_FILE_TYPE,
+          fileSize: DEFAULT_CONTRACT_FILE_SIZE,
           status: "draft",
         })
 
@@ -1589,6 +1604,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       if (existingUrl && existingUrl !== currentDefaultUrl) {
         const updateResult = await updateContractInDB(existingDefault.id, {
           file_url: currentDefaultUrl,
+          file_type: PDF_CONTRACT_FILE_TYPE,
           file_size: DEFAULT_CONTRACT_FILE_SIZE,
         } as any)
 
@@ -1596,8 +1612,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
           const updatedContract = {
             ...existingDefault,
             fileUrl: currentDefaultUrl,
+            fileType: PDF_CONTRACT_FILE_TYPE,
             fileSize: DEFAULT_CONTRACT_FILE_SIZE,
-            file: existingDefault.file ? { ...existingDefault.file, url: currentDefaultUrl, size: DEFAULT_CONTRACT_FILE_SIZE } : existingDefault.file,
+            file: existingDefault.file ? { ...existingDefault.file, url: currentDefaultUrl, type: PDF_CONTRACT_FILE_TYPE, size: DEFAULT_CONTRACT_FILE_SIZE } : existingDefault.file,
           }
 
           setContracts((prev) => prev.map((contract) =>
@@ -1616,7 +1633,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       description: "Preformatted OrdainedPro default wedding contract with BoldSign tags. Download to personalize or send as-is.",
       type: "Wedding Service Agreement",
       fileUrl: getDefaultContractUrl(),
-      fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      fileType: PDF_CONTRACT_FILE_TYPE,
       fileSize: DEFAULT_CONTRACT_FILE_SIZE,
       status: "draft",
     })
@@ -3392,6 +3409,7 @@ ${shareScriptForm.body}`)
       if (originalUrl && originalUrl !== currentDefaultUrl) {
         const updateResult = await updateContractInDB(contract.id, {
           file_url: currentDefaultUrl,
+          file_type: PDF_CONTRACT_FILE_TYPE,
           file_size: DEFAULT_CONTRACT_FILE_SIZE,
         } as any)
 
@@ -3404,9 +3422,11 @@ ${shareScriptForm.body}`)
                   ...c,
                   fileUrl: currentDefaultUrl,
                   file_url: currentDefaultUrl,
+                  fileType: PDF_CONTRACT_FILE_TYPE,
+                  file_type: PDF_CONTRACT_FILE_TYPE,
                   fileSize: DEFAULT_CONTRACT_FILE_SIZE,
                   file_size: DEFAULT_CONTRACT_FILE_SIZE,
-                  file: c.file ? { ...c.file, url: currentDefaultUrl, size: DEFAULT_CONTRACT_FILE_SIZE } : c.file,
+                  file: c.file ? { ...c.file, url: currentDefaultUrl, type: PDF_CONTRACT_FILE_TYPE, size: DEFAULT_CONTRACT_FILE_SIZE } : c.file,
                 } as any
               : c
           ))
@@ -3535,17 +3555,27 @@ ${shareScriptForm.body}`)
       ]
       const signers = [
         ...coupleSigners,
-        ...(isDefaultContractSend
-          ? []
-          : officiantEmail
-            ? [
-                {
-                  emailAddress: officiantEmail,
-                  name: officiantName || officiantLabel || "Wedding Officiant",
-                },
-              ]
-            : []),
+        ...(officiantEmail
+          ? [
+              {
+                emailAddress: officiantEmail,
+                name: officiantName || officiantLabel || "Wedding Officiant",
+              },
+            ]
+          : []),
       ]
+
+      if (isDefaultContractSend && !officiantEmail) {
+        alert("The default PDF contract requires the officiant email before it can be sent for signature.")
+        return
+      }
+
+      const duplicateEmails = getDuplicateEmails(signers)
+      if (duplicateEmails.length > 0) {
+        alert(`Each BoldSign signer needs a unique email address. Please update these duplicate email(s) before sending: ${duplicateEmails.join(", ")}`)
+        return
+      }
+
       console.log("BoldSign signer roles before server cleanup:", signers)
 
       const response = await fetch("/api/boldsign/send-contract", {
@@ -3709,6 +3739,11 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     }
 
     const fileExt = uploadedFile.name.split(".").pop() || "file"
+    if (fileExt.toLowerCase() !== "pdf") {
+      alert("Contracts must be uploaded as PDF files. Please export your contract to PDF and upload it again.")
+      return
+    }
+
     const fileName = `${Date.now()}_${currentUser.id}.${fileExt}`
     const filePath = `${currentUser.id}/${fileName}`
 

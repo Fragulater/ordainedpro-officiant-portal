@@ -313,7 +313,7 @@ export function ContractUploadDialog({
               You only need to set this up once per contract, not once per couple.
             </p>
             <p className="mt-1 text-sm text-green-800">
-              The default OrdainedPro contract is already preloaded for each new couple. Use it as-is, download it to personalize, or upload your own tagged DOCX/PDF contract.
+              The default OrdainedPro contract is already preloaded for each new couple. Use it as-is, download it to personalize, or upload your own tagged PDF contract.
             </p>
           </div>
 
@@ -349,7 +349,7 @@ export function ContractUploadDialog({
                 Upload / Use Your Own Contract
               </div>
               <p className="mt-2 text-sm text-slate-600">
-                Upload a personalized DOCX or PDF and use the helper tags below so BoldSign knows where fields belong.
+                Upload a personalized PDF and use the helper tags below so BoldSign knows where fields belong.
               </p>
             </button>
           </div>
@@ -361,7 +361,7 @@ export function ContractUploadDialog({
                 Default Contract Ready
               </h4>
               <p className="text-sm text-blue-800">
-                The default contract is automatically added to this couple's contract list. Download it from the contract card if you want to edit it in Word and upload your personalized version later.
+                The default contract is automatically added to this couple's contract list. Download it from the contract card if you want to edit it in Word or Google Docs, then export and upload your personalized PDF version later.
               </p>
               {errors.defaultContract && (
                 <p className="mt-2 text-sm text-red-600 flex items-center">
@@ -459,7 +459,7 @@ export function ContractUploadDialog({
               Contract Document
             </h4>
             <p className="mb-3 text-sm text-blue-800">
-              Upload a tagged DOCX or PDF contract. Use the setup helper below to copy the fields into the contract before uploading.
+              Upload a tagged PDF contract. Create or edit the contract in Word or Google Docs, then export it as a PDF before uploading.
             </p>
 
             <FileUpload
@@ -468,7 +468,7 @@ export function ContractUploadDialog({
               onFileRemoved={handleFileRemoved}
               maxFiles={1}
               maxFileSize={10}
-              acceptedFileTypes={[".docx", ".pdf"]}
+              acceptedFileTypes={[".pdf"]}
               existingFiles={uploadedFiles}
             />
 
@@ -487,11 +487,11 @@ export function ContractUploadDialog({
               <div>
                 <h4 className="font-semibold text-amber-900 mb-1">Contract Setup Helper</h4>
                 <p className="text-sm text-amber-800">
-                  Copy these tags into a DOCX contract where each field should appear. Partner 1, Partner 2, and Officiant match the signer order used when sending through BoldSign.
+                  Copy these tags into the contract where each field should appear, then export the finished file as a PDF before uploading. Partner 1, Partner 2, and Officiant match the signer order used when sending through BoldSign.
                 </p>
               </div>
               <span className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium text-amber-800">
-                DOCX or PDF recommended
+                PDF required
               </span>
             </div>
 
