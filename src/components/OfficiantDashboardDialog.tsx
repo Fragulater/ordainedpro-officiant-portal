@@ -259,6 +259,7 @@ export function OfficiantDashboardDialog({
   const [user, setUser] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [publicProfileCopied, setPublicProfileCopied] = useState(false);
+  const [profileSaveStatus, setProfileSaveStatus] = useState<"idle" | "saved">("idle");
   // Form state for Add New Ceremony - mirrors Communication Portal
   const [newCeremony, setNewCeremony] = useState({
     ceremonyName: "",
@@ -899,6 +900,7 @@ export function OfficiantDashboardDialog({
 
   const handleProfileSubmit = async () => {
     try {
+      setProfileSaveStatus("idle");
       if (!user?.id) {
         alert("⚠️ Please sign in before saving your profile.");
         return;
@@ -941,6 +943,8 @@ export function OfficiantDashboardDialog({
       if (error) throw error;
 
       console.log("✅ Supabase response:", data);
+      setProfileSaveStatus("saved");
+      window.setTimeout(() => setProfileSaveStatus("idle"), 2600);
     } catch (err) {
       console.error("❌ Error saving profile:", err);
       alert("❌ Failed to save profile. Please try again.");
@@ -2313,7 +2317,17 @@ export function OfficiantDashboardDialog({
                     </Card>
 
                     {/* Save Button */}
-                    <div className="flex justify-end">
+                    <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end">
+                      <p
+                        className={`text-sm font-medium text-green-700 transition-all duration-500 ${
+                          profileSaveStatus === "saved"
+                            ? "opacity-100 translate-y-0"
+                            : "pointer-events-none opacity-0 translate-y-1"
+                        }`}
+                        aria-live="polite"
+                      >
+                        Profile changes saved.
+                      </p>
                       <Button
                         onClick={handleProfileSubmit}
                         className="bg-blue-500 hover:bg-blue-600"
