@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
+import { readFile } from "fs/promises"
+import path from "path"
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -14,12 +17,19 @@ type PrefillField = {
   value: string
 }
 
+type PrefillMap = Record<string, string>
+
 const SUPPORTED_BOLDSIGN_FILE_EXTENSIONS = [".pdf"]
 
 function getFileExtension(fileNameOrUrl: string) {
   const cleanValue = fileNameOrUrl.split("?")[0].toLowerCase()
   const dotIndex = cleanValue.lastIndexOf(".")
   return dotIndex >= 0 ? cleanValue.slice(dotIndex) : ""
+}
+
+function truncateForPdf(text: string, maxLength = 80) {
+  const cleanText = text.replace(/\s+/g, " ").trim()
+  return cleanText.length > maxLength ? `${cleanText.slice(0, maxLength - 3)}...` : cleanText
 }
 
 function getPublicSiteUrl() {
@@ -149,6 +159,115 @@ function sanitizePrefillFields(prefillFields: unknown): PrefillField[] {
     .filter((field) => field.id && field.value)
 }
 
+function prefillFieldsToMap(prefillFields: PrefillField[]): PrefillMap {
+  return prefillFields.reduce<PrefillMap>((acc, field) => {
+    acc[field.id] = field.value
+    return acc
+  }, {})
+}
+
+function getPrefillValue(prefillValues: PrefillMap, ...keys: string[]) {
+  for (const key of keys) {
+    const value = prefillValues[key]
+    if (value) return value
+  }
+
+  return ""
+}
+
+function drawPrefillValue(
+  page: any,
+  font: any,
+  value: string,
+  options: { x: number; y: number; width: number; fontSize?: number }
+) {
+  if (!value.trim()) return
+
+  const fontSize = options.fontSize || 8.5
+  const text = truncateForPdf(value, Math.max(12, Math.floor(options.width / (fontSize * 0.45))))
+
+  page.drawRectangle({
+    x: options.x - 1,
+    y: options.y - 2,
+    width: options.width + 2,
+    height: fontSize + 5,
+    color: rgb(1, 1, 1),
+  })
+  page.drawText(text, {
+    x: options.x,
+    y: options.y,
+    size: fontSize,
+    font,
+    color: rgb(0, 0, 0),
+  })
+}
+
+async function getDefaultContractTemplateBytes(contractUrl: string) {
+  try {
+    return await readFile(path.join(process.cwd(), "public", "contracts", "ordainedpro-default-contract.pdf"))
+  } catch {
+    const response = await fetch(contractUrl)
+    if (!response.ok) {
+      throw new Error("Unable to load the default contract PDF for personalization.")
+    }
+
+    return Buffer.from(await response.arrayBuffer())
+  }
+}
+
+async function createPersonalizedDefaultContractBase64(contractUrl: string, prefillFields: PrefillField[]) {
+  const templateBytes = await getDefaultContractTemplateBytes(contractUrl)
+  const pdfDocument = await PDFDocument.load(templateBytes)
+  const font = await pdfDocument.embedFont(StandardFonts.Helvetica)
+  const prefillValues = prefillFieldsToMap(prefillFields)
+  const pages = pdfDocument.getPages()
+
+  const draw = (pageIndex: number, key: string | string[], x: number, y: number, width: number, fontSize?: number) => {
+    const keys = Array.isArray(key) ? key : [key]
+    const value = getPrefillValue(prefillValues, ...keys)
+    const page = pages[pageIndex]
+    if (!page) return
+    drawPrefillValue(page, font, value, { x, y, width, fontSize })
+  }
+
+  draw(0, ["agreement_date", "wed_date"], 391, 689, 88)
+  draw(0, ["comp_name", "officiant_business_name"], 54, 677, 250)
+  draw(0, ["bride_name", "partner_1_name"], 312, 677, 90)
+  draw(0, ["groom_name", "partner_2_name"], 408, 677, 95)
+  draw(0, ["wed_date", "wedding_date"], 315, 600, 90)
+  draw(0, ["wed_time", "wedding_time"], 461, 600, 80)
+  draw(0, ["venue", "venue_name"], 84, 567, 220)
+  draw(0, ["venue_addr", "venue_address"], 118, 556, 360)
+
+  draw(1, ["ceremony_fee", "total_fee"], 159, 719, 80)
+  draw(1, "deposit_amount", 107, 691, 80)
+  draw(1, "arrival_minutes", 201, 375, 40)
+  draw(1, "late_grace_minutes", 182, 358, 40)
+  draw(1, "late_grace_minutes", 225, 330, 40)
+  draw(1, "late_fee_half_hour", 190, 318, 55)
+  draw(1, "full_day_fee", 360, 245, 70)
+  draw(1, "included_miles", 105, 208, 50)
+  draw(1, ["officiant_addr", "travel_origin_or_service_area"], 54, 175, 350)
+  draw(1, "mileage_rate", 268, 158, 55)
+
+  draw(2, "rehearsal_arrival_minutes", 54, 616, 45)
+
+  draw(3, ["ceremony_fee", "total_fee"], 143, 633, 80)
+  draw(3, "deposit_amount", 153, 621, 80)
+
+  draw(4, ["bride_name", "partner_1_name"], 180, 642, 205)
+  draw(4, ["groom_name", "partner_2_name"], 180, 542, 205)
+  draw(4, ["comp_name", "officiant_business_name"], 180, 442, 205)
+  draw(4, "bride_phone", 128, 340, 145)
+  draw(4, "groom_phone", 392, 340, 145)
+  draw(4, "bride_email", 125, 322, 150, 8)
+  draw(4, "groom_email", 390, 322, 150, 8)
+  draw(4, ["mailing_addr", "couple_mailing_address"], 125, 304, 390, 8)
+
+  const personalizedBytes = await pdfDocument.save()
+  return `data:application/pdf;base64,${Buffer.from(personalizedBytes).toString("base64")}`
+}
+
 function extractBoldSignErrorMessages(details: any): string[] {
   const messages = new Set<string>()
 
@@ -243,10 +362,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "At least one signer email is required." }, { status: 400 })
   }
 
+  const personalizedDefaultContractFile = shouldUseManualFields
+    ? await createPersonalizedDefaultContractBase64(contractUrl, prefillFields)
+    : null
+
   const boldSignPayload = {
     Title: contractName,
     Message: message,
-    FileUrls: [contractUrl],
+    ...(personalizedDefaultContractFile
+      ? {
+          Files: [
+            {
+              fileName: "OrdainedPro-Default-Wedding-Contract.pdf",
+              base64: personalizedDefaultContractFile,
+            },
+          ],
+        }
+      : {
+          FileUrls: [contractUrl],
+        }),
     Signers: signers.map((signer, index) => ({
       name: signer.name,
       emailAddress: signer.emailAddress,
