@@ -25,6 +25,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { supabase } from "@/supabase/utils/client";
+import { MyVendorsView } from "@/components/officiant-dashboard/MyVendorsView";
 import {
   LayoutDashboard,
   Heart,
@@ -61,6 +62,7 @@ import {
   Sparkles,
   CreditCard,
   Check,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -242,6 +244,7 @@ export function OfficiantDashboardDialog({
     | "ceremonies"
     | "calendar"
     | "documents"
+    | "vendors"
     | "profile"
     | "settings"
   >(initialView);
@@ -1186,6 +1189,14 @@ export function OfficiantDashboardDialog({
               >
                 <FileText className="w-4 h-4 mr-3" />
                 Documents
+              </Button>
+              <Button
+                variant={activeView === "vendors" ? "secondary" : "ghost"}
+                className="w-full justify-start"
+                onClick={() => setActiveView("vendors")}
+              >
+                <BriefcaseBusiness className="w-4 h-4 mr-3" />
+                My Vendors
               </Button>
               <Button
                 variant={activeView === "settings" ? "secondary" : "ghost"}
@@ -2339,6 +2350,11 @@ export function OfficiantDashboardDialog({
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* My Vendors View */}
+            {activeView === "vendors" && (
+              <MyVendorsView userId={user?.id} />
             )}
 
             {/* Documents View */}
