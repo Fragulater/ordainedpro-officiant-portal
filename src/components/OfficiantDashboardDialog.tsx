@@ -367,11 +367,18 @@ export function OfficiantDashboardDialog({
   const handleSharePublicProfileByEmail = () => {
     if (!user?.id) return;
 
-    const subject = encodeURIComponent(`${officiantFullName}'s OrdainedPro profile`);
+    const displayName = profile.fullName || officiantFullName;
+    const subject = encodeURIComponent(`${displayName}'s OrdainedPro public profile`);
     const body = encodeURIComponent(
-      `Here is my OrdainedPro public profile:\n\n${publicProfileUrl}`
+      `Hi,\n\nHere is my OrdainedPro public profile:\n${publicProfileUrl}\n\nThank you,\n${displayName}`
     );
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
+    const mailtoLink = document.createElement("a");
+    mailtoLink.href = mailtoUrl;
+    mailtoLink.rel = "noopener noreferrer";
+    document.body.appendChild(mailtoLink);
+    mailtoLink.click();
+    mailtoLink.remove();
   };
   const getCoupleColors = (coupleId: number) => {
     const colorPairs = [
