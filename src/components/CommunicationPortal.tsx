@@ -85,6 +85,39 @@ const formatMeetingDateTime = (meeting: { date?: string; time?: string | null })
   })
 }
 
+const getPaymentDateValue = (payment: any) => new Date(payment.dueDate || payment.paidDate || payment.createdAt || payment.date || Date.now())
+
+const isRefundPayment = (payment: any) =>
+  payment?.status === "refunded" || String(payment?.type || payment?.payment_method || "").toLowerCase() === "refund"
+
+const isPaidPayment = (payment: any) => payment?.status === "paid" && !isRefundPayment(payment)
+
+const isInvoiceCharge = (payment: any) => payment?.status === "pending"
+
+const calculatePaymentSummary = (records: any[]) => {
+  const charges = records.filter(isInvoiceCharge)
+  const paidRecords = records.filter(isPaidPayment)
+  const refundRecords = records.filter(isRefundPayment)
+  const totalCharged = charges.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+  const totalPaid = paidRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+  const totalRefunded = refundRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+  const netPaid = Math.max(0, totalPaid - totalRefunded)
+  const totalAmount = totalCharged > 0 ? totalCharged : netPaid
+  const balance = Math.max(0, totalAmount - netPaid)
+  const nextCharge = charges
+    .slice()
+    .sort((a, b) => getPaymentDateValue(a).getTime() - getPaymentDateValue(b).getTime())[0]
+
+  return {
+    totalAmount,
+    totalPaid: netPaid,
+    totalRefunded,
+    balance,
+    finalPaymentDue: nextCharge?.dueDate || nextCharge?.due_date || "",
+    paymentStatus: balance === 0 && totalAmount > 0 ? "paid_in_full" : netPaid > 0 ? "deposit_paid" : "pending"
+  }
+}
+
 // Helper function to generate consistent colors based on couple ID
 const getCoupleColors = (coupleId: number) => {
   const colorPairs = [
@@ -1285,19 +1318,15 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       }))
       setPaymentHistory(transformedPayments)
 
-      // Calculate payment info from history
-      const paidPayments = transformedPayments.filter((p: any) => p.status === "paid")
-      const pendingPayments = transformedPayments.filter((p: any) => p.status === "pending")
-      const totalPaid = paidPayments.reduce((sum: number, p: any) => sum + Number(p.amount), 0)
-      const totalPending = pendingPayments.reduce((sum: number, p: any) => sum + Number(p.amount), 0)
+      const paymentSummary = calculatePaymentSummary(transformedPayments)
 
       setPaymentInfo({
-        totalAmount: totalPaid + totalPending,
-        depositPaid: totalPaid,
-        balance: totalPending,
-        depositDate: paidPayments.length > 0 ? paidPayments[0].date : "",
-        finalPaymentDue: pendingPayments.length > 0 ? pendingPayments[0].dueDate || "" : "",
-        paymentStatus: totalPending === 0 && totalPaid > 0 ? "paid_in_full" : totalPaid > 0 ? "deposit_paid" : "pending"
+        totalAmount: paymentSummary.totalAmount,
+        depositPaid: paymentSummary.totalPaid,
+        balance: paymentSummary.balance,
+        depositDate: transformedPayments.find((payment: any) => isPaidPayment(payment))?.date || "",
+        finalPaymentDue: paymentSummary.finalPaymentDue,
+        paymentStatus: paymentSummary.paymentStatus
       })
 
       console.log("âœ… Loaded", transformedPayments.length, "payments for couple", editCoupleInfo.id)
@@ -3664,12 +3693,19 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
   }
 
   // Handle sending payment reminder email
-  const handleSendPaymentReminderEmail = () => {
-    const recipient = paymentReminderForm.to === 'both'
-      ? `${editCoupleInfo.brideEmail}, ${editCoupleInfo.groomEmail}`
-      : paymentReminderForm.to || paymentReminderForm.customEmail
+  const handleSendPaymentReminderEmail = async () => {
+    const recipientEmails = Array.from(
+      new Set(
+        (paymentReminderForm.to === 'both'
+          ? [editCoupleInfo.brideEmail, editCoupleInfo.groomEmail]
+          : [paymentReminderForm.to || paymentReminderForm.customEmail]
+        )
+          .map((email) => String(email || "").trim())
+          .filter(Boolean)
+      )
+    )
 
-    if (!recipient.trim()) {
+    if (recipientEmails.length === 0) {
       alert('Please select a recipient or enter an email address.')
       return
     }
@@ -3684,24 +3720,84 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
       return
     }
 
-    // Add to messaging platform
-    setNewMessage(`’° Payment Reminder sent to: ${recipient}\n[SCRIPT]„ Subject: ${paymentReminderForm.subject}\n\n${paymentReminderForm.body}`)
+    if (isSendingMessage) return
+    setIsSendingMessage(true)
 
-    // Auto-send the message
-    setTimeout(() => {
-      handleSendMessage()
-    }, 100)
+    const reminderMessage = `Payment Reminder\nSubject: ${paymentReminderForm.subject}\n\n${paymentReminderForm.body}`
 
-    // Close dialog and reset form
-    setShowSendPaymentReminderDialog(false)
-    setPaymentReminderForm({
-      to: '',
-      customEmail: '',
-      subject: '',
-      body: ''
-    })
+    try {
+      if (currentUser?.id && editCoupleInfo?.id) {
+        const { data: savedMessage, error: saveError } = await supabase
+          .from("messages")
+          .insert([{
+            user_id: currentUser.id,
+            couple_id: editCoupleInfo.id,
+            sender: "officiant",
+            sender_name: officiantLabel,
+            content: reminderMessage,
+            read: true,
+            created_at: new Date().toISOString(),
+          }])
+          .select()
 
-    console.log(`Payment reminder sent to: ${recipient}`)
+        if (saveError) {
+          console.error("Failed to save payment reminder message:", saveError)
+        } else if (savedMessage?.[0]) {
+          setMessages(prev => {
+            const messageExists = prev.some((message) => String(message.id) === String(savedMessage[0].id))
+            if (messageExists) return prev
+
+            return [...prev, {
+              id: savedMessage[0].id,
+              sender: officiantLabel,
+              role: "officiant",
+              message: reminderMessage,
+              timestamp: "Just now",
+              avatar: "/api/placeholder/40/40"
+            }]
+          })
+        }
+      }
+
+      const coupleName = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
+
+      for (const email of recipientEmails) {
+        const response = await fetch("/api/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: email,
+            subject: paymentReminderForm.subject,
+            message: paymentReminderForm.body,
+            fromName: officiantLabel,
+            coupleName,
+            coupleId: editCoupleInfo?.id,
+            officiantId: currentUser?.id,
+            attachments: []
+          })
+        })
+
+        const result = await response.json().catch(() => null)
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || result?.details || `Failed to send reminder to ${email}`)
+        }
+      }
+
+      setShowSendPaymentReminderDialog(false)
+      setPaymentReminderForm({
+        to: '',
+        customEmail: '',
+        subject: '',
+        body: ''
+      })
+
+      console.log(`Payment reminder sent to: ${recipientEmails.join(", ")}`)
+    } catch (error) {
+      console.error("Failed to send payment reminder:", error)
+      alert(error instanceof Error ? error.message : "Failed to send payment reminder. Please try again.")
+    } finally {
+      setIsSendingMessage(false)
+    }
   }
 
   const handleContractUploaded = async (contractData: Omit<Contract, 'id' | 'createdDate'>) => {
@@ -3987,12 +4083,23 @@ Note: This is an initial draft. Further development needed to incorporate specif
     .slice()
     .sort((a, b) => (b.earnings || 0) - (a.earnings || 0))[0]
 
-  const getPaymentDateValue = (payment: any) => new Date(payment.dueDate || payment.paidDate || payment.createdAt || Date.now())
   const currentYear = new Date().getFullYear()
   const currentMonth = new Date().getMonth()
-  const paidPaymentRecords = allPaymentRecords.filter(payment => payment.status === "paid")
-  const refundPaymentRecords = allPaymentRecords.filter(payment => payment.status === "refunded" || payment.type === "refund")
-  const pendingPaymentRecords = allPaymentRecords.filter(payment => payment.status === "pending")
+  const paidPaymentRecords = allPaymentRecords.filter(isPaidPayment)
+  const refundPaymentRecords = allPaymentRecords.filter(isRefundPayment)
+  const paymentSummaryByCouple = allPaymentRecords.reduce((groups: Record<string, any[]>, payment: any) => {
+    const key = String(payment.coupleId || "unassigned")
+    groups[key] = groups[key] || []
+    groups[key].push(payment)
+    return groups
+  }, {})
+  const outstandingSummaries = Object.entries(paymentSummaryByCouple)
+    .map(([coupleId, records]) => ({
+      coupleId,
+      records,
+      summary: calculatePaymentSummary(records as any[])
+    }))
+    .filter(({ summary }) => summary.balance > 0)
   const financialReport = {
     grossIncome: paidPaymentRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
     refunds: refundPaymentRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
@@ -4006,7 +4113,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
     yearIncome: paidPaymentRecords
       .filter(payment => getPaymentDateValue(payment).getFullYear() === currentYear)
       .reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
-    outstanding: pendingPaymentRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    outstanding: outstandingSummaries.reduce((sum, item) => sum + item.summary.balance, 0),
     paymentsReceived: paidPaymentRecords.length,
     refundsIssued: refundPaymentRecords.length,
   }
@@ -4019,10 +4126,25 @@ Note: This is an initial draft. Further development needed to incorporate specif
       weddingDate: couple?.weddingDetails?.weddingDate || "",
     }
   })
-  const outstandingBalanceRows = financialRows
-    .filter(payment => payment.status === "pending")
+  const outstandingBalanceRows = outstandingSummaries
+    .map(({ coupleId, records, summary }) => {
+      const firstCharge = (records as any[])
+        .filter(isInvoiceCharge)
+        .sort((a, b) => getPaymentDateValue(a).getTime() - getPaymentDateValue(b).getTime())[0]
+      const couple = allCouples.find((item: any) => String(item.id) === coupleId)
+
+      return {
+        id: `outstanding-${coupleId}`,
+        coupleId,
+        coupleName: couple ? `${couple.brideName} & ${couple.groomName}` : `Couple #${coupleId}`,
+        weddingDate: couple?.weddingDetails?.weddingDate || "",
+        description: firstCharge?.description || "Outstanding ceremony balance",
+        dueDate: summary.finalPaymentDue,
+        amount: summary.balance,
+      }
+    })
     .sort((a, b) => getPaymentDateValue(a).getTime() - getPaymentDateValue(b).getTime())
-  const refundRows = financialRows.filter(payment => payment.status === "refunded" || payment.type === "refund")
+  const refundRows = financialRows.filter(isRefundPayment)
 
   const exportFinancialCsv = () => {
     const headers = ["Date", "Couple", "Wedding Date", "Description", "Type", "Status", "Amount"]

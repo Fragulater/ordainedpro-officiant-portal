@@ -17,6 +17,7 @@ export function PortalSendPaymentReminderDialog() {
     editCoupleInfo,
     handleSendPaymentReminderEmail,
     paymentInfo,
+    isSendingMessage,
   } = useCommunicationPortal()
 
   // Don't render if editCoupleInfo is not available
@@ -168,13 +169,14 @@ export function PortalSendPaymentReminderDialog() {
               onClick={handleSendPaymentReminderEmail}
               className="bg-orange-500 hover:bg-orange-600"
               disabled={
+                isSendingMessage ||
                 (!paymentReminderForm.to && !paymentReminderForm.customEmail) ||
                 !paymentReminderForm.subject.trim() ||
                 !paymentReminderForm.body.trim()
               }
             >
               <AlertCircle className="w-4 h-4 mr-2" />
-              Send Payment Reminder
+              {isSendingMessage ? "Sending..." : "Send Payment Reminder"}
             </Button>
           </div>
         </DialogContent>
