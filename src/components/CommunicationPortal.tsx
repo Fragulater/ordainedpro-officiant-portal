@@ -3539,13 +3539,14 @@ ${shareScriptForm.body}`)
 
       const boldSignResult = await response.json().catch(() => null)
       const normalizedBoldSignStatus = String(boldSignResult?.boldSignStatus || "").toLowerCase()
-      const contractWasSent = ["sent", "waiting for me", "waiting for others", "completed", "signed"].some((status) =>
+      const contractWasSent = ["accepted", "sent", "waiting for me", "waiting for others", "completed", "signed"].some((status) =>
         normalizedBoldSignStatus.includes(status)
       )
       console.log("BoldSign send result:", {
         documentId: boldSignResult?.documentId,
         status: boldSignResult?.boldSignStatus,
         details: boldSignResult?.statusCheck,
+        prefillSkipped: boldSignResult?.prefillSkipped,
       })
 
       const sentAt = new Date()
