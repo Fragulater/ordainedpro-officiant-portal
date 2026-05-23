@@ -55,6 +55,52 @@ function isLocalContractUrl(contractUrl: string) {
   }
 }
 
+function isDefaultContractUrl(contractUrl: string) {
+  try {
+    return new URL(contractUrl).pathname.endsWith("/contracts/ordainedpro-default-contract.pdf")
+  } catch {
+    return contractUrl.endsWith("/contracts/ordainedpro-default-contract.pdf")
+  }
+}
+
+function getDefaultContractFormFields(index: number) {
+  const rows = [
+    { signatureY: 365, dateY: 365 },
+    { signatureY: 397, dateY: 397 },
+    { signatureY: 429, dateY: 429 },
+  ]
+  const row = rows[index] || rows[rows.length - 1]
+
+  return [
+    {
+      id: `signature_${index + 1}`,
+      name: `Signature ${index + 1}`,
+      fieldType: "Signature",
+      pageNumber: 1,
+      bounds: {
+        x: 190,
+        y: row.signatureY,
+        width: 210,
+        height: 28,
+      },
+      isRequired: true,
+    },
+    {
+      id: `signed_date_${index + 1}`,
+      name: `Signed Date ${index + 1}`,
+      fieldType: "DateSigned",
+      pageNumber: 1,
+      bounds: {
+        x: 455,
+        y: row.dateY,
+        width: 95,
+        height: 24,
+      },
+      isRequired: true,
+    },
+  ]
+}
+
 function sanitizeSigners(signers: Signer[]) {
   return signers
     .map((signer) => ({
@@ -169,6 +215,7 @@ export async function POST(request: NextRequest) {
   const signers = makeSignerEmailsUnique(sanitizeSigners(Array.isArray(body.signers) ? body.signers : []))
   const prefillFields = sanitizePrefillFields(body.prefillFields)
   const fileExtension = getFileExtension(contractUrl || contractName)
+  const shouldUseManualFields = isDefaultContractUrl(contractUrl)
 
   if (!originalContractUrl) {
     return NextResponse.json({ error: "Contract file URL is required." }, { status: 400 })
@@ -208,10 +255,11 @@ export async function POST(request: NextRequest) {
       signerType: "Signer",
       locale: "EN",
       signerOrder: index + 1,
+      ...(shouldUseManualFields ? { formFields: getDefaultContractFormFields(index) } : {}),
     })),
     EnableSigningOrder: false,
-    AutoDetectFields: true,
-    UseTextTags: true,
+    AutoDetectFields: !shouldUseManualFields,
+    UseTextTags: !shouldUseManualFields,
     DisableEmails: false,
     ReminderSettings: {
       EnableAutoReminder: true,
