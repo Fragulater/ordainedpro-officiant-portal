@@ -108,9 +108,9 @@ const DEFAULT_CONTRACT_SIGNATURE_PAGE = 5
 
 function getDefaultContractFormFields(roleIndices: number[]) {
   const rows = [
-    { signatureY: 188, dateY: 188 },
-    { signatureY: 288, dateY: 288 },
-    { signatureY: 388, dateY: 388 },
+    { signatureY: 236, dateY: 236 },
+    { signatureY: 336, dateY: 336 },
+    { signatureY: 436, dateY: 436 },
   ]
 
   return roleIndices.flatMap((roleIndex) => {
