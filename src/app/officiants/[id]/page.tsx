@@ -16,6 +16,7 @@ import {
   Phone,
   Play,
   ShoppingCart,
+  Star,
   Youtube,
 } from "lucide-react"
 
@@ -187,6 +188,8 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
         : "Travel details available on request"
   const marketplaceBaseUrl = process.env.NEXT_PUBLIC_MARKETPLACE_URL || "https://scripts.ordainedpro.com"
   const storeUrl = `${marketplaceBaseUrl}/store/${profile.user_id}`
+  const totalReviews = Number(profile.total_reviews || 0)
+  const rating = Number(profile.rating || 0)
 
   return (
     <main className="min-h-screen bg-slate-100 p-3 sm:p-4">
@@ -221,6 +224,12 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
               <Badge className="px-3 py-2 text-sm font-semibold bg-green-100 text-green-800 hover:bg-green-100">
                 <DollarSign className="mr-1.5 h-4 w-4" />
                 {formatPrice(profile)}
+              </Badge>
+              <Badge className="px-3 py-2 text-sm font-semibold bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                <Star className="mr-1.5 h-4 w-4 fill-yellow-500 text-yellow-500" />
+                {totalReviews > 0
+                  ? `${rating.toFixed(1)} (${totalReviews} ${totalReviews === 1 ? "review" : "reviews"})`
+                  : "No reviews yet"}
               </Badge>
               <Badge className="px-3 py-2 text-sm font-semibold bg-purple-100 text-purple-800 hover:bg-purple-100">{travelDescription}</Badge>
             </div>

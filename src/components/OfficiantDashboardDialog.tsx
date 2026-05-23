@@ -263,6 +263,10 @@ export function OfficiantDashboardDialog({
   const [saving, setSaving] = useState(false);
   const [publicProfileCopied, setPublicProfileCopied] = useState(false);
   const [profileSaveStatus, setProfileSaveStatus] = useState<"idle" | "saved">("idle");
+  const [reviewLinkCopied, setReviewLinkCopied] = useState(false);
+  const [selectedReviewCoupleId, setSelectedReviewCoupleId] = useState("");
+  const [sendingReviewRequest, setSendingReviewRequest] = useState(false);
+  const [reviewRequestStatus, setReviewRequestStatus] = useState<"idle" | "sent" | "error">("idle");
   // Form state for Add New Ceremony - mirrors Communication Portal
   const [newCeremony, setNewCeremony] = useState({
     ceremonyName: "",
@@ -295,7 +299,7 @@ export function OfficiantDashboardDialog({
     travelRadiusMiles: 50,
     travelState: "",
     yearsExperience: 0,
-    rating: 4.8,
+    rating: 0,
     totalReviews: 0,
     phone: "",
     email: "",
@@ -353,6 +357,20 @@ export function OfficiantDashboardDialog({
     typeof window !== "undefined" && user?.id
       ? `${window.location.origin}${publicProfilePath}`
       : publicProfilePath;
+  const reviewRequestPath = user?.id ? `/review/${user.id}` : "/find-officiant";
+  const reviewRequestUrl =
+    typeof window !== "undefined" && user?.id
+      ? `${window.location.origin}${reviewRequestPath}`
+      : reviewRequestPath;
+  const hasReviews = profile.totalReviews > 0;
+
+  useEffect(() => {
+    if (!selectedReviewCoupleId && couples && couples.length > 0) {
+      const firstActiveCouple = couples.find((couple) => couple.isActive) || couples[0];
+      setSelectedReviewCoupleId(String(firstActiveCouple.id));
+    }
+  }, [couples, selectedReviewCoupleId]);
+
   const handleCopyPublicProfileUrl = async () => {
     if (!user?.id) return;
 
@@ -379,6 +397,93 @@ export function OfficiantDashboardDialog({
     document.body.appendChild(mailtoLink);
     mailtoLink.click();
     mailtoLink.remove();
+  };
+
+  const handleCopyReviewRequestUrl = async () => {
+    if (!user?.id) return;
+
+    try {
+      await navigator.clipboard.writeText(reviewRequestUrl);
+      setReviewLinkCopied(true);
+      window.setTimeout(() => setReviewLinkCopied(false), 1800);
+    } catch (error) {
+      console.error("Unable to copy review request URL:", error);
+    }
+  };
+
+  const handleSendReviewRequestEmail = async () => {
+    if (!user?.id) return;
+
+    const couple = (couples || []).find(
+      (candidate) => String(candidate.id) === selectedReviewCoupleId
+    );
+
+    if (!couple) {
+      setReviewRequestStatus("error");
+      return;
+    }
+
+    const recipients = Array.from(
+      new Set(
+        [couple.brideEmail, couple.groomEmail]
+          .map((email) => email?.trim())
+          .filter((email): email is string => Boolean(email))
+      )
+    );
+
+    if (recipients.length === 0) {
+      setReviewRequestStatus("error");
+      return;
+    }
+
+    const coupleNames = [couple.brideName, couple.groomName]
+      .filter(Boolean)
+      .join(" & ");
+    const coupleReviewUrl = `${reviewRequestUrl}?couple=${encodeURIComponent(
+      String(couple.id)
+    )}&names=${encodeURIComponent(coupleNames)}`;
+    const message = `Hi ${coupleNames || "there"},
+
+Thank you for allowing me to be part of your wedding ceremony. If you have a moment, I would be grateful if you could leave a short review of your experience.
+
+Review link: ${coupleReviewUrl}
+
+Thank you,
+${officiantFullName}`;
+
+    try {
+      setSendingReviewRequest(true);
+      setReviewRequestStatus("idle");
+
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: recipients,
+          subject: "Thank you for letting me be part of your wedding",
+          message,
+          fromName: officiantFullName,
+          coupleName: coupleNames,
+          coupleId: couple.id,
+          officiantId: user.id,
+          actionUrl: coupleReviewUrl,
+          actionLabel: "Leave a Review",
+          emailTitle: "Share Your Wedding Review",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Review request email failed");
+      }
+
+      setReviewRequestStatus("sent");
+      window.setTimeout(() => setReviewRequestStatus("idle"), 3000);
+    } catch (error) {
+      console.error("Unable to send review request:", error);
+      setReviewRequestStatus("error");
+    } finally {
+      setSendingReviewRequest(false);
+    }
   };
   const getCoupleColors = (coupleId: number) => {
     const colorPairs = [
@@ -615,8 +720,8 @@ export function OfficiantDashboardDialog({
             },
             photoGallery: data.photo_gallery || [],
             videoUrl: data.video_url || "",
-            rating: 4.8, // Default rating
-            totalReviews: 0, // Default reviews count
+            rating: Number(data.rating || 0),
+            totalReviews: Number(data.total_reviews || 0),
           });
         }
       } catch (err) {
@@ -1759,25 +1864,101 @@ export function OfficiantDashboardDialog({
                         </div>
 
                         {/* Rating */}
-                        <div className="flex items-center justify-center space-x-2">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
                           <div className="flex items-center">
                             {[...Array(5)].map((_, i) => (
                               <Star
                                 key={i}
                                 className={`w-4 h-4 ${
-                                  i < Math.floor(profile.rating)
+                                  hasReviews && i < Math.round(profile.rating)
                                     ? "fill-yellow-400 text-yellow-400"
                                     : "text-gray-300"
                                 }`}
                               />
                             ))}
                           </div>
-                          <span className="font-semibold text-gray-900">
-                            {profile.rating.toFixed(1)}
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            ({profile.totalReviews} reviews)
-                          </span>
+                          {hasReviews ? (
+                            <>
+                              <span className="font-semibold text-gray-900">
+                                {profile.rating.toFixed(1)}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                ({profile.totalReviews}{" "}
+                                {profile.totalReviews === 1 ? "review" : "reviews"})
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-sm font-medium text-gray-500">
+                              No reviews yet
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Review Request */}
+                        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 space-y-3">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              Request a Review
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              Send this after the ceremony so the couple can leave a star rating and written review.
+                            </p>
+                          </div>
+                          <Input
+                            readOnly
+                            aria-label="Review request URL"
+                            value={reviewRequestUrl}
+                            className="h-8 bg-white text-xs"
+                          />
+                          {couples && couples.length > 0 && (
+                            <select
+                              value={selectedReviewCoupleId}
+                              onChange={(event) => {
+                                setSelectedReviewCoupleId(event.target.value);
+                                setReviewRequestStatus("idle");
+                              }}
+                              className="h-9 w-full rounded-md border border-yellow-200 bg-white px-3 text-xs text-gray-800"
+                            >
+                              {couples.map((couple) => (
+                                <option key={couple.id} value={String(couple.id)}>
+                                  {[couple.brideName, couple.groomName].filter(Boolean).join(" & ") || `Couple ${couple.id}`}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="border-yellow-300 bg-white text-yellow-800 hover:bg-yellow-100"
+                              onClick={handleCopyReviewRequestUrl}
+                              disabled={!user?.id}
+                            >
+                              <Copy className="w-4 h-4 mr-2" />
+                              {reviewLinkCopied ? "Copied" : "Copy"}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="bg-yellow-500 text-white hover:bg-yellow-600"
+                              onClick={handleSendReviewRequestEmail}
+                              disabled={!user?.id || sendingReviewRequest || !couples?.length}
+                            >
+                              <Mail className="w-4 h-4 mr-2" />
+                              {sendingReviewRequest ? "Sending" : "Send"}
+                            </Button>
+                          </div>
+                          {reviewRequestStatus === "sent" && (
+                            <p className="text-xs font-medium text-green-700">
+                              Review request sent.
+                            </p>
+                          )}
+                          {reviewRequestStatus === "error" && (
+                            <p className="text-xs font-medium text-red-700">
+                              Select a couple with an email address before sending.
+                            </p>
+                          )}
                         </div>
 
                         {/* Experience Badge */}
