@@ -103,6 +103,7 @@ export function PortalRecordPaymentDialog() {
                   onChange={(e) => setNewPayment({...newPayment, method: e.target.value})}
                   className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
+                  <option value="Original payment method">Original payment method</option>
                   <option value="Credit Card">Credit Card</option>
                   <option value="Debit Card">Debit Card</option>
                   <option value="Cash">Cash</option>

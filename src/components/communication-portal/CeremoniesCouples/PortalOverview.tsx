@@ -65,6 +65,7 @@ export function PortalOverview() {
       .find((name) => name && !name.includes("@")) || "Officiant"
   const officiantFirstName = officiantName === "Officiant" ? "Officiant" : officiantName.split(/\s+/)[0]
   const officiantLabel = officiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
+  const yearsExperience = Number(officiantProfile?.years_experience || 0)
   const privateNotes = editWeddingDetails?.officiantNotes?.trim() || ""
   const hasPrivateNotes = privateNotes.length > 0
   const today = new Date()
@@ -360,7 +361,7 @@ export function PortalOverview() {
                     <div className="flex items-center mt-1">
                       <Star className="w-3 h-3 text-yellow-400 fill-current" />
                       <Badge variant="secondary" className="text-xs ml-1 bg-yellow-50 text-yellow-700">
-                        5 Years Experience
+                        {yearsExperience} {yearsExperience === 1 ? "Year" : "Years"} Experience
                       </Badge>
                     </div>
                   </div>

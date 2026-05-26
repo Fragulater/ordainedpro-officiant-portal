@@ -97,30 +97,82 @@ async function getInvoice(id: string) {
   }
 }
 
+async function markInvoicePaidFromCheckoutSession(paymentId: number, sessionId?: string) {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+  const supabase = getServiceClient()
+
+  if (!stripeSecretKey || !supabase || !sessionId) return false
+
+  const response = await fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
+    headers: {
+      Authorization: `Bearer ${stripeSecretKey}`,
+    },
+    cache: "no-store",
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => "")
+    console.error("Unable to verify Stripe checkout session:", response.status, errorBody)
+    return false
+  }
+
+  const session = await response.json()
+  const matchesPayment = String(session.client_reference_id || session.metadata?.paymentId || "") === String(paymentId)
+  const isPaid = session.payment_status === "paid" || session.status === "complete"
+
+  if (!matchesPayment || !isPaid) return false
+
+  const { error } = await supabase
+    .from("payments")
+    .update({
+      status: "paid",
+      paid_date: new Date().toISOString().slice(0, 10),
+      payment_method: "Stripe Checkout",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", paymentId)
+
+  if (error) {
+    console.error("Unable to mark invoice paid after Stripe checkout:", error)
+    return false
+  }
+
+  return true
+}
+
 export default async function InvoicePaymentPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ status?: string; session_id?: string }>
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams])
-  const invoice = await getInvoice(id)
+  let invoice = await getInvoice(id)
 
   if (!invoice) notFound()
 
+  if (query.status === "success" && invoice.payment.status !== "paid") {
+    const updated = await markInvoicePaidFromCheckoutSession(invoice.payment.id, query.session_id)
+    if (updated) {
+      invoice = await getInvoice(id)
+      if (!invoice) notFound()
+    }
+  }
+
   const { payment, couple, profile } = invoice
-  const coupleName = [couple?.bride_name, couple?.groom_name].filter(Boolean).join(" & ") || "Wedding couple"
+  const coupleName = [couple?.bride_name, couple?.groom_name].filter(Boolean).join(" & ") || "Ceremony client"
   const coupleEmail = couple?.bride_email || couple?.groom_email || null
-  const officiantName = profile?.business_name || profile?.full_name || "Your wedding officiant"
-  const isPaid = payment.status === "paid" || query.status === "success"
+  const officiantName = profile?.business_name || profile?.full_name || "Your officiant"
+  const isPaid = payment.status === "paid"
+  const amountDue = isPaid ? 0 : Number(payment.amount)
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8">
       <section className="mx-auto max-w-3xl space-y-6">
         <div className="rounded-2xl bg-blue-600 px-6 py-8 text-center text-white shadow-lg">
           <FileText className="mx-auto mb-3 h-10 w-10" />
-          <h1 className="text-3xl font-bold">Wedding Invoice</h1>
+          <h1 className="text-3xl font-bold">Ceremony Invoice</h1>
           <p className="mt-2 text-blue-100">Secure payment portal from {officiantName}</p>
         </div>
 
@@ -149,7 +201,7 @@ export default async function InvoicePaymentPage({
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-xl border bg-white p-4">
                 <p className="text-sm text-slate-500">Amount Due</p>
-                <p className="mt-1 text-2xl font-bold text-slate-950">{formatCurrency(payment.amount)}</p>
+                <p className="mt-1 text-2xl font-bold text-slate-950">{formatCurrency(amountDue)}</p>
               </div>
               <div className="rounded-xl border bg-white p-4">
                 <p className="text-sm text-slate-500">Due Date</p>
@@ -176,7 +228,7 @@ export default async function InvoicePaymentPage({
                 {profile?.phone && <p>{profile.phone}</p>}
               </div>
               <div className="space-y-2 text-sm text-slate-700">
-                <p className="font-semibold text-slate-950">Wedding Couple</p>
+                <p className="font-semibold text-slate-950">Client / Honoree</p>
                 <p>{coupleName}</p>
                 {couple?.address && <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{couple.address}</p>}
                 <p className="flex items-center gap-2"><CalendarDays className="h-4 w-4" />Invoice created {formatDate(payment.created_at)}</p>

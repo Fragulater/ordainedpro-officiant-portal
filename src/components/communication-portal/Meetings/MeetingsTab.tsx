@@ -128,7 +128,7 @@ export function MeetingsTab() {
                       )})}
                       {meetings.length === 0 && (
                         <div className="text-center py-6 text-gray-500">
-                          <CalendarIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <div className="text-3xl mb-2 opacity-80" aria-hidden="true">📅</div>
                           <p>No meetings scheduled yet</p>
                         </div>
                       )}

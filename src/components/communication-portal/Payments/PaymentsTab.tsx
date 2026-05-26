@@ -21,6 +21,7 @@ export function PaymentsTab() {
     printFinancialReport,
     setShowInvoiceDialog,
     setShowRecordPaymentDialog,
+    setNewPayment,
     handleOpenInvoiceDialog,
   } = useCommunicationPortal()
 
@@ -55,13 +56,42 @@ export function PaymentsTab() {
                           {paymentInfo.balance > 0 && (
                             <Button
                               size="sm"
-                              onClick={() => setShowRecordPaymentDialog(true)}
+                              onClick={() => {
+                                setNewPayment((current: any) => ({
+                                  ...current,
+                                  amount: "",
+                                  date: new Date().toISOString().split("T")[0],
+                                  method: "Credit Card",
+                                  notes: "",
+                                  kind: "payment",
+                                }))
+                                setShowRecordPaymentDialog(true)
+                              }}
                               className="bg-green-500 hover:bg-green-600"
                             >
                               <Plus className="w-4 h-4 mr-2" />
                               Record Payment
                             </Button>
                           )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setNewPayment((current: any) => ({
+                                ...current,
+                                amount: "",
+                                date: new Date().toISOString().split("T")[0],
+                                method: "Original payment method",
+                                notes: "",
+                                kind: "refund",
+                              }))
+                              setShowRecordPaymentDialog(true)
+                            }}
+                            className="border-red-200 text-red-700 hover:bg-red-50"
+                          >
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                            Record Refund
+                          </Button>
                         </div>
                       </div>
                       <CardDescription>Track ceremony payments and outstanding balances</CardDescription>

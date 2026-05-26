@@ -40,15 +40,15 @@ export async function POST(request: NextRequest) {
   const params = new URLSearchParams()
   params.set("mode", "payment")
   params.set("client_reference_id", paymentId)
-  params.set("success_url", `${siteUrl}/pay/invoice/${paymentId}?status=success`)
+  params.set("success_url", `${siteUrl}/pay/invoice/${paymentId}?status=success&session_id={CHECKOUT_SESSION_ID}`)
   params.set("cancel_url", `${siteUrl}/pay/invoice/${paymentId}?status=cancelled`)
   params.set("line_items[0][quantity]", "1")
   params.set("line_items[0][price_data][currency]", "usd")
   params.set("line_items[0][price_data][unit_amount]", String(Math.round(amount * 100)))
-  params.set("line_items[0][price_data][product_data][name]", `Wedding Invoice ${invoiceNumber}`)
+  params.set("line_items[0][price_data][product_data][name]", `Ceremony Invoice ${invoiceNumber}`)
   params.set(
     "line_items[0][price_data][product_data][description]",
-    body.coupleName ? `Ceremony services for ${body.coupleName}` : "Wedding ceremony services"
+    body.coupleName ? `Ceremony services for ${body.coupleName}` : "Ceremony services"
   )
   params.set("metadata[paymentId]", paymentId)
   params.set("metadata[invoiceNumber]", invoiceNumber)

@@ -26,6 +26,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { supabase } from "@/supabase/utils/client";
 import { MyVendorsView } from "@/components/officiant-dashboard/MyVendorsView";
+import { RefundsView } from "@/components/officiant-dashboard/RefundsView";
 import {
   LayoutDashboard,
   Heart,
@@ -63,6 +64,7 @@ import {
   CreditCard,
   Check,
   BriefcaseBusiness,
+  RotateCcw,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -174,6 +176,8 @@ interface OfficiantDashboardDialogProps {
     | "profile"
     | "calendar"
     | "documents"
+    | "vendors"
+    | "refunds"
     | "settings";
 }
 
@@ -275,6 +279,7 @@ export function OfficiantDashboardDialog({
     | "documents"
     | "vendors"
     | "profile"
+    | "refunds"
     | "settings"
   >(initialView);
   const [ceremonyFilter, setCeremonyFilter] = useState<
@@ -489,7 +494,7 @@ export function OfficiantDashboardDialog({
     )}&names=${encodeURIComponent(coupleNames)}`;
     const message = `Hi ${coupleNames || "there"},
 
-Thank you for allowing me to be part of your wedding ceremony. If you have a moment, I would be grateful if you could leave a short review of your experience.
+Thank you for allowing me to be part of your ceremony. If you have a moment, I would be grateful if you could leave a short review of your experience.
 
 Review link: ${coupleReviewUrl}
 
@@ -505,7 +510,7 @@ ${officiantFullName}`;
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           to: recipients,
-          subject: "Thank you for letting me be part of your wedding",
+          subject: "Thank you for letting me be part of your ceremony",
           message,
           fromName: officiantFullName,
           coupleName: coupleNames,
@@ -513,7 +518,8 @@ ${officiantFullName}`;
           officiantId: user.id,
           actionUrl: coupleReviewUrl,
           actionLabel: "Leave a Review",
-          emailTitle: "Share Your Wedding Review",
+          emailTitle: "Share Your Ceremony Review",
+          emailSubtitle: "From your officiant",
         }),
       });
 
@@ -1244,8 +1250,13 @@ ${officiantFullName}`;
     .sort((a, b) => (parseDateOnly(a.rawDate)?.getTime() || 0) - (parseDateOnly(b.rawDate)?.getTime() || 0))
     .slice(0, 2);
 
+  const anniversaryReminderDisplayWindowDays = Math.max(5, anniversarySettings.reminderDays);
   const visibleAnniversaryReminders = anniversaryReminders
-    .filter((anniversary) => anniversary.contactStatus !== "marked_contacted")
+    .filter(
+      (anniversary) =>
+        anniversary.contactStatus === "not_contacted" &&
+        anniversary.daysUntil <= anniversaryReminderDisplayWindowDays
+    )
     .slice(0, 3);
 
   const coupleById = new Map((couples || []).map((couple) => [couple.id, couple]));
@@ -1318,6 +1329,29 @@ ${officiantFullName}`;
   const handleCeremonyClick = (ceremonyId: string) => {
     onSelectCouple(ceremonyId);
     onOpenChange(false);
+  };
+
+  const handleRestoreCeremony = async (ceremonyId: string) => {
+    const { error } = await supabase
+      .from("couples")
+      .update({
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", Number(ceremonyId));
+
+    if (error) {
+      console.error("Failed to restore archived ceremony:", error);
+      return;
+    }
+
+    setCeremonies((currentCeremonies) =>
+      currentCeremonies.map((ceremony) =>
+        ceremony.id === ceremonyId
+          ? { ...ceremony, status: "Active" }
+          : ceremony
+      )
+    );
   };
 
   const handleAddCeremony = async () => {
@@ -1504,6 +1538,7 @@ ${officiantFullName}`;
 
       console.log("✅ Supabase response:", data);
       setProfileSaveStatus("saved");
+      window.dispatchEvent(new CustomEvent("ordainedpro:profile-updated", { detail: data }));
       window.setTimeout(() => setProfileSaveStatus("idle"), 2600);
     } catch (err) {
       console.error("❌ Error saving profile:", err);
@@ -1754,6 +1789,14 @@ ${officiantFullName}`;
               >
                 <BriefcaseBusiness className="w-4 h-4 mr-3" />
                 My Vendors
+              </Button>
+              <Button
+                variant={activeView === "refunds" ? "secondary" : "ghost"}
+                className="w-full justify-start"
+                onClick={() => setActiveView("refunds")}
+              >
+                <RotateCcw className="w-4 h-4 mr-3" />
+                Refunds
               </Button>
               <Button
                 variant={activeView === "settings" ? "secondary" : "ghost"}
@@ -2198,7 +2241,7 @@ ${officiantFullName}`;
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="flex items-center space-x-4 text-sm text-gray-600">
+                            <div className="flex items-center justify-end space-x-4 text-sm text-gray-600">
                               <span className="flex items-center">
                                 <MapPin className="w-4 h-4 mr-1" />
                                 {ceremony.location}
@@ -2208,7 +2251,23 @@ ${officiantFullName}`;
                                 {ceremony.phone}
                               </span>
                             </div>
-                            <ChevronRight className="w-5 h-5 text-gray-400 ml-auto mt-2" />
+                            <div className="mt-3 flex items-center justify-end gap-2">
+                              {ceremony.status === "Archived" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-green-200 text-green-700 hover:bg-green-50"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleRestoreCeremony(ceremony.id);
+                                  }}
+                                >
+                                  <Check className="mr-2 h-4 w-4" />
+                                  Restore
+                                </Button>
+                              )}
+                              <ChevronRight className="h-5 w-5 text-gray-400" />
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -3229,6 +3288,11 @@ ${officiantFullName}`;
               <MyVendorsView userId={user?.id} />
             )}
 
+            {/* Refunds View */}
+            {activeView === "refunds" && (
+              <RefundsView userId={user?.id} />
+            )}
+
             {/* Documents View */}
             {activeView === "documents" && (
               <div className="p-8">
@@ -3451,7 +3515,7 @@ ${officiantFullName}`;
                           <CardDescription className="mt-1">
                             {isProfessional
                               ? "You have full access to all features"
-                              : "Upgrade to unlock all features"}
+                              : "Starter access for newly ordained officiants"}
                           </CardDescription>
                         </div>
                         {isAspirant && (
@@ -3585,7 +3649,7 @@ ${officiantFullName}`;
                       <h3 className="text-lg font-bold text-gray-900 mb-4">
                         Upgrade Your Plan
                       </h3>
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         {/* Aspirant Plan */}
                         <Card className="border-2 border-blue-500 shadow-lg">
                           <CardHeader>
@@ -3599,9 +3663,12 @@ ${officiantFullName}`;
                             </div>
                             <div className="mt-2">
                               <span className="text-4xl font-bold text-gray-900">
-                                $14.95
+                                $29.95
                               </span>
-                              <span className="text-gray-600">/month</span>
+                              <span className="text-gray-600">/3 months</span>
+                              <p className="mt-2 text-sm text-gray-500">
+                                Built for newly ordained officiants getting started.
+                              </p>
                             </div>
                           </CardHeader>
                           <CardContent>
@@ -3615,7 +3682,7 @@ ${officiantFullName}`;
                               <div className="flex items-start space-x-2">
                                 <Check className="w-5 h-5 text-green-500 mt-0.5" />
                                 <span className="text-sm text-gray-700">
-                                  Script builder access
+                                  Award-winning script builder
                                 </span>
                               </div>
                               <div className="flex items-start space-x-2">
@@ -3631,9 +3698,33 @@ ${officiantFullName}`;
                                 </span>
                               </div>
                               <div className="flex items-start space-x-2">
+                                <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                                <span className="text-sm text-gray-700">
+                                  English and Spanish scripts only
+                                </span>
+                              </div>
+                              <div className="flex items-start space-x-2">
+                                <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                                <span className="text-sm text-gray-700">
+                                  Buy scripts from the marketplace
+                                </span>
+                              </div>
+                              <div className="flex items-start space-x-2">
+                                <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                                <span className="text-sm text-gray-700">
+                                  Share scripts with clients
+                                </span>
+                              </div>
+                              <div className="flex items-start space-x-2">
                                 <X className="w-5 h-5 text-gray-300 mt-0.5" />
                                 <span className="text-sm text-gray-400">
-                                  Messages & files
+                                  Public officiant profile
+                                </span>
+                              </div>
+                              <div className="flex items-start space-x-2">
+                                <X className="w-5 h-5 text-gray-300 mt-0.5" />
+                                <span className="text-sm text-gray-400">
+                                  Review requests and star ratings
                                 </span>
                               </div>
                               <div className="flex items-start space-x-2">
@@ -3645,9 +3736,12 @@ ${officiantFullName}`;
                               <div className="flex items-start space-x-2">
                                 <X className="w-5 h-5 text-gray-300 mt-0.5" />
                                 <span className="text-sm text-gray-400">
-                                  Marketplace access
+                                  Sell scripts in the marketplace
                                 </span>
                               </div>
+                              <p className="pt-2 text-xs leading-relaxed text-gray-500">
+                                After 3 months, renew for another 3 months, cancel, or move to Professional.
+                              </p>
                             </div>
                           </CardContent>
                         </Card>
@@ -3688,6 +3782,12 @@ ${officiantFullName}`;
                               <div className="flex items-start space-x-2">
                                 <Check className="w-5 h-5 text-green-500 mt-0.5" />
                                 <span className="text-sm text-gray-700">
+                                  Any supported language
+                                </span>
+                              </div>
+                              <div className="flex items-start space-x-2">
+                                <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                                <span className="text-sm text-gray-700">
                                   Full messaging system
                                 </span>
                               </div>
@@ -3706,15 +3806,42 @@ ${officiantFullName}`;
                               <div className="flex items-start space-x-2">
                                 <Check className="w-5 h-5 text-green-500 mt-0.5" />
                                 <span className="text-sm text-gray-700">
+                                  Anniversary tracking
+                                </span>
+                              </div>
+                              <div className="flex items-start space-x-2">
+                                <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                                <span className="text-sm text-gray-700">
                                   Earnings dashboard
                                 </span>
                               </div>
                               <div className="flex items-start space-x-2">
                                 <Check className="w-5 h-5 text-green-500 mt-0.5" />
                                 <span className="text-sm text-gray-700">
-                                  Marketplace script sales
+                                  Public officiant page, ratings, and reviews
                                 </span>
                               </div>
+                              <div className="flex items-start space-x-2">
+                                <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                                <span className="text-sm text-gray-700">
+                                  Social media, photos, and video uploads
+                                </span>
+                              </div>
+                              <div className="flex items-start space-x-2">
+                                <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                                <span className="text-sm text-gray-700">
+                                  Vendor tracking
+                                </span>
+                              </div>
+                              <div className="flex items-start space-x-2">
+                                <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                                <span className="text-sm text-gray-700">
+                                  Buy and sell scripts
+                                </span>
+                              </div>
+                            </div>
+                            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
+                              If you switch from Aspirant to Professional, the Professional subscription starts right away. Transitional subscription changes are not prorated, credited, or refunded.
                             </div>
                             <Button className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white">
                               <Crown className="w-4 h-4 mr-2" />

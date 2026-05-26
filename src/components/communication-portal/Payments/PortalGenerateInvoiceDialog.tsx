@@ -30,6 +30,29 @@ export function PortalGenerateInvoiceDialog() {
     return null
   }
 
+  const getInvoiceRecipientDisplay = () => {
+    const primaryEmail = editCoupleInfo.brideEmail?.trim()
+    const secondaryEmail = editCoupleInfo.groomEmail?.trim()
+
+    if (invoiceForm.emailRecipients === 'both') {
+      return [primaryEmail, secondaryEmail].filter(Boolean).join(', ') || 'No recipient email selected'
+    }
+
+    if (invoiceForm.emailRecipients === 'bride') {
+      return primaryEmail || 'Primary contact email missing'
+    }
+
+    if (invoiceForm.emailRecipients === 'groom') {
+      return secondaryEmail || 'Secondary contact email missing'
+    }
+
+    if (invoiceForm.emailRecipients === 'custom') {
+      return 'Enter a custom email address below'
+    }
+
+    return invoiceForm.emailRecipients?.trim() || 'No recipient email selected'
+  }
+
   return (
     <>
       {/* Generate Invoice Dialog */}
@@ -158,6 +181,17 @@ export function PortalGenerateInvoiceDialog() {
                   onChange={(e) => setInvoiceForm({...invoiceForm, emailRecipients: e.target.value})}
                 />
               )}
+              <div className="mt-3">
+                <Label className="text-xs font-medium text-gray-600">
+                  Invoice will be sent to
+                </Label>
+                <Input
+                  value={getInvoiceRecipientDisplay()}
+                  readOnly
+                  aria-readonly="true"
+                  className="mt-1 cursor-default border-green-100 bg-green-50 text-gray-700"
+                />
+              </div>
             </div>
 
             {/* Line Items */}
@@ -168,8 +202,8 @@ export function PortalGenerateInvoiceDialog() {
               <div className="space-y-4">
                 {invoiceForm.items.map((item, index) => (
                   <div key={item.id} className="p-4 border border-green-100 rounded-lg bg-green-50">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                      <div className="md:col-span-3">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(180px,1.45fr)_minmax(140px,1fr)_80px_minmax(150px,1fr)_56px] md:items-end">
+                      <div>
                         <Label className="text-xs text-gray-600">Service/Item *</Label>
                         <Input
                           value={item.service}
@@ -183,7 +217,7 @@ export function PortalGenerateInvoiceDialog() {
                           className="border-green-200"
                         />
                       </div>
-                      <div className="md:col-span-2">
+                      <div>
                         <Label className="text-xs text-gray-600">Category</Label>
                         <Select
                           value={item.category || ''}
@@ -209,21 +243,7 @@ export function PortalGenerateInvoiceDialog() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="md:col-span-4">
-                        <Label className="text-xs text-gray-600">Description</Label>
-                        <Input
-                          value={item.description}
-                          onChange={(e) => {
-                            const newItems = invoiceForm.items.map((i, idx) =>
-                              idx === index ? { ...i, description: e.target.value } : i
-                            )
-                            setInvoiceForm({...invoiceForm, items: newItems})
-                          }}
-                          placeholder="Detailed description of service"
-                          className="border-green-200"
-                        />
-                      </div>
-                      <div className="md:col-span-1">
+                      <div>
                         <Label className="text-xs text-gray-600">Qty</Label>
                         <Input
                           type="number"
@@ -238,7 +258,7 @@ export function PortalGenerateInvoiceDialog() {
                           min="1"
                         />
                       </div>
-                      <div className="md:col-span-1">
+                      <div>
                         <Label className="text-xs text-gray-600">Rate ($)</Label>
                         <Input
                           type="number"
@@ -249,12 +269,12 @@ export function PortalGenerateInvoiceDialog() {
                             )
                             setInvoiceForm({...invoiceForm, items: newItems})
                           }}
-                          className="border-green-200"
+                          className="min-w-[9rem] border-green-200"
                           min="0"
                           step="0.01"
                         />
                       </div>
-                      <div className="md:col-span-1">
+                      <div>
                         <div className="flex gap-2 md:flex-col">
                           <Button
                             size="sm"
@@ -283,10 +303,26 @@ export function PortalGenerateInvoiceDialog() {
                         </div>
                       </div>
                     </div>
-                    <div className="mt-2 text-right">
-                      <span className="text-sm font-medium text-gray-900">
-                        Amount: ${(item.quantity * item.rate).toFixed(2)}
-                      </span>
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-end">
+                      <div>
+                        <Label className="text-xs text-gray-600">Description</Label>
+                        <Input
+                          value={item.description}
+                          onChange={(e) => {
+                            const newItems = invoiceForm.items.map((i, idx) =>
+                              idx === index ? { ...i, description: e.target.value } : i
+                            )
+                            setInvoiceForm({...invoiceForm, items: newItems})
+                          }}
+                          placeholder="Detailed description of service"
+                          className="border-green-200"
+                        />
+                      </div>
+                      <div className="md:min-w-[150px] md:text-right">
+                        <span className="text-sm font-medium text-gray-900">
+                          Amount: ${(item.quantity * item.rate).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}

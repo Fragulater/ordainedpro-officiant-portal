@@ -1339,6 +1339,18 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     loadUserAndProfile()
   }, [])
 
+  useEffect(() => {
+    const handleProfileUpdated = (event: Event) => {
+      const updatedProfile = (event as CustomEvent).detail
+      if (updatedProfile?.user_id) {
+        setOfficiantProfile(updatedProfile)
+      }
+    }
+
+    window.addEventListener("ordainedpro:profile-updated", handleProfileUpdated)
+    return () => window.removeEventListener("ordainedpro:profile-updated", handleProfileUpdated)
+  }, [])
+
   // Load couples from database
   useEffect(() => {
     const loadCouples = async () => {
@@ -1704,16 +1716,19 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
     if (result.ok && result.data) {
       // Transform database format to component format
-      const transformedPayments = result.data.map((p: any) => ({
-        id: p.id,
-        date: p.paid_date || p.due_date || new Date(p.created_at).toLocaleDateString(),
-        amount: p.amount,
-        type: p.invoice_number || p.description || "Invoice",
-        method: p.status === "paid" ? "Completed" : "Pending",
-        status: p.status,
-        description: p.notes || p.description || p.invoice_number || "Wedding ceremony invoice",
-        dueDate: p.due_date
-      }))
+      const transformedPayments = result.data.map((p: any) => {
+        const isRefundRow = String(p.payment_method || p.payment_type || "").toLowerCase() === "refund"
+        return {
+          id: p.id,
+          date: p.paid_date || p.due_date || new Date(p.created_at).toLocaleDateString(),
+          amount: p.amount,
+          type: isRefundRow ? "Refund" : p.invoice_number || p.description || "Invoice",
+          method: isRefundRow ? "Refund" : p.status === "paid" ? "Completed" : "Pending",
+          status: isRefundRow ? "refunded" : p.status,
+          description: p.notes || p.description || p.invoice_number || "Ceremony invoice",
+          dueDate: p.due_date
+        }
+      })
       setPaymentHistory(transformedPayments)
 
       const paymentSummary = calculatePaymentSummary(transformedPayments)
@@ -1756,10 +1771,12 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       setAllPaymentRecords(result.data.map((payment: any) => ({
         id: payment.id,
         coupleId: payment.couple_id,
-        description: payment.notes || payment.description || payment.invoice_number || "Wedding ceremony invoice",
+        description: payment.notes || payment.description || payment.invoice_number || "Ceremony invoice",
         amount: Number(payment.amount) || 0,
         type: payment.payment_method || payment.payment_type || "invoice",
-        status: payment.status || "pending",
+        status: String(payment.payment_method || payment.payment_type || "").toLowerCase() === "refund"
+          ? "refunded"
+          : payment.status || "pending",
         dueDate: payment.due_date || "",
         paidDate: payment.paid_date || payment.created_at || "",
         createdAt: payment.created_at || "",
@@ -3020,7 +3037,7 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
       description: isRefund ? `Refund - ${newPayment.notes || "Manual refund"}` : amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
       amount: amount,
       paymentType: isRefund ? "refund" : newPayment.method,
-      status: isRefund ? "refunded" : "paid",
+      status: "paid",
       dueDate: newPayment.date
     })
 
@@ -3064,7 +3081,7 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
       // Show success message
       console.log("âœ… Payment recorded:", payment)
       if (isRefund) {
-        alert(`Refund of ${amount} recorded successfully.`)
+        console.log(`Refund of ${amount} recorded successfully.`)
       } else if (newBalance === 0) {
         alert("Payment recorded successfully! This ceremony is now PAID IN FULL! [CELEBRATE]")
       } else {
@@ -6277,13 +6294,14 @@ ${officiantLabel}${officiantPhone ? `\nPhone: ${officiantPhone}` : ''}${offician
         },
         body: JSON.stringify({
           to: recipients,
-          subject: `Ceremony Invoice ${invoiceForm.invoiceNumber}`,
+          subject: "Ceremony Invoice From Your Officiant",
           message: invoiceContent,
           fromName: officiantName,
           coupleName: invoiceForm.coupleName,
           coupleId: editCoupleInfo?.id,
           officiantId: currentUser?.id,
           emailTitle: "Ceremony Invoice",
+          emailSubtitle: "From Your Officiant",
           actionUrl: paymentPortalUrl,
           actionLabel: "Make a payment",
           attachments: [

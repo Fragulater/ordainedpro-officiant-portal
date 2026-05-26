@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       actionUrl,
       actionLabel,
       emailTitle,
+      emailSubtitle,
     } = body;
     const recipients = Array.isArray(to)
       ? to.filter((email) => typeof email === "string" && email.trim())
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
           : "reply@ziloesteo.resend.app",
         to: recipients,
         subject: subject,
-        html: generateEmailHtml(fromName, coupleName, message, subject, attachments, calendarUrl, actionUrl, actionLabel, emailTitle),
+        html: generateEmailHtml(fromName, coupleName, message, subject, attachments, calendarUrl, actionUrl, actionLabel, emailTitle, emailSubtitle),
         text: message,
       };
 
@@ -137,7 +138,8 @@ function generateEmailHtml(
   calendarUrl?: string,
   actionUrl?: string,
   actionLabel?: string,
-  emailTitle?: string
+  emailTitle?: string,
+  emailSubtitle?: string
 ): string {
   const trimmedMessage = message.trim();
   const startsWithGreeting = /^dear\s/i.test(trimmedMessage);
@@ -193,7 +195,7 @@ function generateEmailHtml(
                 ${emailTitle || "Wedding Documents"}
               </h1>
               <p style="margin: 10px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">
-                From your wedding officiant
+                ${emailSubtitle || "From your officiant"}
               </p>
             </td>
           </tr>
@@ -215,7 +217,7 @@ function generateEmailHtml(
 
               <p style="margin: 30px 0 0; color: #6b7280; font-size: 14px;">
                 Best regards,<br>
-                <strong style="color: #1f2937;">${fromName || "Your Wedding Officiant"}</strong>
+                <strong style="color: #1f2937;">${fromName || "Your Officiant"}</strong>
               </p>
             </td>
           </tr>

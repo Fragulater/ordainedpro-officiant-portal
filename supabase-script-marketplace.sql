@@ -1,6 +1,9 @@
 -- Marketplace publishing + reporting fields for officiant scripts.
 -- Run once in Supabase SQL Editor before relying on script marketplace reporting.
 
+ALTER TABLE public.subscriptions
+  ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE;
+
 ALTER TABLE public.scripts
   ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS price DECIMAL(10, 2) DEFAULT 0,
