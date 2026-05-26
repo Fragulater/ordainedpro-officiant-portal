@@ -39,7 +39,6 @@ export function PortalHeader() {
     getCeremonyTypeConfig,
     handleAddCeremony,
     handleSwitchCouple,
-    toggleCeremonyStatus,
     handleUnarchiveCouple,
     editCoupleInfo,
     officiantProfile,
@@ -658,21 +657,23 @@ export function PortalHeader() {
                 </DialogContent>
               </Dialog>
 
-              {/* Active Ceremony Status Button */}
-              <Button
-                size="default"
-                onClick={toggleCeremonyStatus}
-                className={`px-4 py-2 h-10 text-white transition-all ${
+              {/* Active Ceremony Status */}
+              <div
+                className={`inline-flex h-10 items-center rounded-md px-4 py-2 text-sm font-medium text-white shadow-sm ${
                   allCouples[activeCoupleIndex]?.isActive
-                    ? 'bg-green-500 hover:bg-green-600'
-                    : 'bg-red-500 hover:bg-red-600'
+                    ? 'bg-green-500'
+                    : 'bg-red-500'
+                }`}
+                title="Current ceremony status"
+                aria-label={`Current ceremony status: ${
+                  allCouples[activeCoupleIndex]?.isActive ? 'Active Ceremony' : 'Archived Ceremony'
                 }`}
               >
                 <div className={`w-2 h-2 rounded-full mr-2 ${
                   allCouples[activeCoupleIndex]?.isActive ? 'bg-white' : 'bg-white'
                 }`}></div>
                 {allCouples[activeCoupleIndex]?.isActive ? 'Active Ceremony' : 'Archived Ceremony'}
-              </Button>
+              </div>
 
               <div ref={profileMenuRef} className="relative">
                 <button

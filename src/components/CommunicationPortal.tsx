@@ -5070,10 +5070,13 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
   }
 
   const toggleCeremonyStatus = async () => {
-    const currentCouple = allCouples[activeCoupleIndex]
+    const selectedCoupleId = editCoupleInfo?.id || allCouples[activeCoupleIndex]?.id
+    const currentCouple =
+      allCouples.find(couple => String(couple.id) === String(selectedCoupleId)) ||
+      allCouples[activeCoupleIndex]
     if (!currentCouple?.id) return
 
-    const nextIsActive = !currentCouple.isActive
+    const nextIsActive = currentCouple.isActive === false
     const result = await updateCoupleInDB(currentCouple.id, { is_active: nextIsActive })
 
     if (!result.ok) {
@@ -5081,15 +5084,16 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
       return
     }
 
-    const updatedCouples = allCouples.map((couple, index) =>
-      index === activeCoupleIndex
+    const updatedCouples = allCouples.map((couple) =>
+      String(couple.id) === String(currentCouple.id)
         ? { ...couple, isActive: nextIsActive }
         : couple
     )
     setAllCouples(updatedCouples)
 
     if (!nextIsActive) {
-      const nextActiveIndex = updatedCouples.findIndex((couple, index) => index !== activeCoupleIndex && couple.isActive)
+      const archivedIndex = allCouples.findIndex(couple => String(couple.id) === String(currentCouple.id))
+      const nextActiveIndex = updatedCouples.findIndex((couple, index) => index !== archivedIndex && couple.isActive)
 
       if (nextActiveIndex !== -1) {
         const nextActiveCouple = updatedCouples[nextActiveIndex]
