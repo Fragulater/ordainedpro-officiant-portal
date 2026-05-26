@@ -12,6 +12,12 @@ export type MrScriptService = {
   requiredQuestions: string[]
   optionalQuestions: string[]
   storyPrompts: string[]
+  intakeQuestionGroups: {
+    id: string
+    title: string
+    prompt: string
+    helpText: string
+  }[]
   outputTypes: string[]
   scriptSections: string[]
 }
@@ -64,6 +70,20 @@ export const MR_SCRIPT_SERVICES: MrScriptService[] = [
       "Early dates, favorite memories, or funny moments",
       "Milestones, proposal, family, challenges, and future hopes",
     ],
+    intakeQuestionGroups: [
+      {
+        id: "relationship-story",
+        title: "Relationship story",
+        prompt: "What relationship story details would make this wedding feel personal?",
+        helpText: "Helpful notes include how they met, what they love about each other, the proposal, family moments, challenges, or future hopes.",
+      },
+      {
+        id: "ceremony-elements",
+        title: "Ceremony elements",
+        prompt: "Which wedding ceremony elements should be included or skipped?",
+        helpText: "Mention vows, rings, unity ceremony, readings, prayers, remembrance, cultural traditions, family involvement, or anything the couple wants kept simple.",
+      },
+    ],
     outputTypes: ["ceremony_script", "ceremony_outline", "vow_wording", "reading_suggestions"],
     scriptSections: ["Processional", "Welcome", "Reflection", "Declaration of Intent", "Vows", "Rings", "Pronouncement", "Recessional"],
   },
@@ -92,6 +112,20 @@ export const MR_SCRIPT_SERVICES: MrScriptService[] = [
       "Accomplishments, school, faith, culture, sports, arts, or service",
       "Family members, mentors, or friends who helped shape them",
       "Future hopes such as college, career, travel, goals, or adulthood",
+    ],
+    intakeQuestionGroups: [
+      {
+        id: "honoree-story",
+        title: "Honoree story",
+        prompt: "What should the ceremony say about the person being honored?",
+        helpText: "Include personality, achievements, family relationships, interests, faith or culture, and what makes this milestone meaningful.",
+      },
+      {
+        id: "family-traditions",
+        title: "Family traditions",
+        prompt: "Are there family, cultural, religious, or symbolic traditions to include?",
+        helpText: "Examples include candle, crown, shoe, Bible, rosary, parent blessing, court of honor, mentor words, or a custom family moment.",
+      },
     ],
     outputTypes: ["ceremony_script", "family_blessing", "parent_speech", "ceremony_outline"],
     scriptSections: ["Welcome", "Meaning of the Milestone", "Family Recognition", "Traditions", "Blessing", "Closing"],
@@ -123,6 +157,26 @@ export const MR_SCRIPT_SERVICES: MrScriptService[] = [
       "Close family, friends, mentors, and meaningful relationships",
       "Accomplishments, lessons, favorite stories, legacy, and what they leave behind",
     ],
+    intakeQuestionGroups: [
+      {
+        id: "life-story",
+        title: "Life story",
+        prompt: "What should be remembered about the person being honored?",
+        helpText: "Share who they were, what they loved, important family and friends, accomplishments, favorite memories, lessons, and legacy.",
+      },
+      {
+        id: "service-tone",
+        title: "Service tone",
+        prompt: "How should this service feel for the family and guests?",
+        helpText: "Mention whether it should be solemn, hopeful, spiritual, non-religious, story-filled, brief, gently humorous, or mostly quiet reflection.",
+      },
+      {
+        id: "memorial-elements",
+        title: "Memorial elements",
+        prompt: "Are there readings, songs, speakers, prayers, military honors, or closing rituals to include?",
+        helpText: "Only include details the family is comfortable sharing. If something is sensitive, note how carefully it should be handled.",
+      },
+    ],
     outputTypes: ["memorial_script", "wake_opening_words", "eulogy", "closing_blessing"],
     scriptSections: ["Words of Condolence", "Welcome", "Life Tribute", "Readings or Music", "Reflection", "Closing Words"],
   },
@@ -151,6 +205,20 @@ export const MR_SCRIPT_SERVICES: MrScriptService[] = [
       "Parents, guardians, siblings, grandparents, godparents, or mentors",
       "Family hopes, blessings, promises, values, and traditions",
       "Readings, songs, prayers, cultural elements, or symbolic moments",
+    ],
+    intakeQuestionGroups: [
+      {
+        id: "child-family",
+        title: "Child and family",
+        prompt: "What should the ceremony say about the child and family?",
+        helpText: "Include the child's name, name meaning, parents or guardians, siblings, godparents, grandparents, adoption story, or family values.",
+      },
+      {
+        id: "family-promises",
+        title: "Family promises",
+        prompt: "What promises, blessings, or hopes should be spoken over the child?",
+        helpText: "These can be spiritual, religious, cultural, non-religious, or simple words of love and support.",
+      },
     ],
     outputTypes: ["baby_blessing_script", "family_promises", "guardian_blessing", "ceremony_outline"],
     scriptSections: ["Welcome", "Meaning of the Child's Name", "Parent Promises", "Family Blessing", "Community Support", "Closing"],
@@ -181,6 +249,20 @@ export const MR_SCRIPT_SERVICES: MrScriptService[] = [
       "Challenges overcome and how their love has changed or deepened",
       "Promises for the next season of marriage",
     ],
+    intakeQuestionGroups: [
+      {
+        id: "shared-journey",
+        title: "Shared journey",
+        prompt: "What should be highlighted about the couple's years together?",
+        helpText: "Include years married, family, milestones, original wedding memories, growth, challenges, humor, gratitude, and hopes for the next chapter.",
+      },
+      {
+        id: "renewal-elements",
+        title: "Renewal elements",
+        prompt: "Which vow renewal moments should be included?",
+        helpText: "Mention renewed vows, ring rededication, children or family involvement, readings, prayer, music, or a brief anniversary blessing.",
+      },
+    ],
     outputTypes: ["vow_renewal_script", "renewed_vows", "anniversary_blessing", "ceremony_outline"],
     scriptSections: ["Welcome", "Reflection on Their Journey", "Renewed Promises", "Optional Rings", "Blessing", "Closing"],
   },
@@ -210,6 +292,20 @@ export const MR_SCRIPT_SERVICES: MrScriptService[] = [
       "Words, stories, humor, faith, gratitude, or emotion to include",
       "The desired ending: blessing, toast, goodbye, commitment, or call to action",
     ],
+    intakeQuestionGroups: [
+      {
+        id: "speaker-voice",
+        title: "Speaker voice",
+        prompt: "Whose voice should this sound like, and who is it for?",
+        helpText: "Mention whether the wording should sound natural, polished, emotional, simple, formal, funny, spiritual, or conversational.",
+      },
+      {
+        id: "main-message",
+        title: "Main message",
+        prompt: "What is the most important message, memory, promise, or tribute to include?",
+        helpText: "A few high-level bullet points are enough. Mr. Script can shape them into a clean speech or written piece.",
+      },
+    ],
     outputTypes: ["vows", "eulogy", "toast", "speech", "reading", "ceremony_outline"],
     scriptSections: ["Opening", "Personal Details", "Main Message", "Closing"],
   },
@@ -238,6 +334,20 @@ export const MR_SCRIPT_SERVICES: MrScriptService[] = [
       "Who is being honored, included, remembered, blessed, or supported",
       "Stories, values, symbols, traditions, or objects that matter",
       "The feeling people should leave with when the ceremony ends",
+    ],
+    intakeQuestionGroups: [
+      {
+        id: "life-moment",
+        title: "Life moment",
+        prompt: "What life moment, milestone, transition, or custom ceremony should this honor?",
+        helpText: "Describe who is involved, why the moment matters, and what feeling the officiant should create for everyone present.",
+      },
+      {
+        id: "symbols-participants",
+        title: "Symbols and participants",
+        prompt: "Are there symbols, people, readings, objects, or rituals that should be included?",
+        helpText: "Examples include candle, keepsake, blessing, community response, remembrance object, music, reading, or a custom symbolic action.",
+      },
     ],
     outputTypes: ["custom_ceremony_script", "ceremony_outline", "symbolic_action_wording", "blessing"],
     scriptSections: ["Welcome", "Meaning of the Moment", "Story or Reflection", "Symbolic Action", "Blessing", "Closing"],

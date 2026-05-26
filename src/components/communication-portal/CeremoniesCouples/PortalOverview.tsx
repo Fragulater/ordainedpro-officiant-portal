@@ -408,15 +408,6 @@ export function PortalOverview() {
                   Ceremony Details
                 </CardTitle>
                 <div className="flex items-center space-x-2">
-                  {/* Ceremony Details Form Button */}
-                  <Button
-                    size="sm"
-                    onClick={() => window.open('/ceremony-details', '_blank')}
-                    className="bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1 h-8"
-                  >
-                    <FileText className="w-3 h-3 mr-1" />
-                    Form
-                  </Button>
                   <Button
                     size="sm"
                     variant="outline"

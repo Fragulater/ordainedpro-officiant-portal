@@ -38,6 +38,7 @@
   ],
   "exclude": [
     "CLONED",
+    "backup",
     "node_modules"
   ]
 }

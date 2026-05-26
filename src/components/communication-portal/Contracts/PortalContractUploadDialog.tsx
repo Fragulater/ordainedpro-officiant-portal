@@ -14,6 +14,7 @@ export function PortalContractUploadDialog() {
     hasAcceptedDefaultContractLegal,
     acceptDefaultContractLegalAcknowledgment,
     acceptUploadedContractLegalAcknowledgment,
+    isCurrentCeremonyWedding,
   } = useCommunicationPortal()
 
   return (
@@ -29,6 +30,7 @@ export function PortalContractUploadDialog() {
         hasAcceptedDefaultContractLegal={hasAcceptedDefaultContractLegal}
         onAcceptDefaultContractLegal={acceptDefaultContractLegalAcknowledgment}
         onAcceptUploadedContractLegal={acceptUploadedContractLegalAcknowledgment}
+        allowDefaultContract={isCurrentCeremonyWedding}
       />
     </>
   )

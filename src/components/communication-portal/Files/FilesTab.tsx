@@ -11,6 +11,8 @@ import { useCommunicationPortal } from "../CommunicationPortalContext"
 export function FilesTab() {
   const {
     generatedScripts,
+    editCoupleInfo,
+    getCeremonyTypeConfig,
     files,
     handleEditScript,
     handleViewScript,
@@ -22,6 +24,13 @@ export function FilesTab() {
     handleFileRemoved,
     getFileIcon,
   } = useCommunicationPortal()
+  const ceremonyConfig = getCeremonyTypeConfig?.(editCoupleInfo?.ceremonyType)
+  const coupleNames = [editCoupleInfo?.brideName, editCoupleInfo?.groomName]
+    .filter(Boolean)
+    .join(" & ")
+  const visibleGeneratedScripts = generatedScripts.filter((script: any) =>
+    editCoupleInfo?.id ? String(script.coupleId || "") === String(editCoupleInfo.id) : false
+  )
 
   return (
 <TabsContent value="files">
@@ -32,18 +41,20 @@ export function FilesTab() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <MessageCircle className="w-5 h-5 text-green-600" />
-                      <CardTitle className="text-green-900">Mr. Script Generated Wedding Scripts</CardTitle>
+                      <CardTitle className="text-green-900">Mr. Script Generated Scripts</CardTitle>
                     </div>
                     <Badge className="bg-green-100 text-green-800 border-green-200">
-                      {generatedScripts.length} scripts
+                      {visibleGeneratedScripts.length} scripts
                     </Badge>
                   </div>
                   <CardDescription className="text-green-700">
-                    Custom ceremony scripts created by Mr. Script for Sarah Johnson & David Chen
+                    {coupleNames
+                      ? `Custom ${ceremonyConfig?.label?.toLowerCase() || "ceremony"} scripts created by Mr. Script for ${coupleNames}`
+                      : "Custom ceremony scripts created by Mr. Script for this profile"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
-                  {generatedScripts.length === 0 ? (
+                  {visibleGeneratedScripts.length === 0 ? (
                     <div className="text-center py-8">
                       <MessageCircle className="w-12 h-12 mx-auto mb-4 text-green-300" />
                       <p className="text-green-700 mb-2">No Mr. Script scripts generated yet</p>
@@ -51,7 +62,7 @@ export function FilesTab() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {generatedScripts.map((script) => (
+                      {visibleGeneratedScripts.map((script: any) => (
                         <div key={script.id} className="border border-green-200 rounded-xl p-4 bg-white hover:bg-green-50 transition-colors group">
                           <div className="flex items-start space-x-3">
                             <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-xl flex items-center justify-center flex-shrink-0">

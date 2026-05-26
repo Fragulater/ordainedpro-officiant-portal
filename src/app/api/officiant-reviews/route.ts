@@ -108,6 +108,16 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error("Unable to insert officiant review:", insertError);
+      if (insertError.code === "PGRST205" || insertError.message?.includes("officiant_reviews")) {
+        return NextResponse.json(
+          {
+            error:
+              "Review storage is not installed yet. Run supabase-officiant-reviews.sql in Supabase, then try again.",
+          },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json(
         { error: "Unable to save your review right now." },
         { status: 500 }

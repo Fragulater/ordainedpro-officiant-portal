@@ -56,6 +56,9 @@ export function ScriptMarketplaceTab() {
     mainMarketplaceScriptCount,
     accountCreatedAt,
     scriptSales,
+    editCoupleInfo,
+    currentCeremonyType,
+    currentCeremonyConfig,
     myScripts,
     popularScripts,
   } = useCommunicationPortal()
@@ -73,6 +76,41 @@ export function ScriptMarketplaceTab() {
   const [otherLanguage, setOtherLanguage] = useState("")
   const [otherCategory, setOtherCategory] = useState("")
   const [otherCeremonyType, setOtherCeremonyType] = useState("")
+
+  const serviceTerms = [
+    currentCeremonyType,
+    currentCeremonyConfig?.label,
+    currentCeremonyConfig?.value,
+    ...(currentCeremonyType === "wedding" ? ["wedding", "weddings"] : []),
+    ...(currentCeremonyType === "celebration_of_life" ? ["celebration of life", "wake", "funeral", "memorial", "memorial services"] : []),
+    ...(currentCeremonyType === "quinceanera" ? ["quinceanera", "quinceañera", "coming of age", "sweet 16", "sweet sixteen"] : []),
+    ...(currentCeremonyType === "vow_renewal" ? ["vow renewal", "vow renewals"] : []),
+    ...(currentCeremonyType === "baby_blessing" ? ["baby blessing", "naming"] : []),
+    ...(currentCeremonyType === "other" ? ["other"] : []),
+  ]
+    .filter(Boolean)
+    .map((term: string) => term.toLowerCase())
+
+  const scriptMatchesServiceType = (script: any) => {
+    const searchableValues = [
+      script.type,
+      script.title,
+      script.description,
+      ...(Array.isArray(script.marketplaceCeremonyTypes) ? script.marketplaceCeremonyTypes : []),
+      ...(Array.isArray(script.categories) ? script.categories : []),
+    ]
+      .filter(Boolean)
+      .map((value: string) => value.toLowerCase())
+
+    return serviceTerms.some((term: string) =>
+      searchableValues.some((value: string) => value.includes(term) || term.includes(value))
+    )
+  }
+
+  const profileScopedScripts = myScripts.filter((script: any) =>
+    editCoupleInfo?.id && String(script.coupleId || "") === String(editCoupleInfo.id) && scriptMatchesServiceType(script)
+  )
+  const matchingMarketplaceScripts = popularScripts.filter(scriptMatchesServiceType)
 
   const resetMarketplaceDetails = () => {
     setMarketplacePrice("25")
@@ -117,7 +155,7 @@ export function ScriptMarketplaceTab() {
     const ceremonyTypes = normalizeSelections(selectedCeremonyTypes, otherCeremonyType)
 
     if (languages.length === 0 || categories.length === 0 || ceremonyTypes.length === 0) {
-      alert("Please choose at least one language, category, and ceremony type.")
+      alert("Please choose at least one language, category, and ceremony type. If selecting Other, enter a custom option.")
       return
     }
 
@@ -171,7 +209,7 @@ export function ScriptMarketplaceTab() {
           className="col-span-2"
           value={otherValue}
           onChange={(event) => setOtherValue(event.target.value)}
-          placeholder="Enter custom option"
+          placeholder="Enter custom option for Other"
         />
       )}
     </div>
@@ -186,14 +224,14 @@ export function ScriptMarketplaceTab() {
                 resetMarketplaceDetails()
               }
             }}>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-h-[90vh] max-w-2xl overflow-hidden">
                 <DialogHeader>
                   <DialogTitle>Marketplace Script Details</DialogTitle>
                   <DialogDescription>
                     Choose how this script should appear in the public script marketplace filters.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-5">
+                <div className="max-h-[65vh] space-y-5 overflow-y-auto pr-2">
                   <div className="space-y-2">
                     <Label htmlFor="marketplace-price">Price</Label>
                     <Input
@@ -268,7 +306,7 @@ export function ScriptMarketplaceTab() {
                     </span>
                   </label>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="border-t pt-4">
                   <Button variant="outline" onClick={() => setMarketplaceDetailsOpen(false)}>
                     Cancel
                   </Button>
@@ -307,12 +345,12 @@ export function ScriptMarketplaceTab() {
                     </CardHeader>
                     <CardContent className="p-6">
                       <div className="space-y-4">
-                        {myScripts.length === 0 && (
+                        {profileScopedScripts.length === 0 && (
                           <div className="rounded-lg border border-dashed border-blue-200 p-6 text-center text-sm text-gray-600">
-                            Upload or publish a saved script to start selling in the marketplace.
+                            No matching scripts are available for this ceremony profile yet.
                           </div>
                         )}
-                        {myScripts.map((script) => (
+                        {profileScopedScripts.map((script: any) => (
                           <div key={script.id} className="border border-blue-100 rounded-xl p-4 bg-white hover:bg-blue-50 transition-colors">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-3">
@@ -409,7 +447,12 @@ export function ScriptMarketplaceTab() {
                     </CardHeader>
                     <CardContent className="p-6">
                       <div className="space-y-4">
-                        {popularScripts.map((script) => (
+                        {matchingMarketplaceScripts.length === 0 && (
+                          <div className="rounded-lg border border-dashed border-blue-200 p-6 text-center text-sm text-gray-600">
+                            No matching marketplace scripts are available for this service type yet.
+                          </div>
+                        )}
+                        {matchingMarketplaceScripts.map((script: any) => (
                           <div key={script.id} className="border border-blue-100 rounded-xl p-4 bg-white hover:bg-blue-50 transition-colors">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-3">

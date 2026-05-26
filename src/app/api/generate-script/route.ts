@@ -1,214 +1,263 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  MR_SCRIPT_SERVICES,
+  getMrScriptServiceByResponse,
+  type MrScriptService,
+} from "@/data/mr-script-services";
 
-// Force Node.js runtime (not Edge) for Netlify compatibility
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Define ceremony segments - each will be generated separately
-// Note: Cannot export from API routes - only HTTP handlers allowed
-const CEREMONY_SEGMENTS = [
-  {
-    id: "opening",
-    name: "Opening & Welcome",
-    sections: ["Processional", "Welcome & Opening Words", "Reflection on Love & Marriage"],
-    wordTarget: 600,
-  },
-  {
-    id: "declarations",
-    name: "Declarations & Readings",
-    sections: ["Reading (if applicable)", "Address to the Couple", "Declaration of Intent"],
-    wordTarget: 500,
-  },
-  {
-    id: "vows",
-    name: "Vows & Promises",
-    sections: ["Introduction to Vows", "Exchange of Vows", "Affirmation"],
-    wordTarget: 500,
-  },
-  {
-    id: "unity",
-    name: "Unity & Rings",
-    sections: ["Unity Ceremony (if applicable)", "Ring Ceremony", "Ring Exchange Words"],
-    wordTarget: 500,
-  },
-  {
-    id: "closing",
-    name: "Closing & Pronouncement",
-    sections: ["Blessing/Closing Words", "Pronouncement", "The Kiss", "Presentation to Guests", "Recessional"],
-    wordTarget: 400,
-  },
-];
+type ScriptSegment = {
+  id: string;
+  name: string;
+  sections: string[];
+  wordTarget: number;
+};
 
-async function generateSegment(
+type ScriptGenerationBody = {
+  ceremonyType?: string;
+  ceremonyStyle?: string;
+  ceremonyLength?: string;
+  ceremonyTone?: string;
+  officiantStyle?: string;
+  brideName?: string;
+  groomName?: string;
+  subjectName?: string;
+  venue?: string;
+  weddingDate?: string;
+  ceremonyDate?: string;
+  userResponses?: Record<string, string>;
+  storyNotes?: string;
+  coreDetails?: string;
+  specialInclusions?: string;
+  avoidances?: string;
+  unityCeremony?: string;
+  vowsType?: string;
+  readingStyle?: string;
+  readingText?: string;
+  religiousElements?: string;
+  culturalTraditions?: string;
+  refinementInstructions?: string;
+  regenerateSegmentIndex?: number;
+  existingSegments?: string[];
+  segmentInstructions?: string;
+};
+
+const WORDS_PER_MINUTE = 130;
+
+const normalize = (value?: string) => (value || "").trim();
+
+const safeList = (items: string[]) => items.filter(Boolean).map((item) => `- ${item}`).join("\n");
+
+const parseDurationMinutes = (duration?: string) => {
+  if (!duration) return 18;
+  const numbers = duration.match(/\d+/g)?.map(Number) || [];
+  if (numbers.length >= 2) return Math.round((numbers[0] + numbers[1]) / 2);
+  if (numbers.length === 1) return numbers[0];
+  return 18;
+};
+
+const getTargetWordCount = (duration?: string) => {
+  const minutes = parseDurationMinutes(duration);
+  return Math.min(5200, Math.max(650, minutes * WORDS_PER_MINUTE));
+};
+
+const chunkSections = (sections: string[], chunkCount: number) => {
+  const chunks: string[][] = [];
+  const safeChunkCount = Math.max(1, Math.min(chunkCount, sections.length || 1));
+
+  for (let i = 0; i < safeChunkCount; i += 1) {
+    const start = Math.floor((i * sections.length) / safeChunkCount);
+    const end = Math.floor(((i + 1) * sections.length) / safeChunkCount);
+    chunks.push(sections.slice(start, end));
+  }
+
+  return chunks.map((chunk, index) => (chunk.length ? chunk : [sections[index] || "Ceremony Section"]));
+};
+
+const getSegmentCount = (service: MrScriptService, duration?: string) => {
+  const minutes = parseDurationMinutes(duration);
+  if (service.id === "writing_service") return Math.min(4, service.scriptSections.length);
+  if (minutes <= 10) return Math.min(3, service.scriptSections.length);
+  if (minutes <= 20) return Math.min(4, service.scriptSections.length);
+  return Math.min(6, service.scriptSections.length);
+};
+
+const buildSegments = (service: MrScriptService, duration?: string): ScriptSegment[] => {
+  const sections = service.scriptSections.length ? service.scriptSections : ["Opening", "Main Message", "Closing"];
+  const segmentCount = getSegmentCount(service, duration);
+  const totalWords = getTargetWordCount(duration);
+  const chunks = chunkSections(sections, segmentCount);
+
+  return chunks.map((chunk, index) => ({
+    id: `${service.id}-${index + 1}`,
+    name: chunk.length === 1 ? chunk[0] : `${chunk[0]} to ${chunk[chunk.length - 1]}`,
+    sections: chunk,
+    wordTarget: Math.max(280, Math.round(totalWords / chunks.length)),
+  }));
+};
+
+const getSubjectName = (body: ScriptGenerationBody, service: MrScriptService) => {
+  const responses = body.userResponses || {};
+  const responseSubject =
+    responses["honoree-name"] ||
+    responses["loved-one-name"] ||
+    responses["child-name"] ||
+    responses["core-details"];
+
+  if (body.subjectName) return body.subjectName;
+  if (service.id === "wedding" || service.id === "vow_renewal") {
+    return [body.brideName, body.groomName].filter(Boolean).join(" & ") || "the couple";
+  }
+  return responseSubject || [body.brideName, body.groomName].filter(Boolean).join(" & ") || "this ceremony";
+};
+
+const getSensitivityInstructions = (service: MrScriptService) => {
+  if (service.sensitivity === "grief") {
+    return [
+      "Use a gentle, compassionate, grounded tone.",
+      "Offer comfort without sounding salesy, cheerful, or performative.",
+      "Do not assume religious beliefs. Include spiritual or religious language only if the details request it.",
+      "Use careful language around loss, family grief, remembrance, and legacy.",
+    ];
+  }
+
+  if (service.sensitivity === "celebratory") {
+    return [
+      "Use warm, joyful, polished language that still sounds natural when spoken aloud.",
+      "Keep the ceremony personal and human, not generic or overly ornate.",
+      "Include stage directions only where they help the officiant perform the ceremony.",
+    ];
+  }
+
+  return [
+    "Use a respectful, flexible tone that matches the life moment described by the user.",
+    "Do not assume religion, culture, relationship structure, or legal meaning unless provided.",
+    "Keep the script useful for an officiant to read aloud.",
+  ];
+};
+
+const getServiceBoundaries = (service: MrScriptService) => {
+  if (service.id === "wedding") {
+    return [
+      "Wedding-specific language such as vows, rings, declaration of intent, and pronouncement is allowed when appropriate.",
+      "Use partner language unless the submitted names or details clearly require different wording.",
+      "Mention legal requirements only generally; do not give legal advice.",
+    ];
+  }
+
+  if (service.id === "vow_renewal") {
+    return [
+      "This is a recommitment ceremony, not a new legal marriage ceremony.",
+      "Do not include legal pronouncement language.",
+      "Renewed vows, optional ring rededication, family recognition, and anniversary reflection are appropriate.",
+    ];
+  }
+
+  if (service.id === "writing_service") {
+    return [
+      "This may be a speech, eulogy, toast, vows, reading, or outline rather than a full ceremony.",
+      "Write the requested piece directly and avoid adding unrelated ceremony structure.",
+    ];
+  }
+
+  return [
+    "Do not include wedding-only language such as marriage pronouncement, ring exchange, vows, bride/groom assumptions, or legal marriage language unless the user explicitly asks for it.",
+    "Use the service category and details to choose appropriate ceremony wording.",
+  ];
+};
+
+const buildContextBlock = (body: ScriptGenerationBody, service: MrScriptService) => {
+  const responses = body.userResponses || {};
+  const subjectName = getSubjectName(body, service);
+  const date = normalize(body.ceremonyDate) || normalize(body.weddingDate) || "date to be confirmed";
+  const venue = normalize(body.venue) || "location to be confirmed";
+  const intakeResponses =
+    Object.entries(responses)
+      .filter(([key, value]) => key.startsWith("intake-") && normalize(value))
+      .map(([key, value]) => `${key.replace(/^intake-/, "").replace(/-/g, " ")}: ${value}`)
+      .join("\n") || "No additional intake details provided yet.";
+
+  return [
+    `Service: ${service.displayName}`,
+    `Service category: ${service.category}`,
+    `Subject / people involved: ${subjectName}`,
+    `Date: ${date}`,
+    `Location: ${venue}`,
+    `Target length: ${body.ceremonyLength || responses["ceremony-duration"] || "20-30 minutes"}`,
+    `Tone: ${body.ceremonyTone || responses["ceremony-tone"] || service.toneOptions[0] || "Warm and natural"}`,
+    `Officiant style: ${body.officiantStyle || responses["officiant-style"] || "Warm, natural, and professional"}`,
+    `Core details: ${body.coreDetails || responses["core-details"] || "No extra core details provided yet."}`,
+    `Story notes: ${body.storyNotes || responses["story-notes"] || "No story notes provided yet."}`,
+    `Special inclusions: ${body.specialInclusions || responses["special-inclusions"] || "No special inclusions provided yet."}`,
+    `Service-specific intake:\n${intakeResponses}`,
+    `Avoidances: ${body.avoidances || responses["avoidances"] || "No avoidances provided yet."}`,
+    `Unity / ritual notes: ${body.unityCeremony || responses["special-elements"] || "None specified"}`,
+    `Vow / promise notes: ${body.vowsType || responses["vows-type"] || "None specified"}`,
+    `Reading notes: ${body.readingText || body.readingStyle || "None specified"}`,
+    `Religious / cultural notes: ${[body.religiousElements, body.culturalTraditions].filter(Boolean).join("; ") || "None specified"}`,
+  ].join("\n");
+};
+
+const buildSegmentPrompt = (
+  segment: ScriptSegment,
   segmentIndex: number,
-  ceremonyDetails: any,
+  segments: ScriptSegment[],
+  service: MrScriptService,
+  body: ScriptGenerationBody,
   previousContent: string,
   isRefinement: boolean,
   customInstructions?: string
-): Promise<string> {
-  const segment = CEREMONY_SEGMENTS[segmentIndex];
-  const {
-    brideName,
-    groomName,
-    venue,
-    weddingDate,
-    ceremonyStyle,
-    ceremonyLength,
-    ceremonyTone,
-    unityCeremony,
-    vowsType,
-    readingStyle,
-    readingText,
-    refinementInstructions,
-    additionalUnity,
-    religiousElements,
-    culturalTraditions,
-  } = ceremonyDetails;
+) => {
+  const sections = segment.sections.map((section, index) => `${index + 1}. ${section}`).join("\n");
+  const context = buildContextBlock(body, service);
+  const sensitivity = safeList(getSensitivityInstructions(service));
+  const boundaries = safeList(getServiceBoundaries(service));
 
-  // Determine if this segment should include optional elements
-  const includeReading = segmentIndex === 1 && readingStyle && readingStyle !== "none";
-  const includeUnity = segmentIndex === 3 && unityCeremony && unityCeremony !== "None";
-  const includeAdditionalUnity = segmentIndex === 3 && additionalUnity && additionalUnity !== "Skip this";
-  const includeReligious = religiousElements && religiousElements !== "Skip this";
+  return `You are Mr. Script, an expert life-ceremony writing assistant for professional officiants.
 
-  // Build segment-specific prompt
-  let segmentPrompt = `You are an expert wedding officiant writing SEGMENT ${segmentIndex + 1} of 5 for a wedding ceremony.
+Write SEGMENT ${segmentIndex + 1} of ${segments.length}: ${segment.name}.
 
-**CRITICAL INSTRUCTIONS:**
-- Write ONLY the sections listed below - do not include sections from other segments
-- Write in first person as the officiant speaking directly
-- Include [stage directions in brackets] for actions
-- Be detailed and heartfelt - use the FULL word count target
-- This segment should be approximately ${segment.wordTarget} words
-- Write as if speaking aloud at the ceremony
+IMPORTANT:
+- Write only this segment's sections. Do not write sections assigned to other segments.
+- Write in first person as the officiant speaking aloud unless the selected service is writing-only.
+- Use natural spoken language, not stiff template language.
+- Include concise stage directions in brackets only when useful.
+- Target approximately ${segment.wordTarget} words for this segment.
+- Keep names, dates, places, and details exactly as provided when possible.
+- If a detail is missing, use a clean bracketed placeholder instead of inventing facts.
 
-**COUPLE:** ${brideName} & ${groomName}
-**VENUE:** ${venue || "their chosen venue"}
-**DATE:** ${weddingDate || "their wedding day"}
-**STYLE:** ${ceremonyStyle || "Traditional"}
-**TONE:** ${ceremonyTone || "Warm and Personal"}
+SERVICE CONTEXT:
+${context}
 
-**SEGMENT TO WRITE: ${segment.name}**
-Sections to include:
-${segment.sections.map((s, i) => `${i + 1}. ${s}`).join("\n")}
-`;
+SENSITIVITY RULES:
+${sensitivity}
 
-  // Add segment-specific details
-  if (segmentIndex === 0) {
-    // Opening segment
-    segmentPrompt += `
-**FOR THIS OPENING SEGMENT:**
-- Start with [Processional music plays as the wedding party enters]
-- Write a warm, engaging welcome that sets the ${ceremonyTone?.toLowerCase() || "warm"} tone
-- Include a meaningful reflection on what love and marriage mean
-- Acknowledge the gathered guests
-- This sets the foundation for the entire ceremony
-`;
-  } else if (segmentIndex === 1) {
-    // Declarations segment
-    if (includeReading) {
-      segmentPrompt += `
-**READING TO INCLUDE:**
-Style: ${readingStyle}
-${readingText ? `Text: "${readingText}"` : "Please select an appropriate reading for this style."}
-`;
-    }
-    segmentPrompt += `
-**FOR THIS DECLARATIONS SEGMENT:**
-- Transition smoothly from the opening
-- Address the couple directly about their commitment
-- Include the Declaration of Intent ("Do you, ${brideName}, take ${groomName}...")
-- Write both questions and the responses ("I do")
-`;
-  } else if (segmentIndex === 2) {
-    // Vows segment
-    segmentPrompt += `
-**VOWS TYPE:** ${vowsType || "Traditional Vows"}
-**FOR THIS VOWS SEGMENT:**
-${vowsType === "Personal Written Vows"
-  ? "- Include placeholder: [${brideName} reads their personal vows] and [${groomName} reads their personal vows]"
-  : `- Write complete traditional vows for both ${brideName} and ${groomName} to repeat
-- Include the officiant's prompts and the couple's responses
-- Make them meaningful and complete`}
-`;
-  } else if (segmentIndex === 3) {
-    // Unity & Rings segment
-    if (includeUnity) {
-      segmentPrompt += `
-**UNITY CEREMONY:** ${unityCeremony}
-- Include complete instructions and words for the ${unityCeremony}
-- Explain the symbolism to guests
-`;
-    }
-    if (includeAdditionalUnity) {
-      segmentPrompt += `
-**ADDITIONAL UNITY CEREMONY:** ${additionalUnity}
-- Also include this unity ceremony with full script
-`;
-    }
-    segmentPrompt += `
-**FOR THE RING EXCHANGE:**
-- Include the presentation of rings
-- Write complete ring exchange vows for both partners
-- Include "With this ring, I thee wed" style promises
-`;
-  } else if (segmentIndex === 4) {
-    // Closing segment
-    if (includeReligious) {
-      segmentPrompt += `
-**RELIGIOUS ELEMENTS:** ${religiousElements}
-- Include appropriate prayers, blessings, or religious traditions
-`;
-    }
-    if (culturalTraditions) {
-      segmentPrompt += `
-**CULTURAL TRADITIONS:** ${culturalTraditions}
-- Incorporate these cultural elements
-`;
-    }
-    segmentPrompt += `
-**FOR THIS CLOSING SEGMENT:**
-- Write a meaningful blessing or closing words
-- Include the official pronouncement: "By the power vested in me..."
-- Include [The couple shares their first kiss as a married couple]
-- Write the presentation: "It is my honor to present to you, for the first time..."
-- End with [Recessional music plays as the newlyweds exit]
-`;
-  }
+SERVICE BOUNDARIES:
+${boundaries}
 
-  // Add context from previous segments for continuity
-  if (previousContent && segmentIndex > 0) {
-    segmentPrompt += `
-**PREVIOUS SEGMENTS (for context and continuity - do NOT repeat this content):**
-${previousContent.slice(-1500)}...
+THIS SEGMENT MUST INCLUDE:
+${sections}
 
-Continue naturally from where the previous segment ended.
-`;
-  }
+USEFUL SERVICE QUESTIONS:
+Required:
+${safeList(service.requiredQuestions)}
 
-  // Add refinement instructions if this is a refinement
-  if (isRefinement && refinementInstructions) {
-    segmentPrompt += `
-**REFINEMENT REQUESTS - Apply these changes:**
-${refinementInstructions}
-`;
-  }
+Optional:
+${safeList(service.optionalQuestions)}
 
-  // Add custom instructions for single segment regeneration
-  if (customInstructions) {
-    segmentPrompt += `
-**SPECIAL INSTRUCTIONS FOR THIS REGENERATION:**
-${customInstructions}
+Story prompts:
+${safeList(service.storyPrompts)}
 
-Apply these specific changes while maintaining the ceremony flow.
-`;
-  }
+${previousContent ? `PREVIOUS SEGMENTS FOR CONTINUITY. Do not repeat them:\n${previousContent.slice(-1800)}\n` : ""}
+${isRefinement && body.refinementInstructions ? `REFINEMENT REQUEST:\n${body.refinementInstructions}\n` : ""}
+${customInstructions ? `SPECIAL INSTRUCTIONS FOR THIS SEGMENT:\n${customInstructions}\n` : ""}
 
-  segmentPrompt += `
-Now write ONLY Segment ${segmentIndex + 1}: ${segment.name}
-Write approximately ${segment.wordTarget} words. Be detailed and complete.`;
+Now write segment ${segmentIndex + 1}: ${segment.name}.`;
+};
 
-  // Make API call for this segment
+async function callOpenAI(prompt: string, service: MrScriptService) {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -216,200 +265,170 @@ Write approximately ${segment.wordTarget} words. Be detailed and complete.`;
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `You are an expert wedding officiant with 20+ years of experience. You write beautiful, heartfelt ceremony scripts. Write in first person as if you are the officiant speaking. Be detailed and use the full word count requested.`,
+          content: [
+            "You are Mr. Script, a professional ceremony script writer for officiants.",
+            "You write scripts for weddings, vow renewals, memorials, celebration-of-life services, coming-of-age ceremonies, baby blessings, writing-only services, and custom life ceremonies.",
+            service.sensitivity === "grief"
+              ? "For grief-related work, be gentle, compassionate, restrained, and never assume religious beliefs."
+              : "For celebratory work, be warm, polished, personal, and easy to speak aloud.",
+            "Do not use emojis. Do not use markdown tables.",
+          ].join(" "),
         },
-        {
-          role: "user",
-          content: segmentPrompt,
-        },
+        { role: "user", content: prompt },
       ],
-      max_tokens: 1500, // Generous limit per segment
-      temperature: 0.7,
+      max_tokens: 1800,
+      temperature: service.sensitivity === "grief" ? 0.55 : 0.72,
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    let errorData;
+    let errorData: unknown;
     try {
       errorData = JSON.parse(errorText);
     } catch {
       errorData = { raw: errorText };
     }
-    console.error(`Error generating segment ${segmentIndex}:`, {
-      status: response.status,
-      statusText: response.statusText,
-      error: errorData
-    });
-    throw new Error(`Failed to generate segment ${segment.name}: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
+    throw new Error(`${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`);
   }
 
   const data = await response.json();
-  return data.choices[0]?.message?.content || "";
+  return data.choices?.[0]?.message?.content || "";
 }
 
-// Helper to build final script from segments array
+async function generateSegment(
+  segmentIndex: number,
+  segments: ScriptSegment[],
+  service: MrScriptService,
+  body: ScriptGenerationBody,
+  previousContent: string,
+  isRefinement: boolean,
+  customInstructions?: string
+) {
+  const segment = segments[segmentIndex];
+  const prompt = buildSegmentPrompt(
+    segment,
+    segmentIndex,
+    segments,
+    service,
+    body,
+    previousContent,
+    isRefinement,
+    customInstructions
+  );
+
+  return callOpenAI(prompt, service);
+}
+
 function buildFinalScript(
-  segments: string[],
-  ceremonyDetails: any,
+  segmentsContent: string[],
+  segments: ScriptSegment[],
+  service: MrScriptService,
+  body: ScriptGenerationBody,
   isRefinement: boolean
-): string {
-  const {
-    brideName,
-    groomName,
-    venue,
-    weddingDate,
-    ceremonyStyle,
-    ceremonyLength,
-    ceremonyTone,
-    unityCeremony,
-    vowsType,
-    readingStyle,
-    additionalUnity,
-    religiousElements,
-    culturalTraditions,
-  } = ceremonyDetails;
+) {
+  const subjectName = getSubjectName(body, service);
+  const date = normalize(body.ceremonyDate) || normalize(body.weddingDate) || "Date TBD";
+  const venue = normalize(body.venue) || "Location TBD";
+  const tone = body.ceremonyTone || body.userResponses?.["ceremony-tone"] || service.toneOptions[0] || "Warm and natural";
+  const duration = body.ceremonyLength || body.userResponses?.["ceremony-duration"] || "20-30 minutes";
 
-  let fullScript = "";
-  for (let i = 0; i < segments.length; i++) {
-    fullScript += `\n\n${"═".repeat(60)}\n`;
-    fullScript += `PART ${i + 1}: ${CEREMONY_SEGMENTS[i].name.toUpperCase()}\n`;
-    fullScript += `${"═".repeat(60)}\n\n`;
-    fullScript += segments[i];
-  }
+  const bodyText = segmentsContent
+    .map((content, index) => {
+      const heading = `PART ${index + 1}: ${segments[index].name.toUpperCase()}`;
+      return `\n\n${"-".repeat(heading.length)}\n${heading}\n${"-".repeat(heading.length)}\n\n${content.trim()}`;
+    })
+    .join("");
 
-  return `${ceremonyStyle?.toUpperCase() || "WEDDING"} CEREMONY SCRIPT
-${isRefinement ? "✨ REFINED VERSION ✨" : ""}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  return `${service.displayName.toUpperCase()} SCRIPT
+${isRefinement ? "REFINED VERSION\n" : ""}Prepared by Mr. Script for ${subjectName}
+Service category: ${service.category}
+Date: ${date}
+Location: ${venue}
+Target duration: ${duration}
+Tone: ${tone}
 
-Generated by Mr. Script (Powered by AI) for ${brideName} & ${groomName}
-Venue: ${venue || "Wedding Venue"}
-Date: ${weddingDate || "Wedding Date"}
-Target Duration: ${ceremonyLength || "20-30 minutes"}
+${bodyText}
 
-This is a COMPLETE, DETAILED ceremony script generated in 5 segments
-for maximum detail and personalization.
+${"-".repeat(32)}
+END OF SCRIPT
+${"-".repeat(32)}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${fullScript}
+SCRIPT NOTES
+- Service: ${service.displayName}
+- Sensitivity: ${service.sensitivity}
+- Output type: ${service.outputTypes[0] || "ceremony_script"}
+- Segments generated: ${segments.length}
 
-${"═".repeat(60)}
-END OF CEREMONY SCRIPT
-${"═".repeat(60)}
-
-CEREMONY DETAILS:
-• Style: ${ceremonyStyle || "Traditional"}
-• Tone: ${ceremonyTone || "Warm and Personal"}
-• Duration: ${ceremonyLength || "20-30 minutes"}
-${unityCeremony && unityCeremony !== "None" ? `• Unity Ceremony: ${unityCeremony}` : ""}
-${additionalUnity && additionalUnity !== "Skip this" ? `• Additional Unity: ${additionalUnity}` : ""}
-${religiousElements && religiousElements !== "Skip this" ? `• Religious Elements: ${religiousElements}` : ""}
-${culturalTraditions ? `• Cultural Traditions: ${culturalTraditions}` : ""}
-• Vows: ${vowsType || "Traditional Vows"}
-${readingStyle && readingStyle !== "none" ? `• Reading Style: ${readingStyle}` : ""}
-
-Generated with AI assistance by Mr. Script - Your Personal Wedding Script Creator
-Total segments: 5 | Each segment optimized for maximum detail
-`;
+Prepared with Mr. Script for professional officiant review and editing.`;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Check if OpenAI API key is configured
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      console.error("OPENAI_API_KEY is not configured");
       return NextResponse.json(
         { error: "OpenAI API key not configured", details: "Please add OPENAI_API_KEY to environment variables" },
         { status: 500 }
       );
     }
 
-    // Log that we have an API key (first 10 chars for debugging)
-    console.log(`OpenAI API key found: ${apiKey.substring(0, 10)}...`);
+    const body = (await request.json()) as ScriptGenerationBody;
+    const service = getMrScriptServiceByResponse(body.ceremonyType || body.ceremonyStyle);
+    const segments = buildSegments(service, body.ceremonyLength || body.userResponses?.["ceremony-duration"]);
+    const isRefinement = Boolean(body.refinementInstructions);
+    const isSingleSegment = typeof body.regenerateSegmentIndex === "number";
 
-    const body = await request.json();
-    const {
-      refinementInstructions,
-      // Single segment regeneration params
-      regenerateSegmentIndex,
-      existingSegments,
-      segmentInstructions,
-    } = body;
-
-    const isRefinement = !!refinementInstructions;
-    const isSingleSegment = typeof regenerateSegmentIndex === "number";
-
-    // SINGLE SEGMENT REGENERATION
-    if (isSingleSegment && existingSegments && Array.isArray(existingSegments)) {
-      console.log(`Regenerating single segment ${regenerateSegmentIndex + 1}: ${CEREMONY_SEGMENTS[regenerateSegmentIndex].name}`);
-
-      // Build context from previous segments
-      let previousContent = "";
-      for (let i = 0; i < regenerateSegmentIndex; i++) {
-        previousContent += existingSegments[i] + "\n\n";
-      }
-
-      // Generate just the one segment
+    if (isSingleSegment && body.existingSegments && Array.isArray(body.existingSegments)) {
+      const index = Math.max(0, Math.min(body.regenerateSegmentIndex || 0, segments.length - 1));
+      const previousContent = body.existingSegments.slice(0, index).join("\n\n");
       const newSegment = await generateSegment(
-        regenerateSegmentIndex,
+        index,
+        segments,
+        service,
         body,
         previousContent,
         false,
-        segmentInstructions
+        body.segmentInstructions
       );
 
-      // Replace the segment in the array
-      const updatedSegments = [...existingSegments];
-      updatedSegments[regenerateSegmentIndex] = newSegment;
-
-      // Build the final script
-      const finalScript = buildFinalScript(updatedSegments, body, false);
+      const updatedSegments = [...body.existingSegments];
+      updatedSegments[index] = newSegment;
+      const finalScript = buildFinalScript(updatedSegments, segments, service, body, false);
 
       return NextResponse.json({
         script: finalScript,
         segments: updatedSegments,
-        regeneratedIndex: regenerateSegmentIndex,
+        regeneratedIndex: index,
+        serviceId: service.id,
       });
     }
 
-    // FULL SCRIPT GENERATION
-    const segments: string[] = [];
+    const generatedSegments: string[] = [];
     let previousContent = "";
 
-    console.log("Starting full segmented script generation...");
+    for (let i = 0; i < segments.length; i += 1) {
+      const segmentContent = await generateSegment(i, segments, service, body, previousContent, isRefinement);
+      generatedSegments.push(segmentContent);
+      previousContent += `\n\nPART ${i + 1}: ${segments[i].name}\n${segmentContent}`;
 
-    for (let i = 0; i < CEREMONY_SEGMENTS.length; i++) {
-      console.log(`Generating segment ${i + 1}/${CEREMONY_SEGMENTS.length}: ${CEREMONY_SEGMENTS[i].name}`);
-
-      const segmentContent = await generateSegment(i, body, previousContent, isRefinement);
-      segments.push(segmentContent);
-
-      // Update previous content for context in next segment
-      previousContent += `\n\n${"═".repeat(60)}\n`;
-      previousContent += `PART ${i + 1}: ${CEREMONY_SEGMENTS[i].name.toUpperCase()}\n`;
-      previousContent += `${"═".repeat(60)}\n\n`;
-      previousContent += segmentContent;
-
-      // Small delay between API calls to avoid rate limiting
-      if (i < CEREMONY_SEGMENTS.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+      if (i < segments.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 350));
       }
     }
 
-    // Build the final script
-    const finalScript = buildFinalScript(segments, body, isRefinement);
-
-    console.log("Script generation complete!");
     return NextResponse.json({
-      script: finalScript,
-      segments: segments, // Return segments array for future single-segment regeneration
+      script: buildFinalScript(generatedSegments, segments, service, body, isRefinement),
+      segments: generatedSegments,
+      serviceId: service.id,
+      serviceName: service.displayName,
+      segmentPlan: segments,
+      availableServices: MR_SCRIPT_SERVICES.map((item) => item.id),
     });
-
   } catch (error) {
     console.error("Error generating script:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -417,7 +436,7 @@ export async function POST(request: NextRequest) {
       {
         error: "Script generation failed",
         details: errorMessage,
-        hint: "Check Netlify function logs for more details. Common issues: invalid API key, rate limiting, or model access."
+        hint: "Check server logs for model access, rate limits, or missing environment variables.",
       },
       { status: 500 }
     );

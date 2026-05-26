@@ -18,7 +18,13 @@ export function PortalSendPaymentReminderDialog() {
     handleSendPaymentReminderEmail,
     paymentInfo,
     isSendingMessage,
+    currentCeremonyType,
+    currentCeremonyConfig,
   } = useCommunicationPortal()
+  const recipientGroupLabel =
+    currentCeremonyType === "wedding"
+      ? "both couple members"
+      : "both listed contacts"
 
   // Don't render if editCoupleInfo is not available
   if (!editCoupleInfo?.brideName) {
@@ -36,7 +42,9 @@ export function PortalSendPaymentReminderDialog() {
               Send Payment Reminder
             </DialogTitle>
             <DialogDescription>
-              {paymentReminderForm.to === 'both' ? 'Send payment reminder to both couple members' : 'Send payment reminder to selected recipient'}
+              {paymentReminderForm.to === 'both'
+                ? `Send payment reminder to ${recipientGroupLabel}`
+                : `Send ${currentCeremonyConfig?.label?.toLowerCase() || "ceremony"} payment reminder to selected recipient`}
             </DialogDescription>
           </DialogHeader>
 

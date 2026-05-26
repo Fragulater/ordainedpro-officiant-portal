@@ -132,8 +132,10 @@ export function PaymentsTab() {
                     <CardHeader className="bg-gradient-to-r from-emerald-50 to-green-50">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <CardTitle className="text-emerald-900">Business Reports</CardTitle>
-                          <CardDescription>Income, refunds, outstanding balances, and export-ready records</CardDescription>
+                          <CardTitle className="text-2xl font-bold text-emerald-950">Business Snapshot</CardTitle>
+                          <CardDescription className="mt-2 max-w-3xl text-sm leading-relaxed text-emerald-800">
+                            This section gives you a high-level overview of your entire officiant business, including all couples, ceremonies, upcoming events, completed services, payments, and activity across your account.
+                          </CardDescription>
                         </div>
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportFinancialCsv}>

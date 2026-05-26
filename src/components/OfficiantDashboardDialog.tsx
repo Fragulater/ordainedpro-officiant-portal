@@ -217,16 +217,28 @@ interface OfficiantProfile {
   videoUrl: string;
 }
 
-// Helper function to calculate days until ceremony
-const getDaysUntilCeremony = (ceremonyDate: string): string => {
+const parseLocalDateOnly = (dateString?: string) => {
+  if (!dateString) return null;
+  const [datePart] = dateString.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+};
+
+const getStartOfLocalToday = () => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  return today;
+};
 
-  const ceremony = new Date(ceremonyDate);
-  ceremony.setHours(0, 0, 0, 0);
+// Helper function to calculate days until ceremony
+const getDaysUntilCeremony = (ceremonyDate: string): string => {
+  const today = getStartOfLocalToday();
+  const ceremony = parseLocalDateOnly(ceremonyDate);
+  if (!ceremony) return "Date TBD";
 
   const diffTime = ceremony.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) {
     return `${Math.abs(diffDays)} days ago`;
@@ -289,6 +301,7 @@ export function OfficiantDashboardDialog({
   });
   const [anniversarySettingsStatus, setAnniversarySettingsStatus] = useState<"idle" | "saved" | "error">("idle");
   const [updatingAnniversaryId, setUpdatingAnniversaryId] = useState<string | number | null>(null);
+  const [anniversaryReminderPersistenceReady, setAnniversaryReminderPersistenceReady] = useState(true);
   // Form state for Add New Ceremony - mirrors Communication Portal
   const [newCeremony, setNewCeremony] = useState({
     ceremonyName: "",
@@ -385,11 +398,21 @@ export function OfficiantDashboardDialog({
       ? `${window.location.origin}${reviewRequestPath}`
       : reviewRequestPath;
   const hasReviews = profile.totalReviews > 0;
+  const reviewRequestCouples = (couples || []).slice(0, 10);
 
   useEffect(() => {
-    if (!selectedReviewCoupleId && couples && couples.length > 0) {
-      const firstActiveCouple = couples.find((couple) => couple.isActive) || couples[0];
-      setSelectedReviewCoupleId(String(firstActiveCouple.id));
+    if (couples && couples.length > 0) {
+      const reviewCandidates = couples.slice(0, 10);
+      const selectedIsVisible = reviewCandidates.some(
+        (couple) => String(couple.id) === selectedReviewCoupleId
+      );
+
+      if (!selectedReviewCoupleId || !selectedIsVisible) {
+        const firstActiveCouple =
+          reviewCandidates.find((couple) => couple.isActive) ||
+          reviewCandidates[0];
+        setSelectedReviewCoupleId(String(firstActiveCouple.id));
+      }
     }
   }, [couples, selectedReviewCoupleId]);
 
@@ -508,6 +531,70 @@ ${officiantFullName}`;
     }
   };
 
+  const isMissingAnniversaryRemindersTable = (error: any) => {
+    const message = String(error?.message || "");
+    return (
+      error?.code === "PGRST205" ||
+      error?.code === "42P01" ||
+      (message.includes("anniversary_reminders") &&
+        (message.includes("schema cache") || message.includes("Could not find the table")))
+    );
+  };
+
+  const getAnniversaryReminderStorageKey = () =>
+    user?.id ? `ordainedpro-anniversary-reminders-${user.id}` : "";
+
+  const getLocalAnniversaryReminderRows = (): Array<Record<string, any>> => {
+    const storageKey = getAnniversaryReminderStorageKey();
+    if (!storageKey || typeof window === "undefined") return [];
+
+    try {
+      const stored = window.localStorage.getItem(storageKey);
+      const parsed = stored ? JSON.parse(stored) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.warn("Unable to read local anniversary reminder statuses:", error);
+      return [];
+    }
+  };
+
+  const saveLocalAnniversaryReminderRow = (
+    anniversary: DashboardAnniversary,
+    status: AnniversaryContactStatus,
+    timestamp: string
+  ) => {
+    const storageKey = getAnniversaryReminderStorageKey();
+    if (!storageKey || typeof window === "undefined") return;
+
+    try {
+      const existingRows = getLocalAnniversaryReminderRows();
+      const nextRow = {
+        id: anniversary.id,
+        user_id: user?.id,
+        couple_id: anniversary.coupleId,
+        wedding_date: anniversary.weddingDate,
+        anniversary_year: anniversary.anniversaryYear,
+        anniversary_date: anniversary.anniversaryDate,
+        contact_status: status,
+        email_sent_at: status === "email_sent" ? timestamp : anniversary.emailSentAt || null,
+        marked_contacted_at:
+          status === "marked_contacted" ? timestamp : anniversary.markedContactedAt || null,
+        updated_at: timestamp,
+      };
+      const otherRows = existingRows.filter(
+        (row) =>
+          !(
+            Number(row.couple_id) === Number(anniversary.coupleId) &&
+            Number(row.anniversary_year) === Number(anniversary.anniversaryYear)
+          )
+      );
+
+      window.localStorage.setItem(storageKey, JSON.stringify([...otherRows, nextRow]));
+    } catch (error) {
+      console.warn("Unable to save local anniversary reminder status:", error);
+    }
+  };
+
   const updateAnniversaryReminderStatus = async (
     anniversary: DashboardAnniversary,
     status: AnniversaryContactStatus
@@ -530,6 +617,11 @@ ${officiantFullName}`;
     );
 
     if (!user?.id) return;
+    saveLocalAnniversaryReminderRow(anniversary, status, timestamp);
+
+    if (!anniversaryReminderPersistenceReady) {
+      return;
+    }
 
     const updatePayload = {
       user_id: user.id,
@@ -548,6 +640,11 @@ ${officiantFullName}`;
       .upsert(updatePayload, { onConflict: "user_id,couple_id,anniversary_year" });
 
     if (error) {
+      if (isMissingAnniversaryRemindersTable(error)) {
+        setAnniversaryReminderPersistenceReady(false);
+        return;
+      }
+
       console.warn("Could not persist anniversary status yet:", error.message);
     }
   };
@@ -696,10 +793,7 @@ ${officiantFullName}`;
   const [dashboardMeetings, setDashboardMeetings] = useState<DashboardMeeting[]>([]);
 
   const parseDateOnly = (dateString?: string) => {
-    if (!dateString) return null;
-    const [year, month, day] = dateString.split("-").map(Number);
-    if (!year || !month || !day) return null;
-    return new Date(year, month - 1, day);
+    return parseLocalDateOnly(dateString);
   };
 
   const getDateKey = (date?: Date | null) => {
@@ -836,7 +930,7 @@ ${officiantFullName}`;
           : "TBD";
 
         const parsedWeddingDate = parseDateOnly(couple.weddingDetails?.weddingDate);
-        const isPastDate = parsedWeddingDate ? parsedWeddingDate < new Date() : false;
+        const isPastDate = parsedWeddingDate ? parsedWeddingDate < getStartOfLocalToday() : false;
 
         // Use colors from couple object or fallback to defaults
         const coupleColors = (couple as any).colors || {
@@ -950,9 +1044,10 @@ ${officiantFullName}`;
           console.warn("Anniversary settings table not ready yet:", settingsError.message);
         }
 
-        const anniversaryRows = buildDerivedAnniversaries();
+        const localReminderRows = getLocalAnniversaryReminderRows();
+        const anniversaryRows = buildDerivedAnniversaries(localReminderRows);
 
-        if (anniversaryRows.length > 0) {
+        if (anniversaryRows.length > 0 && anniversaryReminderPersistenceReady) {
           const rowsToUpsert = anniversaryRows.map((anniversary) => ({
             user_id: user.id,
             couple_id: anniversary.coupleId,
@@ -970,10 +1065,21 @@ ${officiantFullName}`;
             });
 
           if (upsertError) {
+            if (isMissingAnniversaryRemindersTable(upsertError)) {
+              setAnniversaryReminderPersistenceReady(false);
+              setAnniversaryReminders(anniversaryRows);
+              return;
+            }
+
             console.warn("Anniversary reminder table not ready yet:", upsertError.message);
             setAnniversaryReminders(anniversaryRows);
             return;
           }
+        }
+
+        if (!anniversaryReminderPersistenceReady) {
+          setAnniversaryReminders(anniversaryRows);
+          return;
         }
 
         const { data: reminderData, error: reminderError } = await supabase
@@ -982,20 +1088,27 @@ ${officiantFullName}`;
           .eq("user_id", user.id);
 
         if (reminderError) {
+          if (isMissingAnniversaryRemindersTable(reminderError)) {
+            setAnniversaryReminderPersistenceReady(false);
+            setAnniversaryReminders(anniversaryRows);
+            return;
+          }
+
           console.warn("Failed to load anniversary reminders:", reminderError.message);
           setAnniversaryReminders(anniversaryRows);
           return;
         }
 
+        setAnniversaryReminderPersistenceReady(true);
         setAnniversaryReminders(buildDerivedAnniversaries(reminderData || []));
       } catch (error) {
         console.warn("Anniversary reminders are running in local fallback mode:", error);
-        setAnniversaryReminders(buildDerivedAnniversaries());
+        setAnniversaryReminders(buildDerivedAnniversaries(getLocalAnniversaryReminderRows()));
       }
     };
 
     loadAnniversaryData();
-  }, [open, user?.id, couples]);
+  }, [open, user?.id, couples, anniversaryReminderPersistenceReady]);
 
   // ✅ Load profile from Supabase (not localStorage)
   useEffect(() => {
@@ -1091,49 +1204,49 @@ ${officiantFullName}`;
 
   // Get current year for YTD calculations
   const currentYear = new Date().getFullYear();
-  const currentDate = new Date();
+  const currentDate = getStartOfLocalToday();
 
   const activeCeremonies = ceremonies.filter((c) => c.status === "Active");
 
   // Completed ceremonies (dates that have passed)
   const completedCeremonies = ceremonies.filter((c) => {
-    const ceremonyDate = new Date(c.rawDate || c.date);
-    return c.status === "Active" && ceremonyDate < new Date();
+    const ceremonyDate = parseDateOnly(c.rawDate || c.date);
+    return c.status === "Active" && Boolean(ceremonyDate && ceremonyDate < currentDate);
   });
 
   // Year-to-Date ceremonies (all ceremonies with dates in current year)
   const ytdCeremonies = ceremonies.filter((c) => {
     if (!c.rawDate) return false;
-    const ceremonyDate = new Date(c.rawDate);
-    return ceremonyDate.getFullYear() === currentYear;
+    const ceremonyDate = parseDateOnly(c.rawDate);
+    return Boolean(ceremonyDate && ceremonyDate.getFullYear() === currentYear);
   });
 
   // Completed ceremonies this year only
   const ytdCompletedCeremonies = ceremonies.filter((c) => {
     if (!c.rawDate) return false;
-    const ceremonyDate = new Date(c.rawDate);
+    const ceremonyDate = parseDateOnly(c.rawDate);
     return (
-      ceremonyDate.getFullYear() === currentYear && ceremonyDate < currentDate
+      Boolean(ceremonyDate && ceremonyDate.getFullYear() === currentYear && ceremonyDate < currentDate)
     );
   });
 
   // Get upcoming ceremonies within next 30 days, sorted by date
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = getStartOfLocalToday();
   const thirtyDaysFromNow = new Date(today);
   thirtyDaysFromNow.setDate(today.getDate() + 30);
 
   const upcomingCeremonies = activeCeremonies
     .filter((c) => {
       if (!c.rawDate) return false;
-      const ceremonyDate = new Date(c.rawDate);
-      ceremonyDate.setHours(0, 0, 0, 0);
-      return ceremonyDate >= today && ceremonyDate <= thirtyDaysFromNow;
+      const ceremonyDate = parseDateOnly(c.rawDate);
+      return Boolean(ceremonyDate && ceremonyDate >= today && ceremonyDate <= thirtyDaysFromNow);
     })
-    .sort(
-      (a, b) => new Date(a.rawDate).getTime() - new Date(b.rawDate).getTime()
-    )
+    .sort((a, b) => (parseDateOnly(a.rawDate)?.getTime() || 0) - (parseDateOnly(b.rawDate)?.getTime() || 0))
     .slice(0, 2);
+
+  const visibleAnniversaryReminders = anniversaryReminders
+    .filter((anniversary) => anniversary.contactStatus !== "marked_contacted")
+    .slice(0, 3);
 
   const coupleById = new Map((couples || []).map((couple) => [couple.id, couple]));
 
@@ -1880,17 +1993,15 @@ ${officiantFullName}`;
                   </div>
                   <Card className="border-pink-100 bg-pink-50/40">
                     <CardContent className="pt-6">
-                      {anniversaryReminders.length > 0 ? (
+                      {visibleAnniversaryReminders.length > 0 ? (
                         <div className="space-y-4">
-                          {anniversaryReminders.slice(0, 4).map((anniversary) => {
+                          {visibleAnniversaryReminders.map((anniversary) => {
                             const isDue = anniversary.daysUntil <= anniversarySettings.reminderDays;
                             const isBusy = updatingAnniversaryId === `${anniversary.coupleId}-${anniversary.anniversaryYear}`;
                             const statusLabel =
                               anniversary.contactStatus === "email_sent"
                                 ? "Email sent"
-                                : anniversary.contactStatus === "marked_contacted"
-                                  ? "Marked as contacted"
-                                  : "Not contacted";
+                                : "Not contacted";
 
                             return (
                               <div
@@ -1962,10 +2073,10 @@ ${officiantFullName}`;
                         <div className="rounded-lg border border-dashed border-pink-200 bg-white p-6 text-center">
                           <Heart className="mx-auto mb-2 h-8 w-8 text-pink-300" />
                           <p className="text-sm font-medium text-gray-900">
-                            No completed wedding anniversaries yet.
+                            No upcoming anniversary reminders to show.
                           </p>
                           <p className="mt-1 text-sm text-gray-500">
-                            Once a wedding date has passed, OrdainedPro will track the yearly anniversary automatically.
+                            Completed or contacted reminders are hidden from this dashboard list.
                           </p>
                         </div>
                       )}
@@ -2155,6 +2266,102 @@ ${officiantFullName}`;
                             day: "h-[--cell-size] w-[--cell-size]",
                           }}
                         />
+                      </CardContent>
+                    </Card>
+
+                    <Card className="mt-6 border-2 border-pink-200 shadow-lg">
+                      <CardHeader className="bg-pink-50">
+                        <CardTitle className="flex items-center gap-2 text-xl text-pink-900">
+                          <Heart className="h-5 w-5 text-pink-500" />
+                          Anniversary Tracking
+                        </CardTitle>
+                        <CardDescription>
+                          Remind yourself when past couples are coming up on an anniversary.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-5 p-6">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <Label htmlFor="anniversaryReminderDays">
+                              Reminder timing
+                            </Label>
+                            <div className="mt-2 flex items-center gap-2">
+                              <Input
+                                id="anniversaryReminderDays"
+                                type="number"
+                                min={0}
+                                max={60}
+                                value={anniversarySettings.reminderDays}
+                                onChange={(event) =>
+                                  setAnniversarySettings((current) => ({
+                                    ...current,
+                                    reminderDays: Math.min(
+                                      60,
+                                      Math.max(0, Number(event.target.value) || 0)
+                                    ),
+                                  }))
+                                }
+                                className="max-w-28"
+                              />
+                              <span className="text-sm text-gray-600">
+                                days before each anniversary
+                              </span>
+                            </div>
+                            <p className="mt-2 text-xs text-gray-500">
+                              The default is 3 days before, giving the officiant time
+                              to send a thoughtful note.
+                            </p>
+                          </div>
+
+                          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-pink-100 bg-pink-50/60 p-4">
+                            <input
+                              type="checkbox"
+                              checked={anniversarySettings.autoSendEnabled}
+                              onChange={(event) =>
+                                setAnniversarySettings((current) => ({
+                                  ...current,
+                                  autoSendEnabled: event.target.checked,
+                                }))
+                              }
+                              className="mt-1 h-4 w-4 rounded border-pink-300 text-pink-600 focus:ring-pink-500"
+                            />
+                            <span>
+                              <span className="block font-medium text-pink-900">
+                                Automatically send anniversary congratulations
+                              </span>
+                              <span className="mt-1 block text-sm text-gray-600">
+                                When enabled, OrdainedPro can email couples on behalf
+                                of the officiant when the reminder window is reached.
+                              </span>
+                            </span>
+                          </label>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-2 border-t border-pink-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                          <p
+                            className={`text-sm font-medium transition-all duration-500 ${
+                              anniversarySettingsStatus === "saved"
+                                ? "text-green-700 opacity-100"
+                                : anniversarySettingsStatus === "error"
+                                ? "text-red-700 opacity-100"
+                                : "pointer-events-none opacity-0"
+                            }`}
+                            aria-live="polite"
+                          >
+                            {anniversarySettingsStatus === "saved"
+                              ? "Anniversary settings saved."
+                              : anniversarySettingsStatus === "error"
+                              ? "Unable to save anniversary settings."
+                              : "Anniversary settings saved."}
+                          </p>
+                          <Button
+                            onClick={handleSaveAnniversarySettings}
+                            className="bg-pink-500 hover:bg-pink-600"
+                          >
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Anniversary Settings
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   </div>
@@ -2377,7 +2584,7 @@ ${officiantFullName}`;
                             value={reviewRequestUrl}
                             className="h-8 bg-white text-xs"
                           />
-                          {couples && couples.length > 0 && (
+                          {reviewRequestCouples.length > 0 && (
                             <select
                               value={selectedReviewCoupleId}
                               onChange={(event) => {
@@ -2386,7 +2593,7 @@ ${officiantFullName}`;
                               }}
                               className="h-9 w-full rounded-md border border-yellow-200 bg-white px-3 text-xs text-gray-800"
                             >
-                              {couples.map((couple) => (
+                              {reviewRequestCouples.map((couple) => (
                                 <option key={couple.id} value={String(couple.id)}>
                                   {[couple.brideName, couple.groomName].filter(Boolean).join(" & ") || `Couple ${couple.id}`}
                                 </option>
@@ -3369,102 +3576,6 @@ ${officiantFullName}`;
                           </p>
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-2 border-pink-200 shadow-lg mb-6">
-                    <CardHeader className="bg-pink-50">
-                      <CardTitle className="flex items-center gap-2 text-xl text-pink-900">
-                        <Heart className="h-5 w-5 text-pink-500" />
-                        Anniversary Tracking
-                      </CardTitle>
-                      <CardDescription>
-                        Remind yourself when past couples are coming up on an anniversary.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-5 p-6">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div>
-                          <Label htmlFor="anniversaryReminderDays">
-                            Reminder timing
-                          </Label>
-                          <div className="mt-2 flex items-center gap-2">
-                            <Input
-                              id="anniversaryReminderDays"
-                              type="number"
-                              min={0}
-                              max={60}
-                              value={anniversarySettings.reminderDays}
-                              onChange={(event) =>
-                                setAnniversarySettings((current) => ({
-                                  ...current,
-                                  reminderDays: Math.min(
-                                    60,
-                                    Math.max(0, Number(event.target.value) || 0)
-                                  ),
-                                }))
-                              }
-                              className="max-w-28"
-                            />
-                            <span className="text-sm text-gray-600">
-                              days before each anniversary
-                            </span>
-                          </div>
-                          <p className="mt-2 text-xs text-gray-500">
-                            The default is 3 days before, giving the officiant time
-                            to send a thoughtful note.
-                          </p>
-                        </div>
-
-                        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-pink-100 bg-pink-50/60 p-4">
-                          <input
-                            type="checkbox"
-                            checked={anniversarySettings.autoSendEnabled}
-                            onChange={(event) =>
-                              setAnniversarySettings((current) => ({
-                                ...current,
-                                autoSendEnabled: event.target.checked,
-                              }))
-                            }
-                            className="mt-1 h-4 w-4 rounded border-pink-300 text-pink-600 focus:ring-pink-500"
-                          />
-                          <span>
-                            <span className="block font-medium text-pink-900">
-                              Automatically send anniversary congratulations
-                            </span>
-                            <span className="mt-1 block text-sm text-gray-600">
-                              When enabled, OrdainedPro can email couples on behalf
-                              of the officiant when the reminder window is reached.
-                            </span>
-                          </span>
-                        </label>
-                      </div>
-
-                      <div className="flex flex-col items-end gap-2 border-t border-pink-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
-                        <p
-                          className={`text-sm font-medium transition-all duration-500 ${
-                            anniversarySettingsStatus === "saved"
-                              ? "text-green-700 opacity-100"
-                              : anniversarySettingsStatus === "error"
-                              ? "text-red-700 opacity-100"
-                              : "pointer-events-none opacity-0"
-                          }`}
-                          aria-live="polite"
-                        >
-                          {anniversarySettingsStatus === "saved"
-                            ? "Anniversary settings saved."
-                            : anniversarySettingsStatus === "error"
-                            ? "Unable to save anniversary settings."
-                            : "Anniversary settings saved."}
-                        </p>
-                        <Button
-                          onClick={handleSaveAnniversarySettings}
-                          className="bg-pink-500 hover:bg-pink-600"
-                        >
-                          <Save className="mr-2 h-4 w-4" />
-                          Save Anniversary Settings
-                        </Button>
-                      </div>
                     </CardContent>
                   </Card>
 

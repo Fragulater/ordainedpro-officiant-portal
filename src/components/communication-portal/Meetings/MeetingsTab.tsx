@@ -42,13 +42,13 @@ export function MeetingsTab() {
             <div className="space-y-6">
               {/* Top Section: Meetings, Tasks, and Events */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="border-blue-100 shadow-md">
+                <Card className="border-blue-100 shadow-md flex flex-col">
                   <CardHeader className="bg-gradient-to-r from-sky-50 to-blue-50">
                     <CardTitle className="text-blue-900">Scheduled Meetings</CardTitle>
                     <CardDescription>Meetings with calendar invite status tracking</CardDescription>
                   </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
+                  <CardContent className="p-6 flex flex-1 flex-col">
+                    <div className="space-y-4 flex-1">
                       {sortedMeetings.map((meeting) => {
                         const meetingStart = new Date(`${meeting.date}T${meeting.time || "00:00"}`)
                         const displayStatus = ["canceled", "declined", "completed"].includes(meeting.status)
@@ -143,13 +143,16 @@ export function MeetingsTab() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-blue-100 shadow-md">
+                <Card className="border-blue-100 shadow-md flex flex-col">
                   <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
-                    <CardTitle className="text-purple-900">Events Schedule</CardTitle>
+                    <CardTitle className="text-purple-900">
+                      <span className="mr-2" aria-hidden="true">✨</span>
+                      Events Schedule
+                    </CardTitle>
                     <CardDescription>Rehearsal, ceremony, and service schedule</CardDescription>
                   </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
+                  <CardContent className="p-6 flex flex-1 flex-col">
+                    <div className="space-y-4 flex-1">
                       {upcomingEvents.map((event) => (
                         <div key={event.id} className="border border-purple-100 rounded-xl p-4 bg-gradient-to-r from-purple-50 to-pink-50">
                           <div className="flex items-center justify-between mb-3">
@@ -194,6 +197,12 @@ export function MeetingsTab() {
                           )}
                         </div>
                       ))}
+                      {upcomingEvents.length === 0 && (
+                        <div className="text-center py-6 text-gray-500">
+                          <div className="text-3xl mb-2 opacity-70" aria-hidden="true">✨</div>
+                          <p>No events scheduled yet</p>
+                        </div>
+                      )}
                     </div>
                     <Button
                       className="w-full mt-6 bg-purple-500 hover:bg-purple-600"

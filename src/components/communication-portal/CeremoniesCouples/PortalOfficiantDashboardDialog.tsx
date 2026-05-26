@@ -15,6 +15,7 @@ export function PortalOfficiantDashboardDialog() {
     setActiveCoupleIndex,
     showDashboardDialog,
     setShowDashboardDialog,
+    dashboardInitialView,
     setEditCoupleInfo,
     setEditWeddingDetails,
     setViewingFile,
@@ -183,6 +184,7 @@ export function PortalOfficiantDashboardDialog() {
       <OfficiantDashboardDialog
         open={showDashboardDialog}
         onOpenChange={setShowDashboardDialog}
+        initialView={dashboardInitialView}
         couples={allCouples}
         documentsData={documentsData}
         onDocumentView={(documentId) => {

@@ -598,6 +598,14 @@ const getActiveGuidedQuestions = (responses: Record<string, string> = {}): Quest
       category: 'personal',
       aiRecommendation: service.storyPrompts.join(" ")
     },
+    ...service.intakeQuestionGroups.slice(0, service.sensitivity === "grief" ? 3 : 2).map((group) => ({
+      id: `intake-${group.id}`,
+      type: 'text' as const,
+      question: group.prompt,
+      required: false,
+      category: 'personal' as const,
+      aiRecommendation: group.helpText
+    })),
     {
       id: 'special-inclusions',
       type: 'text',
@@ -653,6 +661,13 @@ const generateAIResponse = (question: Question, previousResponses: Record<string
       question.question,
       "High-level notes are enough. Couples can answer one, several, or all of these:",
       service.storyPrompts.map((detail) => `- ${detail}`).join("\n")
+    ].filter(Boolean).join('\n\n')
+  }
+
+  if (question.id.startsWith("intake-")) {
+    return [
+      question.question,
+      question.aiRecommendation || "Short notes are fine. Mr. Script will turn them into natural spoken language."
     ].filter(Boolean).join('\n\n')
   }
 
@@ -732,15 +747,17 @@ const generateCompleteScript = (responses: Record<string, string>, coupleInfo: a
   const avoidances = responses['avoidances'] || ''
   const officiantStyle = responses['officiant-style'] || 'Warm, natural, and professional'
 
-  const brideName = coupleInfo.brideName || 'Sarah'
-  const groomName = coupleInfo.groomName || 'David'
-  const venue = weddingDetails.venueName || 'Sunset Gardens'
-  const date = new Date(weddingDetails.weddingDate || '2024-08-25').toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
+  const brideName = coupleInfo.brideName || 'Partner 1'
+  const groomName = coupleInfo.groomName || 'Partner 2'
+  const venue = weddingDetails.venueName || '[venue to be confirmed]'
+  const date = weddingDetails.weddingDate
+    ? new Date(weddingDetails.weddingDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    : '[date to be confirmed]'
 
   if (service.id !== "wedding") {
     const subjectName =
@@ -1095,9 +1112,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     invoiceNumber: '',
     invoiceDate: '',
     dueDate: '',
-    weddingDate: '2024-08-25',
-    coupleName: 'Sarah Johnson & David Chen',
-    venue: 'Sunset Gardens',
+    weddingDate: '',
+    coupleName: '',
+    venue: '',
     items: [
       {
         id: 1,
@@ -1161,6 +1178,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const [showSwitchCeremonyDialog, setShowSwitchCeremonyDialog] = useState(false)
   const [showArchivedCeremoniesDialog, setShowArchivedCeremoniesDialog] = useState(false)
   const [showDashboardDialog, setShowDashboardDialog] = useState(false)
+  const [dashboardInitialView, setDashboardInitialView] = useState<"dashboard" | "ceremonies" | "profile" | "calendar" | "documents" | "settings">("dashboard")
 
   // Form states for Add New Ceremony
   const [newCeremony, setNewCeremony] = useState({
@@ -1191,22 +1209,16 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const [editCoupleInfo, setEditCoupleInfo] = useState<any>(null)
 
   // Persistent storage for wedding details per couple
-  const [savedWeddingDetails, setSavedWeddingDetails] = useState<Record<string, any>>({
-    "Sarah Johnson & David Chen": {
-      venueName: "Sunset Gardens",
-      venueAddress: "123 Rose Avenue, Garden City, CA 90210",
-      weddingDate: "2024-08-25",
-      startTime: "16:00",
-      endTime: "18:00",
-      expectedGuests: "75"
-    }
-  })
+  const [savedWeddingDetails, setSavedWeddingDetails] = useState<Record<string, any>>({})
 
   // Get current couple identifier
   // Get current couple identifier (with null safety)
   const currentCoupleId = editCoupleInfo?.brideName
     ? `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
     : ""
+  const currentCeremonyType = editCoupleInfo?.ceremonyType || getCeremonyTypeFromNotes(editCoupleInfo?.specialRequests)
+  const currentCeremonyConfig = getCeremonyTypeConfig(currentCeremonyType)
+  const isCurrentCeremonyWedding = currentCeremonyType === "wedding"
 
   // Form states for Edit Wedding Details - set when couples load from database
   const [editWeddingDetails, setEditWeddingDetails] = useState({
@@ -1224,22 +1236,13 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     {
       id: 1,
       role: "assistant",
-      content: "Hello! I'm Mr. Script, your personal wedding ceremony script creator. I specialize in crafting beautiful, meaningful ceremonies tailored to Sarah Johnson & David Chen. What type of ceremony are you looking to create today?",
+      content: "Hello! I'm Mr. Script. What kind of script should I help you create today?",
       timestamp: new Date(Date.now() - 300000).toLocaleTimeString()
     }
   ])
   const [aiInput, setAiInput] = useState("")
   const [isGeneratingScript, setIsGeneratingScript] = useState(false)
-  const [generatedScripts, setGeneratedScripts] = useState([
-    {
-      id: 1,
-      title: "Traditional Ceremony Script - Sarah & David",
-      content: "SAMPLE GENERATED SCRIPT:\n\nDearly beloved, we are gathered here today to witness and celebrate the union of Sarah Johnson and David Chen in marriage...",
-      createdDate: "Aug 10, 2024",
-      type: "Traditional",
-      status: "completed"
-    }
-  ])
+  const [generatedScripts, setGeneratedScripts] = useState<any[]>([])
   const [scriptBuilderTab, setScriptBuilderTab] = useState("mr-script")
   const [scriptMode, setScriptMode] = useState<"guided" | "expert" | null>(null)
 
@@ -1653,7 +1656,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (result.ok && result.data) {
       let contractRecords = result.data
 
-      if (contractRecords.length === 0) {
+      if (isCurrentCeremonyWedding && contractRecords.length === 0) {
         const defaultContract = await addContractToDB(currentUser.id, editCoupleInfo.id, {
           name: DEFAULT_CONTRACT_NAME,
           description: "Preformatted OrdainedPro default wedding contract with BoldSign tags. Download to personalize or send as-is.",
@@ -1672,7 +1675,10 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       }
 
       // Transform database format to component format
-      const transformedContracts = contractRecords.map(transformContractRecord)
+      const visibleContractRecords = isCurrentCeremonyWedding
+        ? contractRecords
+        : contractRecords.filter((record: any) => !isOrdainedProDefaultContract(transformContractRecord(record)))
+      const transformedContracts = visibleContractRecords.map(transformContractRecord)
       setContracts(transformedContracts)
       console.log("âœ… Loaded", transformedContracts.length, "contracts for couple", editCoupleInfo.id)
     } else {
@@ -1681,7 +1687,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     }
 
     setIsLoadingContracts(false)
-  }, [currentUser?.id, editCoupleInfo?.id])
+  }, [currentUser?.id, editCoupleInfo?.id, isCurrentCeremonyWedding])
 
   useEffect(() => {
     loadContractsForCouple()
@@ -1897,46 +1903,10 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [isLoadingMeetings, setIsLoadingMeetings] = useState(false)
 
-  const [upcomingEvents, setUpcomingEvents] = useState([
-    { id: 1, title: "Rehearsal", date: "2024-08-24", time: "6:00 PM", location: "Sunset Gardens", type: "rehearsal", details: "Final walkthrough of ceremony proceedings with all wedding party members" },
-    { id: 2, title: "Wedding Ceremony", date: "2024-08-25", time: "4:00 PM", location: "Sunset Gardens", type: "ceremony", details: "The main wedding ceremony with family and friends" }
-  ])
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
 
   // Calendar events data
-  const calendarEvents = {
-    "2024-08-15": {
-      events: [
-        { id: 1, time: "2:00 PM", title: "Pre-marriage Consultation", type: "meeting", location: `${officiantLabel}'s Office`, attendees: ["Sarah Johnson", "David Chen"] }
-      ]
-    },
-    "2024-08-20": {
-      events: [
-        { id: 2, time: "3:00 PM", title: "Ceremony Planning Review", type: "meeting", location: "Video Call", attendees: ["Sarah Johnson", "David Chen"] }
-      ]
-    },
-    "2024-08-22": {
-      events: [
-        { id: 3, time: "11:00 AM", title: "Final venue walkthrough", type: "task", location: "Sunset Gardens", attendees: [officiantLabel] },
-        { id: 4, time: "2:00 PM", title: "Marriage license review", type: "task", location: "City Hall", attendees: [officiantLabel] }
-      ]
-    },
-    "2024-08-24": {
-      events: [
-        { id: 5, time: "6:00 PM", title: "Wedding Rehearsal", type: "rehearsal", location: "Sunset Gardens", attendees: ["Wedding Party", officiantLabel] }
-      ]
-    },
-    "2024-08-25": {
-      events: [
-        { id: 6, time: "3:00 PM", title: "Setup and preparation", type: "preparation", location: "Sunset Gardens", attendees: [officiantLabel] },
-        { id: 7, time: "4:00 PM", title: "Wedding Ceremony", type: "ceremony", location: "Sunset Gardens", attendees: ["75 guests"] }
-      ]
-    },
-    "2024-08-26": {
-      events: [
-        { id: 8, time: "10:00 AM", title: "Follow-up call", type: "follow-up", location: "Phone", attendees: ["Sarah Johnson", "David Chen"] }
-      ]
-    }
-  }
+  const calendarEvents = {}
 
   const getSelectedDateDetails = () => {
     if (!selectedDate) return null
@@ -2002,6 +1972,10 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       return { ok: false, error: "No user or couple selected." }
     }
 
+    if (!isCurrentCeremonyWedding) {
+      return { ok: false, error: "The OrdainedPro default wedding contract is only available for wedding ceremonies." }
+    }
+
     const existingDefault = contracts.find(isOrdainedProDefaultContract)
 
     if (existingDefault) {
@@ -2052,7 +2026,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     }
 
     return { ok: false, error: defaultContract.error || "Failed to add the default contract." }
-  }, [contracts, currentUser?.id, editCoupleInfo?.id])
+  }, [contracts, currentUser?.id, editCoupleInfo?.id, isCurrentCeremonyWedding])
 
   // AI Script Builder Functions
   const handleAiMessage = () => {
@@ -2091,11 +2065,14 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     }
 
     if (lowerInput.includes('modern') || lowerInput.includes('contemporary')) {
-      return "Great choice! Modern ceremonies offer wonderful flexibility. Let me know:\n\n1. Do you prefer a spiritual but non-religious approach?\n2. Are there personal vows being exchanged?\n3. Any unity ceremonies (sand, candle, etc.)?\n\nShould I create a contemporary script outline for Sarah and David?"
+      return "Great choice! Modern ceremonies offer wonderful flexibility. Let me know:\n\n1. Do you prefer a spiritual but non-religious approach?\n2. Are there personal vows being exchanged?\n3. Any unity ceremonies, readings, or special moments to include?\n\nShould I create a contemporary script outline for this profile?"
     }
 
     if (lowerInput.includes('generate') || lowerInput.includes('create') || lowerInput.includes('yes')) {
-      return "Excellent! I'm generating a personalized ceremony script for Sarah Johnson & David Chen. This will include:\n\n* Processional guidance\n* Opening words\n* Exchange of vows section\n* Ring ceremony\n* Unity ceremony (optional)\n* Pronouncement and kiss\n* Recessional\n\nThe script is being created and will be saved to your files. Would you like me to customize any specific sections?"
+      const subjectName = [editCoupleInfo?.brideName, editCoupleInfo?.groomName]
+        .filter(Boolean)
+        .join(" & ") || "this profile"
+      return `Excellent! I'm generating a personalized ceremony script for ${subjectName}. This will include:\n\n* Processional or opening guidance\n* Welcome and opening words\n* Main ceremony sections\n* Special moments, readings, or rituals if needed\n* Closing words\n\nThe script is being created and will be saved to your files. Would you like me to customize any specific sections?`
     }
 
     if (lowerInput.includes('vows') || lowerInput.includes('rings')) {
@@ -2109,9 +2086,13 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     setIsGeneratingScript(true)
 
     setTimeout(() => {
+      const subjectName = [editCoupleInfo?.brideName, editCoupleInfo?.groomName]
+        .filter(Boolean)
+        .join(" & ") || currentCeremonyConfig.label
       const newScript = {
         id: generatedScripts.length + 1,
-        title: `${scriptType} Ceremony Script - Sarah & David`,
+        coupleId: editCoupleInfo?.id,
+        title: `${scriptType} Ceremony Script - ${subjectName}`,
         content: generateScriptContent(scriptType),
         createdDate: new Date().toLocaleDateString(),
         type: scriptType,
@@ -2138,7 +2119,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       const confirmationMessage = {
         id: aiChatMessages.length + 1,
         role: "assistant",
-        content: `Perfect! I've generated a ${scriptType.toLowerCase()} ceremony script for Sarah & David. The script is now open in the Script Editor tab where you can customize it. - Mr. Script`,
+        content: `Perfect! I've generated a ${scriptType.toLowerCase()} ceremony script for ${subjectName}. The script is now open in the Script Editor tab where you can customize it. - Mr. Script`,
         timestamp: new Date().toLocaleTimeString()
       }
 
@@ -2155,12 +2136,40 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
   const generateScriptContent = (scriptType: string) => {
     const couple = `${editCoupleInfo?.brideName || 'Partner 1'} and ${editCoupleInfo?.groomName || 'Partner 2'}`
-    const venue = editWeddingDetails.venueName
-    const date = new Date(editWeddingDetails.weddingDate).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
+    const venue = editWeddingDetails.venueName || '[venue to be confirmed]'
+    const date = editWeddingDetails.weddingDate
+      ? new Date(editWeddingDetails.weddingDate).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+      : '[date to be confirmed]'
+
+    if (!isCurrentCeremonyWedding) {
+      const serviceLabel = currentCeremonyConfig?.label || "Ceremony"
+
+      return `${scriptType.toUpperCase()} ${serviceLabel.toUpperCase()} SCRIPT
+Generated by Mr. Script for ${couple}
+${venue} - ${date}
+
+OPENING GUIDANCE
+[Welcome guests and name the purpose of this ${serviceLabel.toLowerCase()}.]
+
+WELCOME
+"Family and friends, thank you for being here today. We are gathered at ${venue} for this meaningful ${serviceLabel.toLowerCase()}."
+
+MAIN CEREMONY SECTION
+[Add the primary story, blessing, tribute, coming-of-age moment, vow renewal language, reading, or reflection here.]
+
+SPECIAL MOMENTS
+[Include any readings, music, traditions, family participation, or symbolic actions that fit this ceremony.]
+
+CLOSING WORDS
+[Close with warmth, gratitude, and any next steps for guests.]
+
+---
+This script is a starter draft created by Mr. Script. Add names, stories, traditions, and details that make the ceremony personal.`
+    }
 
     return `${scriptType.toUpperCase()} WEDDING CEREMONY SCRIPT
 Generated by Mr. Script for ${couple}
@@ -2198,18 +2207,7 @@ Best regards,
 Mr. Script - Your Personal Wedding Script Creator`
   }
 
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([
-    {
-      id: 'ai_script_1',
-      file: new File(['Sample content'], 'Traditional Ceremony Script - Sarah & David.txt', { type: 'text/plain' }),
-      name: 'Traditional Ceremony Script - Sarah & David.txt',
-      size: 2048,
-      type: 'text/plain',
-      url: '#',
-      uploadProgress: 100,
-      status: 'completed'
-    }
-  ])
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
   const handleModeSelect = (mode: "guided" | "expert") => {
     setScriptMode(mode)
@@ -2396,8 +2394,97 @@ Mr. Script - Your Personal Wedding Script Creator`
     }, 1500)
   }
 
-  const generateAndSaveScript = () => {
+  const generateAndSaveScript = async () => {
     setIsTyping(true)
+
+    const service = getMrScriptServiceByResponse(userResponses['ceremony-type'] || selectedCeremonyStyle)
+    const responseMap: Record<string, string> = {
+      ...userResponses,
+      'ceremony-type': userResponses['ceremony-type'] || selectedCeremonyStyle,
+      'ceremony-duration': userResponses['ceremony-duration'] || selectedCeremonyLength,
+      'ceremony-tone': userResponses['ceremony-tone'] || selectedOfficiantStyle,
+      'officiant-style': userResponses['officiant-style'] || selectedOfficiantStyle,
+      'story-notes': userResponses['story-notes'] || storyNotes,
+      'special-elements': userResponses['special-elements'] || selectedUnityCeremony,
+      'vows-type': userResponses['vows-type'] || selectedVowsType,
+    }
+    const fallbackScript = generateCompleteScript(responseMap, editCoupleInfo, editWeddingDetails)
+
+    try {
+      const response = await fetch("/api/generate-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ceremonyType: responseMap['ceremony-type'],
+          ceremonyStyle: responseMap['ceremony-type'],
+          ceremonyLength: responseMap['ceremony-duration'],
+          ceremonyTone: responseMap['ceremony-tone'],
+          officiantStyle: responseMap['officiant-style'],
+          brideName: editCoupleInfo?.brideName || "",
+          groomName: editCoupleInfo?.groomName || "",
+          subjectName: [editCoupleInfo?.brideName, editCoupleInfo?.groomName].filter(Boolean).join(" & "),
+          venue: editWeddingDetails?.venueName || "",
+          weddingDate: editWeddingDetails?.weddingDate || "",
+          ceremonyDate: editWeddingDetails?.weddingDate || "",
+          userResponses: responseMap,
+          storyNotes: responseMap['story-notes'],
+          coreDetails: responseMap['core-details'],
+          specialInclusions: responseMap['special-inclusions'],
+          avoidances: responseMap['avoidances'],
+          unityCeremony: responseMap['special-elements'],
+          vowsType: responseMap['vows-type'],
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+
+      const data = await response.json()
+      const completeScript = data.script || fallbackScript
+      const segmentNames =
+        data.segmentPlan?.map((segment: { name: string }) => `- ${segment.name}`) ||
+        service.scriptSections.map((section) => `- ${section}`)
+
+      setGeneratedScriptContent(completeScript)
+      setHasGeneratedScript(true)
+
+      const scriptGeneratedMessage: ChatMessage = {
+        id: `ai-script-generated-${Date.now()}`,
+        type: 'ai',
+        content: `**Your ${service.shortName.toLowerCase()} script has been generated!**
+
+I've created a first draft for a ${service.displayName.toLowerCase()} using the service type, tone, length, sensitivity needs, and story details you provided.
+
+The draft was built in ${data.segmentPlan?.length || service.scriptSections.length} focused section(s):
+${segmentNames.join("\n")}
+
+**Your script is ready!** Click the "Generate Final Script" button below to open it in the full editor where you can make any final adjustments.`,
+        timestamp: new Date()
+      }
+
+      setChatMessages(prev => [...prev, scriptGeneratedMessage])
+    } catch (error) {
+      console.error("Mr. Script API generation failed, using local fallback:", error)
+
+      setGeneratedScriptContent(fallbackScript)
+      setHasGeneratedScript(true)
+
+      const fallbackMessage: ChatMessage = {
+        id: `ai-script-generated-${Date.now()}`,
+        type: 'ai',
+        content: `**Your ${service.shortName.toLowerCase()} script has been generated locally.**
+
+I could not reach the full Mr. Script generation engine, so I created a structured starter draft instead. You can still open it in the editor and refine it.`,
+        timestamp: new Date()
+      }
+
+      setChatMessages(prev => [...prev, fallbackMessage])
+    } finally {
+      setIsTyping(false)
+    }
+
+    return
 
     setTimeout(() => {
       const service = getMrScriptServiceByResponse(userResponses['ceremony-type'] || selectedCeremonyStyle)
@@ -2886,29 +2973,23 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
   }
 
   const handleDeleteScript = async (script: any) => {
-    if (!confirm(`Are you sure you want to delete "${script.title}"? This action cannot be undone.`)) {
-      return
-    }
-
-    // Check if it's a database script (has numeric id) or generated script (has string id)
-    const isDbScript = typeof script.id === 'number'
+    const isDbScript = coupleScripts.some((savedScript) => String(savedScript.id) === String(script.id))
 
     if (isDbScript) {
       // Delete from database
       const result = await deleteScriptFromDB(script.id)
       if (result.ok) {
-        setCoupleScripts(prev => prev.filter(s => s.id !== script.id))
+        setCoupleScripts(prev => prev.filter(s => String(s.id) !== String(script.id)))
+        setGeneratedScripts(prev => prev.filter(s => String(s.id) !== String(script.id)))
         console.log('âœ… Script deleted from database:', script.title)
-        alert(`Script "${script.title}" has been deleted.`)
       } else {
         console.error('âŒ Failed to delete script:', result.error)
         alert(`Failed to delete script: ${result.error}`)
       }
     } else {
       // Remove from generated scripts (local state only)
-      setGeneratedScripts(prev => prev.filter(s => s.id !== script.id))
+      setGeneratedScripts(prev => prev.filter(s => String(s.id) !== String(script.id)))
       console.log('âœ… Generated script removed:', script.title)
-      alert(`Script "${script.title}" has been removed.`)
     }
   }
 
@@ -3065,6 +3146,7 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
       // Create a new script from the uploaded document
       const newScript = {
         id: generatedScripts.length + 1,
+        coupleId: editCoupleInfo?.id,
         title: `Imported Script - ${getFirstName(editCoupleInfo?.brideName)} & ${getFirstName(editCoupleInfo?.groomName)}`,
         type: 'Custom',
         content: personalizedScript,
@@ -3598,6 +3680,11 @@ ${shareScriptForm.body}`)
     visibility: "main_marketplace" | "store_only"
   }
 
+  const openSubscriptionPage = () => {
+    setDashboardInitialView("settings")
+    setShowDashboardDialog(true)
+  }
+
   const handleUploadMarketplaceScript = async (file: File, details: MarketplaceScriptDetails) => {
     if (!file || !currentUser?.id) return
 
@@ -3605,6 +3692,7 @@ ${shareScriptForm.body}`)
       const canSell = await userHasActiveSellerSubscription(currentUser.id)
       if (!canSell) {
         alert("An active Aspirant or Professional subscription is required to sell scripts in the marketplace.")
+        openSubscriptionPage()
         return
       }
 
@@ -3690,6 +3778,7 @@ ${shareScriptForm.body}`)
     const canSell = await userHasActiveSellerSubscription(currentUser.id)
     if (!canSell) {
       alert("An active Aspirant or Professional subscription is required to sell scripts in the marketplace.")
+      openSubscriptionPage()
       return
     }
 
@@ -4124,17 +4213,69 @@ ${shareScriptForm.body}`)
     }
   }
 
-  // Handle opening payment reminder dialog
-  const handleOpenPaymentReminderDialog = () => {
-    setPaymentReminderForm({
-      to: 'both', // Default to both couple members
-      customEmail: '',
-      subject: 'Payment Reminder - Wedding Ceremony Services',
-      body: `Dear ${getFirstName(editCoupleInfo?.brideName)} and ${getFirstName(editCoupleInfo?.groomName)},
+  const getPaymentReminderTemplate = () => {
+    const serviceLabel = currentCeremonyConfig?.label || "Ceremony"
+    const primaryFirst = getFirstName(editCoupleInfo?.brideName)
+    const secondaryFirst = getFirstName(editCoupleInfo?.groomName)
+    const greetingNames =
+      currentCeremonyType === "celebration_of_life"
+        ? primaryFirst || "there"
+        : [primaryFirst, secondaryFirst].filter(Boolean).join(" and ") || "there"
 
-I hope this message finds you well and that your wedding planning is going smoothly!
+    const templates: Record<string, { subject: string; intro: string; reminder: string; due: string; closing: string }> = {
+      wedding: {
+        subject: "Payment Reminder - Wedding Ceremony Services",
+        intro: "I hope this message finds you well and that your wedding planning is going smoothly.",
+        reminder: "This is a friendly reminder regarding your upcoming payment for our wedding ceremony services.",
+        due: "Please ensure your final payment is submitted by the due date to confirm all arrangements for your special day.",
+        closing: "Looking forward to officiating your beautiful ceremony!",
+      },
+      celebration_of_life: {
+        subject: "Payment Reminder - Memorial Service",
+        intro: "I hope you and your family are doing as well as possible during this time.",
+        reminder: "This is a respectful reminder regarding the upcoming payment for the remembrance service.",
+        due: "Please submit the remaining balance by the due date so the service arrangements can remain confirmed.",
+        closing: "It is an honor to support your family with this service.",
+      },
+      quinceanera: {
+        subject: "Payment Reminder - Quinceañera Ceremony",
+        intro: "I hope the celebration planning is going smoothly.",
+        reminder: "This is a friendly reminder regarding your upcoming payment for the quinceañera ceremony services.",
+        due: "Please submit the remaining balance by the due date so the ceremony arrangements can remain confirmed.",
+        closing: "Looking forward to helping make this celebration meaningful and memorable!",
+      },
+      baby_blessing: {
+        subject: "Payment Reminder - Baby Blessing Ceremony",
+        intro: "I hope your family is doing well.",
+        reminder: "This is a friendly reminder regarding your upcoming payment for the baby blessing or naming ceremony.",
+        due: "Please submit the remaining balance by the due date so the ceremony arrangements can remain confirmed.",
+        closing: "Looking forward to being part of this special family moment!",
+      },
+      vow_renewal: {
+        subject: "Payment Reminder - Vow Renewal Ceremony",
+        intro: "I hope your vow renewal planning is going smoothly.",
+        reminder: "This is a friendly reminder regarding your upcoming payment for the vow renewal ceremony services.",
+        due: "Please submit the remaining balance by the due date so the ceremony arrangements can remain confirmed.",
+        closing: "Looking forward to celebrating this meaningful milestone with you!",
+      },
+      other: {
+        subject: `Payment Reminder - ${serviceLabel}`,
+        intro: "I hope your ceremony planning is going smoothly.",
+        reminder: `This is a friendly reminder regarding your upcoming payment for the ${serviceLabel.toLowerCase()} services.`,
+        due: "Please submit the remaining balance by the due date so the ceremony arrangements can remain confirmed.",
+        closing: "Looking forward to being part of your ceremony!",
+      },
+    }
 
-This is a friendly reminder regarding your upcoming payment for our wedding ceremony services.
+    const template = templates[currentCeremonyType] || templates.other
+
+    return {
+      subject: template.subject,
+      body: `Dear ${greetingNames},
+
+${template.intro}
+
+${template.reminder}
 
 Payment Details:
 * Total Amount: $${paymentInfo.totalAmount}
@@ -4142,14 +4283,25 @@ Payment Details:
 * Balance Due: $${paymentInfo.balance}
 * Due Date: ${paymentInfo.finalPaymentDue}
 
-Please ensure your final payment is submitted by the due date to confirm all arrangements for your special day.
+${template.due}
 
 If you have any questions about the payment or need to discuss payment options, please don't hesitate to reach out to me directly.
 
-Looking forward to officiating your beautiful ceremony!
+${template.closing}
 
 Warm regards,
-${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail ? `\n${officiantEmail}` : ''}`
+${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail ? `\n${officiantEmail}` : ''}`,
+    }
+  }
+
+  // Handle opening payment reminder dialog
+  const handleOpenPaymentReminderDialog = () => {
+    const reminderTemplate = getPaymentReminderTemplate()
+    setPaymentReminderForm({
+      to: 'both', // Default to both couple members
+      customEmail: '',
+      subject: reminderTemplate.subject,
+      body: reminderTemplate.body
     })
     setShowSendPaymentReminderDialog(true)
   }
@@ -4349,135 +4501,6 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
   const [showMarketplaceAnalytics, setShowMarketplaceAnalytics] = useState(false)
   const [showPayoutHistory, setShowPayoutHistory] = useState(false)
 
-  // Demo scripts for marketplace (not editable)
-  const demoScriptsForMarketplace = [
-    {
-      id: 'demo-1',
-      title: "Traditional Ceremony Script v3",
-      type: "Traditional",
-      status: "Latest Draft",
-      lastModified: "Aug 12, 2024",
-      description: "Personalized for sunset garden ceremony with unity candle",
-      content: `TRADITIONAL WEDDING CEREMONY SCRIPT
-Sarah Johnson & David Chen
-Sunset Gardens - August 25, 2024
-
-PROCESSIONAL
-[Bridal party enters to "Canon in D"]
-[Bride enters with father to "Here Comes the Bride"]
-
-OPENING WORDS
-Dearly beloved, we are gathered here today at this beautiful Sunset Gardens to celebrate the union of Sarah Johnson and David Chen in marriage. On this lovely August afternoon, we witness not just the joining of two hearts, but the creation of a new family built on love, trust, and commitment.
-
-Sarah and David, you have chosen to share your lives together, and we are honored to be part of this special moment in your journey.
-
-DECLARATION OF INTENT
-Sarah, do you take David to be your lawfully wedded husband, to have and to hold, in sickness and in health, for richer or poorer, for better or worse, for as long as you both shall live?
-
-David, do you take Sarah to be your lawfully wedded wife, to have and to hold, in sickness and in health, for richer or poorer, for better or worse, for as long as you both shall live?
-
-EXCHANGE OF VOWS
-[Personal vows to be exchanged]
-
-RING CEREMONY
-These rings serve as a symbol of your unending love and commitment. As you place them on each other's hands, remember that love is not just a feeling, but a choice you make every day.
-
-UNITY CANDLE CEREMONY
-Sarah and David will now light the unity candle together, symbolizing the joining of their two lives into one shared journey.
-
-PRONOUNCEMENT
-By the power vested in me, and in the presence of these witnesses, I now pronounce you husband and wife. You may kiss!
-
-RECESSIONAL
-[Couple exits to "Wedding March"]
-
----
-This script has been personalized for Sarah & David's sunset garden ceremony.`
-    },
-    {
-      id: 2,
-      title: "Modern Outdoor Ceremony v2",
-      type: "Modern",
-      status: "In Review",
-      lastModified: "Aug 8, 2024",
-      description: "Alternative script for outdoor setting with personal vows",
-      content: `MODERN OUTDOOR WEDDING CEREMONY
-Sarah Johnson & David Chen
-Sunset Gardens - August 25, 2024
-
-GATHERING
-[Guests are seated as soft music plays]
-[Wedding party processes in together]
-
-WELCOME
-Welcome, everyone! We're here today because Sarah and David have something important to share with all of us - their love for each other and their commitment to building a life together.
-
-Love is what brings us together today. Not just Sarah and David's love for each other, but the love and support of all of you who have traveled here to celebrate with them.
-
-READING
-[Selected reading about love and partnership]
-
-PERSONAL VOWS
-Sarah and David have written their own vows to express their personal promises to each other.
-
-Sarah, please share your vows with David.
-[Sarah's personal vows]
-
-David, please share your vows with Sarah.
-[David's personal vows]
-
-RING EXCHANGE
-The rings you exchange today are a symbol of the promises you've just made. They represent your commitment to each other and the love you share.
-
-[Ring exchange]
-
-PRONOUNCEMENT
-Sarah and David, having witnessed your vows and the exchange of rings, and by the power vested in me, I now pronounce you married! You may kiss!
-
-CELEBRATION
-Let's celebrate the new Mr. and Mrs. Chen!
-
-[Couple exits together as guests celebrate]
-
----
-Modern ceremony focused on personal expression and celebration.`
-    },
-    {
-      id: 3,
-      title: "Interfaith Ceremony Draft v1",
-      type: "Interfaith",
-      status: "Draft",
-      lastModified: "Aug 5, 2024",
-      description: "Initial draft incorporating both cultural backgrounds",
-      content: `INTERFAITH WEDDING CEREMONY DRAFT
-Sarah Johnson & David Chen
-Sunset Gardens - August 25, 2024
-
-OPENING
-[Incorporation of both traditions to be developed]
-
-WELCOME IN BOTH TRADITIONS
-We gather today to celebrate the union of Sarah and David, honoring both the traditions that have shaped them and the new path they create together.
-
-[Details to be added for specific cultural elements]
-
-EXCHANGE OF PROMISES
-[Traditional vows and cultural-specific promises]
-
-SYMBOLIC CEREMONIES
-[Unity ceremony incorporating elements from both backgrounds]
-
-BLESSINGS
-[Blessings from both traditions]
-
-PRONOUNCEMENT
-[Closing incorporating both cultural elements]
-
----
-Note: This is an initial draft. Further development needed to incorporate specific cultural and religious elements from both Sarah's and David's backgrounds.`
-    }
-  ]
-
   const accountCreatedAt = currentUser?.created_at || officiantProfile?.created_at || new Date().toISOString()
   const accountCreatedDate = new Date(accountCreatedAt)
   const monthStart = new Date()
@@ -4602,11 +4625,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
     window.print()
   }
 
-  const popularScripts = [
-    { id: 1, title: "Beach Wedding Ceremony", author: "Rev. Sarah M.", price: 22, rating: 4.9, sales: 156 },
-    { id: 2, title: "Garden Party Wedding", author: "Pastor John D.", price: 18, rating: 4.8, sales: 134 },
-    { id: 3, title: "Rustic Barn Wedding", author: "Minister Lisa K.", price: 24, rating: 4.7, sales: 98 }
-  ]
+  const popularScripts: any[] = []
 
   const handleAddCeremony = async () => {
     const ceremonyConfig = getCeremonyTypeConfig(newCeremony.ceremonyType)
@@ -4946,9 +4965,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
   }
 
   const handleDeleteWeddingEvent = (eventId: number) => {
-    if (confirm('Are you sure you want to delete this wedding event?')) {
-      setUpcomingEvents(upcomingEvents.filter(event => event.id !== eventId))
-    }
+    setUpcomingEvents(upcomingEvents.filter(event => event.id !== eventId))
   }
 
   const handleDeleteMeeting = async (meetingId: number) => {
@@ -6666,6 +6683,8 @@ ${officiantProfile?.name || "Your officiant"}`)
     setShowArchivedCeremoniesDialog,
     showDashboardDialog,
     setShowDashboardDialog,
+    dashboardInitialView,
+    setDashboardInitialView,
     newCeremony,
     setNewCeremony,
     ceremonyTypeOptions: CEREMONY_TYPE_OPTIONS,
@@ -6753,6 +6772,9 @@ ${officiantProfile?.name || "Your officiant"}`)
     setFiles,
     meetings,
     setMeetings,
+    currentCeremonyType,
+    currentCeremonyConfig,
+    isCurrentCeremonyWedding,
     upcomingEvents,
     setUpcomingEvents,
     calendarEvents,

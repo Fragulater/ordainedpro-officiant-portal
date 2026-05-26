@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -95,6 +95,7 @@ interface ContractUploadDialogProps {
   hasAcceptedDefaultContractLegal?: boolean
   onAcceptDefaultContractLegal?: () => Promise<{ ok: boolean; error?: string } | void>
   onAcceptUploadedContractLegal?: (details: { contractName: string; fileName: string }) => Promise<{ ok: boolean; error?: string } | void>
+  allowDefaultContract?: boolean
 }
 
 export function ContractUploadDialog({
@@ -107,6 +108,7 @@ export function ContractUploadDialog({
   hasAcceptedDefaultContractLegal = false,
   onAcceptDefaultContractLegal,
   onAcceptUploadedContractLegal,
+  allowDefaultContract = true,
 }: ContractUploadDialogProps) {
   const [formData, setFormData] = useState({
     name: "",
@@ -158,12 +160,18 @@ export function ContractUploadDialog({
     setCopiedTag("")
     setMiscTextLabel("Additional notes")
     setMiscTextSigner("3")
-    setContractMode("default")
+    setContractMode(allowDefaultContract ? "default" : "custom")
     setIsAddingDefaultContract(false)
     setIsSavingUploadedContractAcknowledgment(false)
     setAttorneyReviewChecked(false)
     setUploadedAttorneyReviewChecked(false)
   }
+
+  useEffect(() => {
+    if (!allowDefaultContract && contractMode === "default") {
+      setContractMode("custom")
+    }
+  }, [allowDefaultContract, contractMode])
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {}
@@ -325,28 +333,32 @@ export function ContractUploadDialog({
               You only need to set this up once per contract, not once per couple.
             </p>
             <p className="mt-1 text-sm text-green-800">
-              The default OrdainedPro contract is already preloaded for each new couple. Use it as-is, download it to personalize, or upload your own tagged PDF contract.
+              {allowDefaultContract
+                ? "The default OrdainedPro wedding contract is available for wedding profiles. Use it as-is, download it to personalize, or upload your own tagged PDF contract."
+                : "Upload a tagged PDF contract for this ceremony type. The default wedding contract is only available for wedding profiles."}
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setContractMode("default")}
-              className={`rounded-lg border p-4 text-left transition ${
-                contractMode === "default"
-                  ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100"
-                  : "border-slate-200 bg-white hover:border-blue-200"
-              }`}
-            >
-              <div className="flex items-center gap-2 font-semibold text-slate-900">
-                <FileText className="h-4 w-4 text-blue-600" />
-                Use Default Contract
-              </div>
-              <p className="mt-2 text-sm text-slate-600">
-                Work from the preloaded OrdainedPro contract. It is already tagged for Partner 1, Partner 2, and the officiant.
-              </p>
-            </button>
+          <div className={`grid grid-cols-1 gap-3 ${allowDefaultContract ? "md:grid-cols-2" : ""}`}>
+            {allowDefaultContract && (
+              <button
+                type="button"
+                onClick={() => setContractMode("default")}
+                className={`rounded-lg border p-4 text-left transition ${
+                  contractMode === "default"
+                    ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100"
+                    : "border-slate-200 bg-white hover:border-blue-200"
+                }`}
+              >
+                <div className="flex items-center gap-2 font-semibold text-slate-900">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  Use Default Contract
+                </div>
+                <p className="mt-2 text-sm text-slate-600">
+                  Work from the preloaded OrdainedPro wedding contract. It is already tagged for Partner 1, Partner 2, and the officiant.
+                </p>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setContractMode("custom")}
