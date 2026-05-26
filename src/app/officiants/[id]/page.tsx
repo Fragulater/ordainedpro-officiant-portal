@@ -22,6 +22,7 @@ import {
 
 import { PublicOfficiantGallery } from "@/components/PublicOfficiantGallery"
 import { PublicOfficiantQuoteForm } from "@/components/PublicOfficiantQuoteForm"
+import { PublicOfficiantReviews, type PublicReview } from "@/components/PublicOfficiantReviews"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -62,6 +63,12 @@ type PublicScript = {
   category: string | null
   price: number | null
   marketplace_visibility?: string | null
+}
+
+type PublicProfileResult = {
+  profile: PublicProfile | null;
+  scripts: PublicScript[];
+  reviews: PublicReview[];
 }
 
 function getServiceClient() {
@@ -107,7 +114,7 @@ function normalizeUrl(url: string) {
 
 async function getProfile(id: string) {
   const supabase = getServiceClient()
-  if (!supabase) return { profile: null, scripts: [] as PublicScript[] }
+  if (!supabase) return { profile: null, scripts: [] as PublicScript[], reviews: [] as PublicReview[] }
 
   const { data: profile, error } = await supabase
     .from("profiles")
@@ -120,7 +127,7 @@ async function getProfile(id: string) {
     return { profile: null, scripts: [] as PublicScript[] }
   }
 
-  if (!profile) return { profile: null, scripts: [] as PublicScript[] }
+  if (!profile) return { profile: null, scripts: [] as PublicScript[], reviews: [] as PublicReview[] }
 
   const { data: scripts, error: scriptsError } = await supabase
     .from("scripts")
@@ -135,10 +142,23 @@ async function getProfile(id: string) {
     console.error("Unable to load public officiant scripts:", scriptsError)
   }
 
+  const { data: reviews, error: reviewsError } = await supabase
+    .from("officiant_reviews")
+    .select("id,reviewer_name,rating,review_text,created_at")
+    .eq("officiant_user_id", profile.user_id)
+    .eq("status", "published")
+    .order("created_at", { ascending: false })
+    .limit(50)
+
+  if (reviewsError) {
+    console.error("Unable to load public officiant reviews:", reviewsError)
+  }
+
   return {
     profile: profile as PublicProfile,
     scripts: (scripts || []) as PublicScript[],
-  }
+    reviews: (reviews || []) as PublicReview[],
+  } satisfies PublicProfileResult
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -171,7 +191,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function PublicOfficiantPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { profile, scripts } = await getProfile(id)
+  const { profile, scripts, reviews } = await getProfile(id)
 
   if (!profile) {
     notFound()
@@ -239,6 +259,12 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
         <div className="grid flex-1 gap-0 overflow-hidden lg:grid-cols-[320px_1fr_360px]">
           <aside className="border-b bg-slate-50 p-5 lg:overflow-y-auto lg:border-b-0 lg:border-r">
             <div className="space-y-7">
+              <PublicOfficiantReviews
+                rating={rating}
+                totalReviews={totalReviews}
+                reviews={reviews}
+              />
+
               <section>
                 <h2 className="mb-4 text-base font-semibold uppercase tracking-wide text-gray-500">Contact</h2>
                 <div className="space-y-5 text-base">

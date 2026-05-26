@@ -73,6 +73,7 @@ export const EMPTY_COUPLE_INFO: PersonName & Record<string, any> = {
 type CommunicationPortalContextValue = {
   [key: string]: any
   GUIDED_QUESTIONS: Array<{ options?: string[]; [key: string]: any }>
+  activeGuidedQuestions: Array<{ options?: string[]; [key: string]: any }>
   aiChatMessages: any[]
   allCouples: CoupleLike[]
   chatMessages: any[]

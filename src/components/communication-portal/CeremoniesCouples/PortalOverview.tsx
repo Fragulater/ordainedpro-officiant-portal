@@ -36,6 +36,7 @@ export function PortalOverview() {
     setShowDashboardDialog,
     setShowAddCeremonyDialog,
     financialReport,
+    getCeremonyTypeConfig,
   } = useCommunicationPortal()
 
   // Guard against null/undefined editCoupleInfo
@@ -52,6 +53,7 @@ export function PortalOverview() {
   // Safely get current couple colors
   const currentCouple = allCouples?.[activeCoupleIndex]
   const colors = currentCouple?.colors || {}
+  const ceremonyConfig = getCeremonyTypeConfig?.(currentCouple?.ceremonyType || editCoupleInfo?.ceremonyType)
   const officiantName =
     [
       officiantProfile?.full_name,
@@ -115,7 +117,7 @@ export function PortalOverview() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center text-blue-900">
                   <Users className="w-5 h-5 mr-2 text-blue-600" />
-                  Wedding Couple
+                  {ceremonyConfig?.peopleCardTitle || "Ceremony Participants"}
                 </CardTitle>
                 <div className="flex items-center space-x-2">
                   {/* Switch Ceremony Button */}
@@ -137,16 +139,18 @@ export function PortalOverview() {
                     </DialogTrigger>
                   <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                      <DialogTitle>Edit Couple Information</DialogTitle>
+                      <DialogTitle>Edit {ceremonyConfig?.peopleCardTitle || "Participant"} Information</DialogTitle>
                       <DialogDescription>
-                        Update the couple's contact information and preferences.
+                        Update contact information and ceremony preferences.
                       </DialogDescription>
                     </DialogHeader>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
                       {/* Bride Information */}
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-pink-900">Bride Information</h3>
+                        <h3 className="text-lg font-semibold text-pink-900">
+                          {ceremonyConfig?.primarySectionTitle || "Primary Contact Information"}
+                        </h3>
                         <div>
                           <Label htmlFor="editBrideName">Full Name</Label>
                           <Input
@@ -179,14 +183,16 @@ export function PortalOverview() {
                             id="editBrideAddress"
                             value={editCoupleInfo?.brideAddress || ""}
                             onChange={(e) => setEditCoupleInfo({...editCoupleInfo, brideAddress: e.target.value})}
-                            placeholder="Bride's primary address"
+                            placeholder={ceremonyConfig?.primaryAddressPlaceholder || "Primary contact address"}
                           />
                         </div>
                       </div>
 
                       {/* Groom Information */}
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-blue-900">Groom Information</h3>
+                        <h3 className="text-lg font-semibold text-blue-900">
+                          {ceremonyConfig?.secondarySectionTitle || "Participant Information"}
+                        </h3>
                         <div>
                           <Label htmlFor="editGroomName">Full Name</Label>
                           <Input
@@ -219,7 +225,7 @@ export function PortalOverview() {
                             id="editGroomAddress"
                             value={editCoupleInfo?.groomAddress || ""}
                             onChange={(e) => setEditCoupleInfo({...editCoupleInfo, groomAddress: e.target.value})}
-                            placeholder="Groom's primary address"
+                            placeholder={ceremonyConfig?.secondaryAddressPlaceholder || "Participant address"}
                           />
                         </div>
                       </div>
@@ -261,8 +267,10 @@ export function PortalOverview() {
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold text-gray-900">{editCoupleInfo?.brideName || 'Bride'}</p>
-                    <p className={`text-sm ${colors.brideText || 'text-pink-600'} font-medium`}>Bride</p>
+                    <p className="font-semibold text-gray-900">{editCoupleInfo?.brideName || ceremonyConfig?.primaryRole || 'Primary Contact'}</p>
+                    <p className={`text-sm ${colors.brideText || 'text-pink-600'} font-medium`}>
+                      {ceremonyConfig?.primaryRole || "Primary Contact"}
+                    </p>
                   </div>
                 </div>
                 {editCoupleInfo?.brideAddress && (
@@ -279,8 +287,10 @@ export function PortalOverview() {
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold text-gray-900">{editCoupleInfo?.groomName || 'Groom'}</p>
-                    <p className={`text-sm ${colors.groomText || 'text-blue-600'} font-medium`}>Groom</p>
+                    <p className="font-semibold text-gray-900">{editCoupleInfo?.groomName || ceremonyConfig?.secondaryRole || 'Participant'}</p>
+                    <p className={`text-sm ${colors.groomText || 'text-blue-600'} font-medium`}>
+                      {ceremonyConfig?.secondaryRole || "Participant"}
+                    </p>
                   </div>
                 </div>
                 {editCoupleInfo?.groomAddress && (
@@ -360,7 +370,7 @@ export function PortalOverview() {
                   <div className="flex items-center justify-between rounded-lg border border-green-100 bg-green-50 px-3 py-2">
                     <div className="flex items-center text-green-800">
                       <Users className="w-4 h-4 mr-2" />
-                      Weddings Completed
+                      Ceremonies Performed
                     </div>
                     <span className="font-semibold text-green-900">{weddingsCompleted}</span>
                   </div>
@@ -395,7 +405,7 @@ export function PortalOverview() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center text-blue-900">
                   <MapPin className="w-5 h-5 mr-2 text-blue-600" />
-                  Wedding Details
+                  Ceremony Details
                 </CardTitle>
                 <div className="flex items-center space-x-2">
                   {/* Ceremony Details Form Button */}
@@ -511,7 +521,7 @@ export function PortalOverview() {
                 Private Notes
               </DialogTitle>
               <DialogDescription>
-                Only you can see these notes for this wedding.
+                Only you can see these notes for this ceremony.
               </DialogDescription>
             </DialogHeader>
             <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-gray-200 bg-white p-4">

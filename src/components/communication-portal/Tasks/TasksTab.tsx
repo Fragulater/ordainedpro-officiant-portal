@@ -27,8 +27,8 @@ export function TasksTab() {
               <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-blue-900">Wedding Preparation Checklist</CardTitle>
-                    <CardDescription>Track progress and stay organized for the big day</CardDescription>
+                    <CardTitle className="text-blue-900">Ceremony Checklist</CardTitle>
+                    <CardDescription>Track progress and stay organized for the ceremony</CardDescription>
                   </div>
                   <div className="flex space-x-2">
                     <Select value={taskFilter} onValueChange={(value: string) => setTaskFilter(value)}>

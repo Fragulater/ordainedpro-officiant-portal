@@ -26,9 +26,9 @@ export function PortalViewInvoiceDialog() {
       <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Wedding Ceremony Invoice</DialogTitle>
+            <DialogTitle>Ceremony Invoice</DialogTitle>
             <DialogDescription>
-              Invoice for {editCoupleInfo.brideName || 'Bride'} & {editCoupleInfo.groomName || 'Groom'}
+              Invoice for {editCoupleInfo.brideName || 'Primary Contact'} & {editCoupleInfo.groomName || 'Participant'}
             </DialogDescription>
           </DialogHeader>
 
@@ -38,7 +38,7 @@ export function PortalViewInvoiceDialog() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-bold text-blue-900">OrdainedPro Services</h3>
-                  <p className="text-sm text-blue-700">Wedding Officiant Services</p>
+                  <p className="text-sm text-blue-700">Ceremony Officiant Services</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-600">Invoice Date</p>
@@ -49,12 +49,12 @@ export function PortalViewInvoiceDialog() {
               <div className="grid grid-cols-2 gap-4 mt-4">
                 <div>
                   <p className="text-xs text-gray-600 mb-1">Bill To:</p>
-                  <p className="font-semibold text-gray-900">{editCoupleInfo.brideName || 'Bride'} & {editCoupleInfo.groomName || 'Groom'}</p>
+                  <p className="font-semibold text-gray-900">{editCoupleInfo.brideName || 'Primary Contact'} & {editCoupleInfo.groomName || 'Participant'}</p>
                   <p className="text-sm text-gray-600">{editCoupleInfo.brideEmail || ''}</p>
                   <p className="text-sm text-gray-600">{editCoupleInfo.bridePhone || ''}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-600 mb-1">Wedding Date:</p>
+                  <p className="text-xs text-gray-600 mb-1">Ceremony Date:</p>
                   <p className="font-semibold text-gray-900">
                     {new Date(editWeddingDetails.weddingDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                   </p>
@@ -75,8 +75,8 @@ export function PortalViewInvoiceDialog() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   <tr>
                     <td className="px-6 py-4">
-                      <p className="font-medium text-gray-900">Wedding Ceremony Officiant Services</p>
-                      <p className="text-sm text-gray-500">Professional officiant services for wedding ceremony</p>
+                      <p className="font-medium text-gray-900">Ceremony Officiant Services</p>
+                      <p className="text-sm text-gray-500">Professional officiant services for ceremony</p>
                     </td>
                     <td className="px-6 py-4 text-right font-semibold text-gray-900">
                       ${paymentInfo.totalAmount}

@@ -19,16 +19,16 @@ export function PortalEditWeddingDetailsDialog() {
 
   return (
     <>
-      {/* Edit Wedding Details Dialog */}
+      {/* Edit Ceremony Details Dialog */}
       <Dialog open={showEditWeddingDialog} onOpenChange={setShowEditWeddingDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-blue-900 flex items-center">
               <MapPin className="w-5 h-5 mr-2" />
-              Edit Wedding Details
+              Edit Ceremony Details
             </DialogTitle>
             <DialogDescription>
-              Update the wedding ceremony details including date, time, location, and guest count
+              Update the ceremony details including date, time, location, and guest count
             </DialogDescription>
           </DialogHeader>
 
@@ -74,7 +74,7 @@ export function PortalEditWeddingDetailsDialog() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="editWeddingDate" className="text-sm font-medium text-gray-700">
-                    Wedding Date *
+                    Ceremony Date *
                   </Label>
                   <Input
                     id="editWeddingDate"
@@ -148,13 +148,13 @@ export function PortalEditWeddingDetailsDialog() {
                   id="officiantNotes"
                   value={editWeddingDetails.officiantNotes || ""}
                   onChange={(e) => setEditWeddingDetails({...editWeddingDetails, officiantNotes: e.target.value})}
-                  placeholder="Add any private notes, reminders, or special considerations for this wedding..."
+                  placeholder="Add any private notes, reminders, or special considerations for this ceremony..."
                   rows={14}
                   className="mt-1 min-h-[320px] resize-y border-blue-200 focus:border-blue-500"
                   spellCheck
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  These notes are for your reference only and won't be shared with the couple
+                  These notes are for your reference only and won't be shared with the clients
                 </p>
               </div>
             </div>

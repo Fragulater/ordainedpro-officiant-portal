@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Select } from "@/components/ui/select"
-import { MessageCircle, FileText, Users, Send, Download, Plus, Check, MapPin, Heart, Edit, FileEdit, Eye, Save, Upload, ChevronRight } from "lucide-react"
+import { MessageCircle, FileText, Users, Send, Download, Plus, Check, MapPin, Heart, Edit, FileEdit, Eye, Save, Upload, ChevronRight, Printer, Mail, BookOpen } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 export function BuildScriptTab() {
   const {
     GUIDED_QUESTIONS,
+    activeGuidedQuestions,
     editWeddingDetails,
     aiChatMessages,
     aiInput,
@@ -35,14 +36,22 @@ export function BuildScriptTab() {
     setSelectedUnityCeremony,
     selectedVowsType,
     setSelectedVowsType,
+    selectedOfficiantStyle,
+    setSelectedOfficiantStyle,
+    storyNotes,
+    setStoryNotes,
+    selectedMrScriptService,
+    storyPromptSuggestions,
     hasGeneratedScript,
     chatMessagesRef,
     editingScript,
     setEditingScript,
     scriptContent,
     setScriptContent,
+    generatedScriptContent,
     editorFontSize,
     editorRef,
+    scriptVersionHistory,
     handleAiMessage,
     handleGenerateScript,
     handleModeSelect,
@@ -51,6 +60,8 @@ export function BuildScriptTab() {
     generateAndSaveScript,
     resetChatbot,
     handleGenerateRequest,
+    handlePrintScript,
+    handleEmailCoupleScriptReview,
     applyFormatting,
     applyTextColor,
     autoSave,
@@ -62,6 +73,9 @@ export function BuildScriptTab() {
     uploadingScript,
     handleSendToEditor,
   } = useCommunicationPortal()
+
+  const guidedQuestions = activeGuidedQuestions?.length ? activeGuidedQuestions : GUIDED_QUESTIONS
+  const showWeddingQuickDetails = ["Wedding", "Vow Renewal"].includes(selectedCeremonyStyle)
 
   return (
 <TabsContent value="buildscript">
@@ -80,16 +94,16 @@ export function BuildScriptTab() {
                     <Button
                       variant={scriptMode === 'guided' ? 'default' : 'outline'}
                       onClick={() => handleModeSelect("guided")}
-                      className={`${scriptMode === 'guided' ? 'bg-green-600 hover:bg-green-700 text-white' : 'border-green-200 text-green-700 hover:bg-green-50'}`}
+                      className={`${scriptMode === 'guided' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}
                     >
-                      Guided Mode
+                      Mr. Script Guided
                     </Button>
                     <Button
                       variant={scriptMode === 'expert' ? 'default' : 'outline'}
                       onClick={() => handleModeSelect("expert")}
                       className={`${scriptMode === 'expert' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}
                     >
-                      Freelance / Expert Mode
+                      Mr. Script Expert
                     </Button>
                   </div>
 
@@ -97,7 +111,7 @@ export function BuildScriptTab() {
                   {scriptMode === 'guided' && (
                     <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-green-900">AI-Guided Script Creation</h3>
+                        <h3 className="font-semibold text-green-900">Mr. Script Guided Setup</h3>
                         <Button
                           variant="outline"
                           size="sm"
@@ -115,24 +129,24 @@ export function BuildScriptTab() {
                             Guided Questions Progress
                           </span>
                           <span className="text-sm font-semibold text-green-700">
-                            {currentQuestionIndex} / {GUIDED_QUESTIONS.length} completed
+                            {currentQuestionIndex} / {guidedQuestions.length} completed
                           </span>
                         </div>
                         <div className="w-full bg-white rounded-full h-3 border border-green-200 overflow-hidden">
                           <div
                             className="bg-gradient-to-r from-green-500 to-green-600 h-full rounded-full transition-all duration-500 ease-out flex items-center justify-end pr-2"
                             style={{
-                              width: `${(currentQuestionIndex / GUIDED_QUESTIONS.length) * 100}%`
+                              width: `${(currentQuestionIndex / guidedQuestions.length) * 100}%`
                             }}
                           >
                             {currentQuestionIndex > 0 && (
                               <span className="text-xs font-bold text-white drop-shadow">
-                                {Math.round((currentQuestionIndex / GUIDED_QUESTIONS.length) * 100)}%
+                                {Math.round((currentQuestionIndex / guidedQuestions.length) * 100)}%
                               </span>
                             )}
                           </div>
                         </div>
-                        {currentQuestionIndex === GUIDED_QUESTIONS.length && (
+                        {currentQuestionIndex === guidedQuestions.length && (
                           <p className="text-xs text-green-700 mt-2 font-medium flex items-center">
                             <Check className="w-4 h-4 mr-1" />
                             All questions completed! You can now refine your script.
@@ -145,19 +159,16 @@ export function BuildScriptTab() {
                         <h4 className="font-medium text-green-900 mb-3">Quick Setup</h4>
                         <div className="grid grid-cols-2 gap-4 mb-4">
                           <div>
-                            <label className="block text-sm font-medium text-green-900 mb-1">Ceremony Style</label>
+                            <label className="block text-sm font-medium text-green-900 mb-1">Script Type</label>
                             <select
                               className="w-full p-2 border border-green-200 rounded text-sm focus:border-green-400 focus:ring-1 focus:ring-green-400"
                               value={selectedCeremonyStyle}
                               onChange={(e) => setSelectedCeremonyStyle(e.target.value)}
                             >
-                              <option value="">Select a style...</option>
-                              <option value="Traditional">Traditional</option>
-                              <option value="Modern">Modern</option>
-                              <option value="Religious">Religious</option>
-                              <option value="Secular">Secular</option>
-                              <option value="Interfaith">Interfaith</option>
-                              <option value="Custom">Custom</option>
+                              <option value="">Select a script type...</option>
+                              {guidedQuestions[0]?.options?.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
                             </select>
                           </div>
                           <div>
@@ -168,12 +179,27 @@ export function BuildScriptTab() {
                               onChange={(e) => setSelectedCeremonyLength(e.target.value)}
                             >
                               <option value="">Select duration...</option>
-                              <option value="15-20 minutes">15-20 minutes</option>
-                              <option value="20-30 minutes">20-30 minutes</option>
-                              <option value="30-45 minutes">30-45 minutes</option>
-                              <option value="45+ minutes">45+ minutes</option>
+                              {guidedQuestions[1]?.options?.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
                             </select>
                           </div>
+                          <div>
+                            <label className="block text-sm font-medium text-green-900 mb-1">Officiant Style</label>
+                            <select
+                              className="w-full p-2 border border-green-200 rounded text-sm focus:border-green-400 focus:ring-1 focus:ring-green-400"
+                              value={selectedOfficiantStyle}
+                              onChange={(e) => setSelectedOfficiantStyle(e.target.value)}
+                            >
+                              <option value="Warm, natural, and professional">Warm, natural, and professional</option>
+                              <option value="Short, heartfelt, and simple">Short, heartfelt, and simple</option>
+                              <option value="Formal and polished">Formal and polished</option>
+                              <option value="Light, joyful, and conversational">Light, joyful, and conversational</option>
+                              <option value="Spiritual but not overly religious">Spiritual but not overly religious</option>
+                              <option value="Gentle, quiet, and comforting">Gentle, quiet, and comforting</option>
+                            </select>
+                          </div>
+                          {showWeddingQuickDetails && (
                           <div>
                             <label className="block text-sm font-medium text-green-900 mb-1">Unity Ceremony</label>
                             <select
@@ -193,6 +219,8 @@ export function BuildScriptTab() {
                               <option value="Tree Planting">Tree Planting</option>
                             </select>
                           </div>
+                          )}
+                          {showWeddingQuickDetails && (
                           <div>
                             <label className="block text-sm font-medium text-green-900 mb-1">Vows</label>
                             <select
@@ -209,7 +237,52 @@ export function BuildScriptTab() {
                               <option value="Community Vows">Community Vows</option>
                             </select>
                           </div>
+                          )}
                         </div>
+
+                        <div className="mb-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-green-900 mb-1">Story Notes</label>
+                            <textarea
+                              className="w-full min-h-[150px] p-3 border border-green-200 rounded text-sm focus:border-green-400 focus:ring-1 focus:ring-green-400 resize-y"
+                              value={storyNotes}
+                              onChange={(e) => setStoryNotes(e.target.value)}
+                              placeholder="Add high-level story notes here. The couple does not need to answer every prompt."
+                            />
+                          </div>
+                          <div className="rounded border border-blue-100 bg-blue-50 p-3">
+                            <div className="flex items-center text-blue-900 font-medium text-sm mb-2">
+                              <BookOpen className="w-4 h-4 mr-2" />
+                              Story Prompts
+                            </div>
+                            <ul className="space-y-2 text-xs text-blue-800">
+                              {storyPromptSuggestions?.map((prompt: string) => (
+                                <li key={prompt} className="flex gap-2">
+                                  <span className="text-blue-500">-</span>
+                                  <span>{prompt}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+
+                        {selectedCeremonyStyle && (
+                          <div className="mb-4 rounded border border-indigo-100 bg-indigo-50 p-3">
+                            <div className="flex items-center justify-between gap-3 mb-2">
+                              <h5 className="text-sm font-semibold text-indigo-950">Outline Preview</h5>
+                              <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-white">
+                                {selectedMrScriptService?.shortName || selectedCeremonyStyle}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedMrScriptService?.scriptSections?.map((section: string) => (
+                                <span key={section} className="text-xs px-2 py-1 rounded bg-white border border-indigo-100 text-indigo-800">
+                                  {section}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         <Button
                           onClick={handleGenerateRequest}
@@ -221,11 +294,11 @@ export function BuildScriptTab() {
 
                         {selectedCeremonyStyle && selectedCeremonyLength && (
                           <div className="mt-3 p-2 bg-green-100 border border-green-200 rounded text-sm text-green-800">
-                            <strong>Selected:</strong> {selectedCeremonyStyle} ceremony, {selectedCeremonyLength} duration
-                            {selectedUnityCeremony && selectedUnityCeremony !== "None" && (
+                            <strong>Selected:</strong> {selectedCeremonyStyle} script, {selectedCeremonyLength} duration
+                            {showWeddingQuickDetails && selectedUnityCeremony && selectedUnityCeremony !== "None" && (
                               <span>, {selectedUnityCeremony} unity ceremony</span>
                             )}
-                            {selectedVowsType && (
+                            {showWeddingQuickDetails && selectedVowsType && (
                               <span>, {selectedVowsType} vows</span>
                             )}
                           </div>
@@ -281,12 +354,12 @@ export function BuildScriptTab() {
                         </div>
 
                         {/* Quick Response Options */}
-                        {currentQuestionIndex < GUIDED_QUESTIONS.length &&
-                         GUIDED_QUESTIONS[currentQuestionIndex]?.type === 'multiple-choice' &&
+                        {currentQuestionIndex < guidedQuestions.length &&
+                         guidedQuestions[currentQuestionIndex]?.type === 'multiple-choice' &&
                          !isTyping && (
                           <div className="border-t border-gray-200 p-3">
                             <div className="flex flex-wrap gap-2">
-                              {GUIDED_QUESTIONS[currentQuestionIndex].options?.map((option) => (
+                              {guidedQuestions[currentQuestionIndex].options?.map((option) => (
                                 <Button
                                   key={option}
                                   variant="outline"
@@ -341,9 +414,9 @@ export function BuildScriptTab() {
                               <div className="relative">
                                 <Button
                                   onClick={generateAndSaveScript}
-                                  disabled={currentQuestionIndex < GUIDED_QUESTIONS.length}
+                                  disabled={currentQuestionIndex < guidedQuestions.length}
                                   className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 disabled:bg-gray-300 disabled:cursor-not-allowed flex-col h-auto w-full"
-                                  title={currentQuestionIndex < GUIDED_QUESTIONS.length ? "Answer all guided questions first" : "Refine your script"}
+                                  title={currentQuestionIndex < guidedQuestions.length ? "Answer all guided questions first" : "Refine your script"}
                                 >
                                   <Edit className="w-5 h-5 mb-1" />
                                   <span className="text-xs">Refine Script</span>
@@ -363,8 +436,8 @@ export function BuildScriptTab() {
                               </Button>
                             </div>
                             <p className="text-xs text-gray-500 text-center mt-2">
-                              {currentQuestionIndex < GUIDED_QUESTIONS.length
-                                ? `Answer ${GUIDED_QUESTIONS.length - currentQuestionIndex} more question(s) to unlock Refine Script`
+                              {currentQuestionIndex < guidedQuestions.length
+                                ? `Answer ${guidedQuestions.length - currentQuestionIndex} more question(s) to unlock Refine Script`
                                 : hasGeneratedScript
                                   ? "Click Generate Final Script to open in editor"
                                   : "Start with Generate Initial Script"}
@@ -378,12 +451,12 @@ export function BuildScriptTab() {
                   )}
                   {scriptMode === 'expert' && (
                     <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h3 className="font-semibold text-blue-900 mb-2">Freelance / Expert Mode</h3>
-                      <p className="text-sm text-blue-800 mb-3">For experienced officiants who have performed weddings before and want full control to customize the ceremony.</p>
+                      <h3 className="font-semibold text-blue-900 mb-2">Mr. Script Expert Mode</h3>
+                      <p className="text-sm text-blue-800 mb-3">For experienced officiants who want full control to customize the ceremony, tribute, blessing, or speech.</p>
 
                       <div className="mt-4 p-3 bg-blue-100 border border-blue-200 rounded">
                         <p className="text-sm text-blue-800">
-                          <strong>Expert Mode Features:</strong>
+                          <strong>Mr. Script Expert Features:</strong>
                         </p>
                         <ul className="text-sm text-blue-700 mt-2 space-y-1">
                           <li>• Full access to the script editor with advanced formatting</li>
@@ -412,7 +485,7 @@ export function BuildScriptTab() {
                       Mr. Script Builder
                     </CardTitle>
                     <CardDescription className={!scriptMode ? 'text-gray-400' : ''}>
-                      {!scriptMode ? 'Please select a script writing mode above to get started' : 'Create personalized ceremony scripts with Mr. Script for Sarah Johnson & David Chen'}
+                      {!scriptMode ? 'Please select a script writing mode above to get started' : 'Create personalized ceremony, blessing, memorial, and milestone scripts with Mr. Script'}
                     </CardDescription>
                   </CardHeader>
                 <CardContent className={`p-0 ${!scriptMode ? 'opacity-40 pointer-events-none' : ''}`}>
@@ -445,7 +518,7 @@ export function BuildScriptTab() {
                           <Card className="h-[600px] flex flex-col">
                             <CardHeader className="pb-4">
                               <CardTitle className="text-lg text-gray-900">Mr. Script</CardTitle>
-                              <CardDescription>Ask me anything about creating your wedding ceremony script</CardDescription>
+                              <CardDescription>Ask me anything about creating a ceremony script, memorial, blessing, vows, or speech</CardDescription>
                             </CardHeader>
 
                             {/* Chat Messages */}
@@ -909,8 +982,29 @@ export function BuildScriptTab() {
                               <div>
                                 <span className="font-medium">Last saved:</span> {editingScript?.lastModified || 'Never'}
                               </div>
+                              {scriptVersionHistory?.length > 0 && (
+                                <div className="mt-1">
+                                  <span className="font-medium">Recent versions:</span> {scriptVersionHistory.slice(0, 3).map((version: any) => `${version.savedAt} (${version.wordCount} words)`).join(" | ")}
+                                </div>
+                              )}
                             </div>
                             <div className="flex space-x-3">
+                              <Button
+                                variant="outline"
+                                onClick={handlePrintScript}
+                                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                              >
+                                <Printer className="w-4 h-4 mr-2" />
+                                Print
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={handleEmailCoupleScriptReview}
+                                className="border-green-200 text-green-700 hover:bg-green-50"
+                              >
+                                <Mail className="w-4 h-4 mr-2" />
+                                Email Review
+                              </Button>
                               <Button
                                 variant="outline"
                                 onClick={() => {
@@ -954,15 +1048,41 @@ export function BuildScriptTab() {
 
                     {/* Preview Tab */}
                     <TabsContent value="preview" className="p-6">
-                      <div className="text-center py-12">
-                        <Eye className="w-16 h-16 text-blue-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Script Preview</h3>
-                        <p className="text-gray-500 mb-4">Preview your ceremony script before the big day</p>
-                        <Button variant="outline" className="border-blue-200 text-blue-700">
-                          <Eye className="w-4 h-4 mr-2" />
-                          Coming Soon
-                        </Button>
-                      </div>
+                      {(scriptContent || generatedScriptContent) ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <h3 className="text-lg font-semibold text-gray-900">Printable Ceremony View</h3>
+                              <p className="text-sm text-gray-500">Clean reading copy for rehearsal, ceremony day, or couple review.</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button variant="outline" className="border-blue-200 text-blue-700" onClick={handlePrintScript}>
+                                <Printer className="w-4 h-4 mr-2" />
+                                Print
+                              </Button>
+                              <Button variant="outline" className="border-green-200 text-green-700" onClick={handleEmailCoupleScriptReview}>
+                                <Mail className="w-4 h-4 mr-2" />
+                                Email Review
+                              </Button>
+                            </div>
+                          </div>
+                          <div
+                            className="max-h-[720px] overflow-y-auto rounded border bg-white p-8 text-gray-950 shadow-sm"
+                            style={{ fontFamily: "Georgia, serif", lineHeight: 1.75, fontSize: 17 }}
+                            dangerouslySetInnerHTML={{ __html: scriptContent || generatedScriptContent }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <Eye className="w-16 h-16 text-blue-300 mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">Script Preview</h3>
+                          <p className="text-gray-500 mb-4">Generate or open a script to preview the clean reading copy.</p>
+                          <Button variant="outline" className="border-blue-200 text-blue-700" onClick={() => setScriptBuilderTab('mr-script')}>
+                            <MessageCircle className="w-4 h-4 mr-2" />
+                            Go to Mr. Script
+                          </Button>
+                        </div>
+                      )}
                     </TabsContent>
                   </Tabs>
                 </CardContent>

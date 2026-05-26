@@ -12,7 +12,9 @@ import { Contract } from "@/components/ContractUploadDialog"
 import { CommunicationPortalProvider } from "./communication-portal/CommunicationPortalContext"
 import {
   loadCouples as loadCouplesFromDB,
+  addCeremony as addCeremonyToDB,
   updateCouple as updateCoupleInDB,
+  upsertCeremonyDetails as upsertCeremonyDetailsInDB,
   loadTasks as loadTasksFromDB,
   addTask as addTaskToDB,
   updateTask as updateTaskInDB,
@@ -48,11 +50,190 @@ import {
   DEFAULT_CONTRACT_ACKNOWLEDGMENT_SLUG,
   DEFAULT_CONTRACT_TEMPLATE_VERSION,
 } from "@/lib/contract-legal-acknowledgment"
+import {
+  MR_SCRIPT_LENGTH_OPTIONS,
+  MR_SCRIPT_SERVICE_OPTIONS,
+  getMrScriptServiceByResponse,
+  getMrScriptStoryPrompts,
+} from "@/data/mr-script-services"
 
 // Safe helper to get first name from a full name (null-safe)
 const getFirstName = (fullName: string | null | undefined): string => {
   if (!fullName || typeof fullName !== 'string') return 'Partner'
   return fullName.split(' ')[0] || 'Partner'
+}
+
+type CeremonyTypeConfig = {
+  value: string
+  label: string
+  createTitle: string
+  createDescription: string
+  participantHeader: string
+  peopleCardTitle: string
+  primarySectionTitle: string
+  secondarySectionTitle: string
+  primaryRole: string
+  secondaryRole: string
+  primaryNamePlaceholder: string
+  secondaryNamePlaceholder: string
+  primaryEmailPlaceholder: string
+  secondaryEmailPlaceholder: string
+  primaryPhonePlaceholder: string
+  secondaryPhonePlaceholder: string
+  primaryAddressPlaceholder: string
+  secondaryAddressPlaceholder: string
+  primaryAgeLabel?: string
+  secondaryAgeLabel?: string
+  ceremonyNamePlaceholder: string
+}
+
+const CEREMONY_TYPE_OPTIONS: CeremonyTypeConfig[] = [
+  {
+    value: "wedding",
+    label: "Wedding Ceremony",
+    createTitle: "Create a New Wedding Ceremony",
+    createDescription: "Fill in the details for the new wedding ceremony you'll be officiating.",
+    participantHeader: "Couple Information",
+    peopleCardTitle: "Wedding Couple",
+    primarySectionTitle: "Partner 1 Information",
+    secondarySectionTitle: "Partner 2 Information",
+    primaryRole: "Partner 1",
+    secondaryRole: "Partner 2",
+    primaryNamePlaceholder: "Partner 1 full name",
+    secondaryNamePlaceholder: "Partner 2 full name",
+    primaryEmailPlaceholder: "Partner 1 email",
+    secondaryEmailPlaceholder: "Partner 2 email",
+    primaryPhonePlaceholder: "Partner 1 phone",
+    secondaryPhonePlaceholder: "Partner 2 phone",
+    primaryAddressPlaceholder: "Partner 1 primary address",
+    secondaryAddressPlaceholder: "Partner 2 primary address",
+    ceremonyNamePlaceholder: "e.g., Sarah & David's Wedding",
+  },
+  {
+    value: "quinceanera",
+    label: "Quinceañera / Coming of Age",
+    createTitle: "Create a New Quinceañera",
+    createDescription: "Fill in the details for the coming-of-age ceremony you'll be officiating.",
+    participantHeader: "Honoree & Parent/Guardian Information",
+    peopleCardTitle: "Honoree & Parent/Guardian",
+    primarySectionTitle: "Honoree Information",
+    secondarySectionTitle: "Parent/Guardian Information",
+    primaryRole: "Honoree",
+    secondaryRole: "Parent/Guardian",
+    primaryNamePlaceholder: "Honoree's full name",
+    secondaryNamePlaceholder: "Parent/guardian full name",
+    primaryEmailPlaceholder: "Honoree email, if available",
+    secondaryEmailPlaceholder: "Parent/guardian email",
+    primaryPhonePlaceholder: "Honoree phone, if available",
+    secondaryPhonePlaceholder: "Parent/guardian phone",
+    primaryAddressPlaceholder: "Honoree primary address",
+    secondaryAddressPlaceholder: "Parent/guardian primary address",
+    primaryAgeLabel: "Honoree Age",
+    ceremonyNamePlaceholder: "e.g., Isabella's Quinceañera",
+  },
+  {
+    value: "celebration_of_life",
+    label: "Celebration of Life / Wake",
+    createTitle: "Create a Celebration of Life",
+    createDescription: "Fill in the details for the remembrance service you'll be officiating.",
+    participantHeader: "Host & Honoree Information",
+    peopleCardTitle: "Host & Honoree",
+    primarySectionTitle: "Host Information",
+    secondarySectionTitle: "Honoree Information",
+    primaryRole: "Host",
+    secondaryRole: "Honoree",
+    primaryNamePlaceholder: "Host's full name",
+    secondaryNamePlaceholder: "Deceased person's full name",
+    primaryEmailPlaceholder: "Host email",
+    secondaryEmailPlaceholder: "Family contact email, if different",
+    primaryPhonePlaceholder: "Host phone",
+    secondaryPhonePlaceholder: "Family contact phone, if different",
+    primaryAddressPlaceholder: "Host primary address",
+    secondaryAddressPlaceholder: "Honoree's city/state or family address",
+    secondaryAgeLabel: "Honoree Age",
+    ceremonyNamePlaceholder: "e.g., Celebration of Life for Robert",
+  },
+  {
+    value: "baby_blessing",
+    label: "Baby Blessing / Naming",
+    createTitle: "Create a Baby Blessing",
+    createDescription: "Fill in the details for the baby blessing or naming ceremony.",
+    participantHeader: "Child & Parent/Guardian Information",
+    peopleCardTitle: "Child & Parent/Guardian",
+    primarySectionTitle: "Child Information",
+    secondarySectionTitle: "Parent/Guardian Information",
+    primaryRole: "Child",
+    secondaryRole: "Parent/Guardian",
+    primaryNamePlaceholder: "Child's full name",
+    secondaryNamePlaceholder: "Parent/guardian full name",
+    primaryEmailPlaceholder: "Child email, if applicable",
+    secondaryEmailPlaceholder: "Parent/guardian email",
+    primaryPhonePlaceholder: "Child phone, if applicable",
+    secondaryPhonePlaceholder: "Parent/guardian phone",
+    primaryAddressPlaceholder: "Child primary address",
+    secondaryAddressPlaceholder: "Parent/guardian primary address",
+    primaryAgeLabel: "Child Age",
+    ceremonyNamePlaceholder: "e.g., Emma's Baby Blessing",
+  },
+  {
+    value: "vow_renewal",
+    label: "Vow Renewal",
+    createTitle: "Create a Vow Renewal",
+    createDescription: "Fill in the details for the vow renewal ceremony you'll be officiating.",
+    participantHeader: "Couple Information",
+    peopleCardTitle: "Couple Information",
+    primarySectionTitle: "Partner 1 Information",
+    secondarySectionTitle: "Partner 2 Information",
+    primaryRole: "Partner 1",
+    secondaryRole: "Partner 2",
+    primaryNamePlaceholder: "Partner 1 full name",
+    secondaryNamePlaceholder: "Partner 2 full name",
+    primaryEmailPlaceholder: "Partner 1 email",
+    secondaryEmailPlaceholder: "Partner 2 email",
+    primaryPhonePlaceholder: "Partner 1 phone",
+    secondaryPhonePlaceholder: "Partner 2 phone",
+    primaryAddressPlaceholder: "Partner 1 primary address",
+    secondaryAddressPlaceholder: "Partner 2 primary address",
+    ceremonyNamePlaceholder: "e.g., Sarah & David's Vow Renewal",
+  },
+  {
+    value: "other",
+    label: "Other Ceremony",
+    createTitle: "Create a New Ceremony",
+    createDescription: "Fill in the details for the ceremony you'll be officiating.",
+    participantHeader: "Participant Information",
+    peopleCardTitle: "Participants",
+    primarySectionTitle: "Primary Contact Information",
+    secondarySectionTitle: "Participant / Honoree Information",
+    primaryRole: "Primary Contact",
+    secondaryRole: "Participant / Honoree",
+    primaryNamePlaceholder: "Primary contact full name",
+    secondaryNamePlaceholder: "Participant or honoree full name",
+    primaryEmailPlaceholder: "Primary contact email",
+    secondaryEmailPlaceholder: "Participant email, if applicable",
+    primaryPhonePlaceholder: "Primary contact phone",
+    secondaryPhonePlaceholder: "Participant phone, if applicable",
+    primaryAddressPlaceholder: "Primary contact address",
+    secondaryAddressPlaceholder: "Participant address, if applicable",
+    ceremonyNamePlaceholder: "e.g., Community Blessing",
+  },
+]
+
+const getCeremonyTypeConfig = (type?: string) =>
+  CEREMONY_TYPE_OPTIONS.find((option) => option.value === type) || CEREMONY_TYPE_OPTIONS[0]
+
+const getCeremonyTypeFromNotes = (notes?: string | null) => {
+  if (!notes) return "wedding"
+  const match = notes.match(/^Ceremony type:\s*(.+)$/im)
+  const label = match?.[1]?.trim()
+  return CEREMONY_TYPE_OPTIONS.find((option) => option.label === label)?.value || "wedding"
+}
+
+const getCeremonyAgeFromNotes = (notes: string | null | undefined, role?: string) => {
+  if (!notes || !role) return ""
+  const escapedRole = role.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const match = notes.match(new RegExp(`^${escapedRole} age:\\s*(.+)$`, "im"))
+  return match?.[1]?.trim() || ""
 }
 
 const getMeetingStart = (meeting: { date?: string; time?: string | null }) => {
@@ -338,20 +519,20 @@ const GUIDED_QUESTIONS: Question[] = [
   {
     id: 'ceremony-type',
     type: 'multiple-choice',
-    question: "What type of ceremony are you looking to officiate?",
-    options: ['Traditional', 'Modern', 'Religious', 'Secular', 'Interfaith', 'Custom'],
+    question: "What kind of script should I help you create?",
+    options: MR_SCRIPT_SERVICE_OPTIONS,
     required: true,
     category: 'ceremony-type',
-    aiRecommendation: "Traditional ceremonies include classic vows and ring exchanges, while modern ceremonies offer more flexibility for personalization."
+    aiRecommendation: "Tell me the life moment first, then I will ask only the questions that fit that kind of ceremony."
   },
   {
     id: 'ceremony-duration',
     type: 'multiple-choice',
     question: "How long should the ceremony be?",
-    options: ['15-20 minutes', '20-30 minutes', '30-45 minutes', '45+ minutes'],
+    options: MR_SCRIPT_LENGTH_OPTIONS,
     required: true,
     category: 'logistics',
-    aiRecommendation: "Most wedding ceremonies are 20-30 minutes. Shorter ceremonies focus on essentials, while longer ones include more personal elements."
+    aiRecommendation: "This helps me decide how many sections to write and how much detail each section should include."
   },
   {
     id: 'ceremony-tone',
@@ -382,8 +563,106 @@ const GUIDED_QUESTIONS: Question[] = [
   }
 ]
 
+const getActiveGuidedQuestions = (responses: Record<string, string> = {}): Question[] => {
+  const service = getMrScriptServiceByResponse(responses['ceremony-type'])
+
+  return [
+    GUIDED_QUESTIONS[0],
+    GUIDED_QUESTIONS[1],
+    {
+      id: 'ceremony-tone',
+      type: 'multiple-choice',
+      question: service.sensitivity === "grief"
+        ? "What tone should this remembrance have?"
+        : "What tone should this script have?",
+      options: service.toneOptions,
+      required: true,
+      category: 'preferences',
+      aiRecommendation: service.sensitivity === "grief"
+        ? "I will keep this gentle, grounded, and careful with family feelings."
+        : "The tone helps Mr. Script choose words that fit the moment instead of sounding generic."
+    },
+    {
+      id: 'core-details',
+      type: 'text',
+      question: `What important details should I include for this ${service.shortName.toLowerCase()} script?`,
+      required: true,
+      category: 'personal',
+      aiRecommendation: `Helpful details include: ${service.requiredQuestions.slice(0, 3).join(" ")}`
+    },
+    {
+      id: 'story-notes',
+      type: 'text',
+      question: `What story details should I weave into this ${service.shortName.toLowerCase()} script?`,
+      required: false,
+      category: 'personal',
+      aiRecommendation: service.storyPrompts.join(" ")
+    },
+    {
+      id: 'special-inclusions',
+      type: 'text',
+      question: "Are there any readings, traditions, people, stories, prayers, music, or special moments that should be included?",
+      required: false,
+      category: 'personal',
+      aiRecommendation: service.optionalQuestions.slice(0, 2).join(" ")
+    },
+    {
+      id: 'avoidances',
+      type: 'text',
+      question: service.sensitivity === "grief"
+        ? "Is there anything the family wants avoided or handled carefully?"
+        : "Is there anything I should avoid or keep out of the script?",
+      required: false,
+      category: 'preferences',
+      aiRecommendation: "This helps Mr. Script keep the wording respectful, accurate, and appropriate."
+    }
+  ]
+}
+
 // AI Assistant Functions
 const generateAIResponse = (question: Question, previousResponses: Record<string, string>): string => {
+  if (question.id === "ceremony-type") {
+    return [
+      "Absolutely. I can help shape this into something meaningful and organized.",
+      question.question,
+      "You can choose one of the common ceremony families below, or tell me in your own words if this is something more custom."
+    ].join('\n\n')
+  }
+
+  if (question.id === "ceremony-duration") {
+    const service = getMrScriptServiceByResponse(previousResponses["ceremony-type"])
+    return [
+      `Good. I'll treat this as a ${service.shortName.toLowerCase()} script.`,
+      question.question,
+      question.aiRecommendation || ""
+    ].filter(Boolean).join('\n\n')
+  }
+
+  if (question.id === "core-details") {
+    const service = getMrScriptServiceByResponse(previousResponses["ceremony-type"])
+    return [
+      `Now I want to understand the heart of this ${service.shortName.toLowerCase()} script.`,
+      question.question,
+      service.requiredQuestions.slice(0, 4).map((detail) => `- ${detail}`).join("\n")
+    ].filter(Boolean).join('\n\n')
+  }
+
+  if (question.id === "story-notes") {
+    const service = getMrScriptServiceByResponse(previousResponses["ceremony-type"])
+    return [
+      question.question,
+      "High-level notes are enough. Couples can answer one, several, or all of these:",
+      service.storyPrompts.map((detail) => `- ${detail}`).join("\n")
+    ].filter(Boolean).join('\n\n')
+  }
+
+  if (question.id === "special-inclusions" || question.id === "avoidances") {
+    return [
+      question.question,
+      question.aiRecommendation || ""
+    ].filter(Boolean).join('\n\n')
+  }
+
   const responses = [
     `Great! Let me ask you about ${question.category === 'ceremony-type' ? 'the type of ceremony' :
       question.category === 'logistics' ? 'the practical details' :
@@ -401,10 +680,17 @@ const generateRecommendation = (responses: Record<string, string>): string => {
   const ceremonyType = responses['ceremony-type']
   const duration = responses['ceremony-duration']
   const tone = responses['ceremony-tone']
+  const service = getMrScriptServiceByResponse(ceremonyType)
 
-  let recommendation = "Based on your preferences, here's what I recommend for your ceremony script:\n\n"
+  let recommendation = "Based on your answers, here's how I would shape this script:\n\n"
 
   if (ceremonyType) {
+    recommendation += `**Ceremony Family**: ${service.displayName}\n`
+    recommendation += `${service.description}\n\n`
+    recommendation += `**Suggested Structure**: ${service.scriptSections.join(", ")}.\n\n`
+  }
+
+  if (false && ceremonyType) {
     recommendation += `[SCRIPT] **Ceremony Style**: Since you've chosen a ${ceremonyType.toLowerCase()} ceremony, `
     if (ceremonyType === 'Traditional') {
       recommendation += "I'll include classic elements like traditional vows, ring exchange, and formal language.\n\n"
@@ -423,7 +709,11 @@ const generateRecommendation = (responses: Record<string, string>): string => {
     recommendation += `[STYLE] **Tone**: The ${tone.toLowerCase()} approach will be reflected in the language and style throughout.\n\n`
   }
 
-  recommendation += "Would you like me to start generating your personalized ceremony script now? I can always adjust it based on any additional preferences you have!"
+  if (service.sensitivity === "grief") {
+    recommendation += "Because this is grief-related, I will keep the language gentle, compassionate, and never assume religious beliefs.\n\n"
+  }
+
+  recommendation += "Would you like me to start generating your personalized script now? I can always adjust it based on any additional preferences you have."
 
   return recommendation
 }
@@ -431,10 +721,16 @@ const generateRecommendation = (responses: Record<string, string>): string => {
 // Generate a complete ceremony script based on user responses
 const generateCompleteScript = (responses: Record<string, string>, coupleInfo: any, weddingDetails: any): string => {
   const ceremonyType = responses['ceremony-type'] || 'Traditional'
+  const service = getMrScriptServiceByResponse(ceremonyType)
   const duration = responses['ceremony-duration'] || '20-30 minutes'
   const tone = responses['ceremony-tone'] || 'Warm and Personal'
   const unityCeremony = responses['special-elements'] || 'None'
   const vowsType = responses['vows-type'] || 'Traditional Vows'
+  const coreDetails = responses['core-details'] || ''
+  const storyNotes = responses['story-notes'] || ''
+  const specialInclusions = responses['special-inclusions'] || ''
+  const avoidances = responses['avoidances'] || ''
+  const officiantStyle = responses['officiant-style'] || 'Warm, natural, and professional'
 
   const brideName = coupleInfo.brideName || 'Sarah'
   const groomName = coupleInfo.groomName || 'David'
@@ -446,9 +742,69 @@ const generateCompleteScript = (responses: Record<string, string>, coupleInfo: a
     day: 'numeric'
   })
 
+  if (service.id !== "wedding") {
+    const subjectName =
+      service.id === "vow_renewal"
+        ? `${brideName} & ${groomName}`
+        : responses["honoree-name"] || responses["loved-one-name"] || responses["child-name"] || `${brideName} & ${groomName}`
+
+    const sensitivityNote =
+      service.sensitivity === "grief"
+        ? "This script should remain gentle, compassionate, and never assume religious beliefs unless the family asks for that language."
+        : "This script should feel warm, grounded, and personal to the people involved."
+
+    return `${service.displayName.toUpperCase()} SCRIPT
+Generated by Mr. Script for ${subjectName}
+${venue} - ${date}
+
+SCRIPT DIRECTION
+Tone: ${tone}
+Target Duration: ${duration}
+Ceremony Family: ${service.category}
+Officiant Style: ${officiantStyle}
+Core Details: ${coreDetails || "Add the names, setting, relationships, stories, and purpose of this script."}
+Story Notes: ${storyNotes || "No story details were provided yet. Keep the draft high-level and leave room for personal details."}
+Special Inclusions: ${specialInclusions || "No specific readings, traditions, music, prayers, or people were listed yet."}
+Avoidances: ${avoidances || "No avoidances were listed yet."}
+
+${sensitivityNote}
+
+${service.scriptSections
+  .map((section, index) => {
+    const prompt =
+      service.sensitivity === "grief"
+        ? "Use quiet, careful language here. Leave room for family names, memories, readings, music, prayers, or reflection."
+        : "Write this section with natural spoken language, clear stage direction, and room for personal details."
+
+    return `${index + 1}. ${section.toUpperCase()}
+[Mr. Script draft section]
+${prompt}
+Use these known details when relevant: ${coreDetails || "details still need to be confirmed."}
+Story material to weave in naturally: ${storyNotes || "none provided yet."}
+
+`
+  })
+  .join("")}
+DETAILS TO COLLECT OR CONFIRM
+${service.requiredQuestions.map((question) => `- ${question}`).join("\n")}
+
+OPTIONAL PERSONAL TOUCHES
+${service.optionalQuestions.map((question) => `- ${question}`).join("\n")}
+
+---
+CEREMONY NOTES:
+- Duration: ${duration}
+- Tone: ${tone}
+- Output Type: ${service.outputTypes[0] || "ceremony_script"}
+
+This is a starter draft created by Mr. Script. Add the personal stories, names, traditions, and details that make this ceremony feel real.`
+  }
+
   let script = `${ceremonyType.toUpperCase()} WEDDING CEREMONY SCRIPT
 Generated by Mr. Script for ${brideName} & ${groomName}
 ${venue} - ${date}
+Officiant Style: ${officiantStyle}
+Story Notes: ${storyNotes || "No couple story notes provided yet."}
 
 PROCESSIONAL
 [Music begins as wedding party enters]
@@ -457,6 +813,11 @@ OPENING WORDS
 "Family and friends, we are gathered here today at ${venue} to celebrate the union of ${brideName} and ${groomName} in marriage. On this beautiful ${date}, we witness not just the joining of two hearts, but the creation of a new family built on love, trust, and commitment.
 
 ${brideName} and ${groomName}, you have chosen to share your lives together, and we are honored to be part of this special moment."
+
+${storyNotes ? `COUPLE STORY
+[Use this story material naturally in the ceremony. Keep it spoken, warm, and concise.]
+${storyNotes}
+` : ''}
 
 DECLARATION OF INTENT
 "${brideName}, do you take ${groomName} to be your lawfully wedded husband, to have and to hold, in sickness and in health, for richer or poorer, for better or worse, for as long as you both shall live?"
@@ -740,8 +1101,8 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     items: [
       {
         id: 1,
-        service: 'Wedding Ceremony Officiant',
-        description: 'Professional wedding ceremony officiation services including pre-ceremony consultation, personalized script, and ceremony performance',
+        service: 'Ceremony Officiant',
+        description: 'Professional ceremony officiation services including pre-ceremony consultation, personalized script, and ceremony performance',
         category: 'Ceremony Services',
         quantity: 1,
         rate: 800,
@@ -756,7 +1117,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     total: 800,
     notes: 'Payment due within 30 days. Thank you for choosing our services for your special day!',
     paymentMethods: 'Check, Cash, Venmo, PayPal, Zelle',
-    terms: 'Payment due within 30 days of invoice date. Final payment must be received at least 7 days before the wedding ceremony. Late payments may incur additional fees.',
+    terms: 'Payment due within 30 days of invoice date. Final payment must be received at least 7 days before the ceremony. Late payments may incur additional fees.',
     bankDetails: 'Bank transfers available upon request',
     emailRecipients: 'both'
   })
@@ -803,6 +1164,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
   // Form states for Add New Ceremony
   const [newCeremony, setNewCeremony] = useState({
+    ceremonyType: "wedding",
     ceremonyName: "",
     ceremonyDate: "",
     ceremonyTime: "",
@@ -813,10 +1175,12 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     brideEmail: "",
     bridePhone: "",
     brideAddress: "",
+    primaryAge: "",
     groomName: "",
     groomEmail: "",
     groomPhone: "",
     groomAddress: "",
+    secondaryAge: "",
     totalAmount: "",
     depositAmount: "",
     finalPaymentDate: "",
@@ -899,10 +1263,18 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const [selectedCeremonyLength, setSelectedCeremonyLength] = useState("")
   const [selectedUnityCeremony, setSelectedUnityCeremony] = useState("")
   const [selectedVowsType, setSelectedVowsType] = useState("")
+  const [selectedOfficiantStyle, setSelectedOfficiantStyle] = useState("Warm, natural, and professional")
+  const [storyNotes, setStoryNotes] = useState("")
 
   // Generated script tracking
   const [hasGeneratedScript, setHasGeneratedScript] = useState(false)
   const [generatedScriptContent, setGeneratedScriptContent] = useState("")
+  const [scriptVersionHistory, setScriptVersionHistory] = useState<Array<{
+    id: string
+    title: string
+    savedAt: string
+    wordCount: number
+  }>>([])
 
   // Chat scroll ref
   const chatMessagesRef = useRef<HTMLDivElement>(null)
@@ -913,6 +1285,17 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
       chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight
     }
   }, [chatMessages, isTyping])
+
+  useEffect(() => {
+    const savedStyle = window.localStorage.getItem("mr-script-officiant-style")
+    if (savedStyle) {
+      setSelectedOfficiantStyle(savedStyle)
+    }
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem("mr-script-officiant-style", selectedOfficiantStyle)
+  }, [selectedOfficiantStyle])
 
   // Log saved ceremonies for debugging
   useEffect(() => {
@@ -965,31 +1348,40 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
       if (result.ok && result.data && result.data.length > 0) {
         // Transform database format to component format
-        const transformedCouples = result.data.map((c: any, index: number) => ({
-          id: c.id, // This is the REAL database ID
-          brideName: c.bride_name || "",
-          brideEmail: c.bride_email || "",
-          bridePhone: c.bride_phone || "",
-          brideAddress: c.bride_address || "",
-          groomName: c.groom_name || "",
-          groomEmail: c.groom_email || "",
-          groomPhone: c.groom_phone || "",
-          groomAddress: c.groom_address || "",
-          address: c.venue_address || "",
-          emergencyContact: c.emergency_contact || "",
-          specialRequests: c.special_requests || c.notes || "",
-          isActive: c.is_active !== false,
-          colors: getCoupleColors(index + 1),
-          weddingDetails: {
-            venueName: c.venue_name || "",
-            venueAddress: c.venue_address || "",
-            weddingDate: c.wedding_date || "",
-            startTime: c.start_time || "",
-            endTime: c.end_time || "",
-            expectedGuests: c.expected_guests?.toString() || "",
-            officiantNotes: c.notes || ""
+        const transformedCouples = result.data.map((c: any, index: number) => {
+          const ceremonyType = getCeremonyTypeFromNotes(c.notes || c.special_requests)
+          const ceremonyConfig = getCeremonyTypeConfig(ceremonyType)
+
+          return {
+            id: c.id, // This is the REAL database ID
+            ceremonyType,
+            ceremonyTypeLabel: ceremonyConfig.label,
+            primaryAge: getCeremonyAgeFromNotes(c.notes || c.special_requests, ceremonyConfig.primaryRole),
+            secondaryAge: getCeremonyAgeFromNotes(c.notes || c.special_requests, ceremonyConfig.secondaryRole),
+            brideName: c.bride_name || "",
+            brideEmail: c.bride_email || "",
+            bridePhone: c.bride_phone || "",
+            brideAddress: c.bride_address || "",
+            groomName: c.groom_name || "",
+            groomEmail: c.groom_email || "",
+            groomPhone: c.groom_phone || "",
+            groomAddress: c.groom_address || "",
+            address: c.venue_address || c.address || "",
+            emergencyContact: c.emergency_contact || "",
+            specialRequests: c.special_requests || c.notes || "",
+            isActive: c.is_active !== false,
+            colors: getCoupleColors(index + 1),
+            weddingDetails: {
+              venueName: c.venue_name || "",
+              venueAddress: c.venue_address || "",
+              weddingDate: c.wedding_date || "",
+              startTime: c.start_time || "",
+              endTime: c.end_time || "",
+              expectedGuests: c.expected_guests?.toString() || "",
+              officiantNotes: c.notes || ""
+            }
           }
-        }))
+        })
 
         const selectedCouple = transformedCouples.find((couple: any) => couple.isActive) || transformedCouples[0]
         const selectedCoupleIndex = transformedCouples.findIndex((couple: any) => couple.id === selectedCouple.id)
@@ -1833,35 +2225,49 @@ Mr. Script - Your Personal Wedding Script Creator`
 
   // AI Chatbot Handler Functions
   const initializeChatbot = () => {
-    // Start with empty chat - no automatic welcome message
     setChatMessages([])
     setCurrentQuestionIndex(0)
     setUserResponses({})
 
-    // No automatic questions - wait for user to interact via Quick Setup
+    setIsTyping(true)
+    setTimeout(() => {
+      const openingQuestion = getActiveGuidedQuestions({})[0]
+      setChatMessages([
+        {
+          id: `ai-opening-${Date.now()}`,
+          type: 'ai',
+          content: generateAIResponse(openingQuestion, {}),
+          timestamp: new Date(),
+          questionId: openingQuestion.id
+        }
+      ])
+      setIsTyping(false)
+    }, 500)
   }
 
-  const askNextQuestion = (questionIndex: number) => {
-    if (questionIndex >= GUIDED_QUESTIONS.length) {
+  const askNextQuestion = (questionIndex: number, responseOverrides: Record<string, string> = userResponses) => {
+    const activeQuestions = getActiveGuidedQuestions(responseOverrides)
+
+    if (questionIndex >= activeQuestions.length) {
       // All questions completed, generate recommendation
-      generateFinalRecommendation()
+      generateFinalRecommendation(responseOverrides)
       return
     }
 
-    const question = GUIDED_QUESTIONS[questionIndex]
+    const question = activeQuestions[questionIndex]
 
     // Skip questions that have already been answered via Quick Setup
-    if (userResponses[question.id]) {
+    if (responseOverrides[question.id]) {
       // Question already answered, move to next one
       setCurrentQuestionIndex(prev => prev + 1)
-      askNextQuestion(questionIndex + 1)
+      askNextQuestion(questionIndex + 1, responseOverrides)
       return
     }
 
     setIsTyping(true)
 
     setTimeout(() => {
-      const aiResponse = generateAIResponse(question, userResponses)
+      const aiResponse = generateAIResponse(question, responseOverrides)
       const questionMessage: ChatMessage = {
         id: `ai-${Date.now()}`,
         type: 'ai',
@@ -1907,12 +2313,15 @@ Mr. Script - Your Personal Wedding Script Creator`
     }
 
     // Save user response
-    const currentQuestion = GUIDED_QUESTIONS[currentQuestionIndex]
+    const currentQuestion = getActiveGuidedQuestions(userResponses)[currentQuestionIndex]
+    const nextResponses = currentQuestion
+      ? {
+          ...userResponses,
+          [currentQuestion.id]: chatInput
+        }
+      : userResponses
     if (currentQuestion) {
-      setUserResponses(prev => ({
-        ...prev,
-        [currentQuestion.id]: chatInput
-      }))
+      setUserResponses(nextResponses)
     }
 
     setChatInput("")
@@ -1920,7 +2329,7 @@ Mr. Script - Your Personal Wedding Script Creator`
     // Ask next question
     setTimeout(() => {
       setCurrentQuestionIndex(prev => prev + 1)
-      askNextQuestion(currentQuestionIndex + 1)
+      askNextQuestion(currentQuestionIndex + 1, nextResponses)
     }, 500)
   }
 
@@ -1941,26 +2350,29 @@ Mr. Script - Your Personal Wedding Script Creator`
     }
 
     // Save user response
-    const currentQuestion = GUIDED_QUESTIONS[currentQuestionIndex]
+    const currentQuestion = getActiveGuidedQuestions(userResponses)[currentQuestionIndex]
+    const nextResponses = currentQuestion
+      ? {
+          ...userResponses,
+          [currentQuestion.id]: response
+        }
+      : userResponses
     if (currentQuestion) {
-      setUserResponses(prev => ({
-        ...prev,
-        [currentQuestion.id]: response
-      }))
+      setUserResponses(nextResponses)
     }
 
     // Ask next question
     setTimeout(() => {
       setCurrentQuestionIndex(prev => prev + 1)
-      askNextQuestion(currentQuestionIndex + 1)
+      askNextQuestion(currentQuestionIndex + 1, nextResponses)
     }, 500)
   }
 
-  const generateFinalRecommendation = () => {
+  const generateFinalRecommendation = (responses: Record<string, string> = userResponses) => {
     setIsTyping(true)
 
     setTimeout(() => {
-      const recommendation = generateRecommendation(userResponses)
+      const recommendation = generateRecommendation(responses)
       const recommendationMessage: ChatMessage = {
         id: `ai-final-${Date.now()}`,
         type: 'ai',
@@ -1976,7 +2388,7 @@ Mr. Script - Your Personal Wedding Script Creator`
         const scriptOfferMessage: ChatMessage = {
           id: `ai-script-offer-${Date.now()}`,
           type: 'ai',
-          content: "Perfect! I have everything I need. Would you like me to generate your complete ceremony script now? Just say 'yes' or 'generate script' and I'll create your personalized wedding ceremony!",
+          content: "Perfect! I have enough to create a first draft. Would you like me to generate the complete script now? Just say 'yes' or 'generate script' and I'll build it out in sections.",
           timestamp: new Date()
         }
         setChatMessages(prev => [...prev, scriptOfferMessage])
@@ -1988,6 +2400,9 @@ Mr. Script - Your Personal Wedding Script Creator`
     setIsTyping(true)
 
     setTimeout(() => {
+      const service = getMrScriptServiceByResponse(userResponses['ceremony-type'] || selectedCeremonyStyle)
+      const isWeddingFlow = ["wedding", "vow_renewal"].includes(service.id)
+
       // Generate the complete script
       const completeScript = generateCompleteScript(userResponses, editCoupleInfo, editWeddingDetails)
 
@@ -2015,6 +2430,17 @@ ${(userResponses['special-elements'] || selectedUnityCeremony) !== 'None' ? `â�
         timestamp: new Date()
       }
 
+      if (!isWeddingFlow) {
+        scriptGeneratedMessage.content = `**Your ${service.shortName.toLowerCase()} script has been generated!**
+
+I've created a first draft for a ${service.displayName.toLowerCase()} using the tone, length, and details you provided.
+
+The draft includes:
+${service.scriptSections.map((section) => `- ${section}`).join("\n")}
+
+**Your script is ready!** Click the "Generate Final Script" button below to open it in the full editor where you can make any final adjustments.`
+      }
+
       setChatMessages(prev => [...prev, scriptGeneratedMessage])
       setIsTyping(false)
     }, 2000)
@@ -2034,12 +2460,14 @@ ${(userResponses['special-elements'] || selectedUnityCeremony) !== 'None' ? `â�
   // Handle ceremony style and length generation request
   const handleGenerateRequest = () => {
     if (!selectedCeremonyStyle || !selectedCeremonyLength) {
-      alert('Please select both ceremony style and duration to generate a script request for Mr. Script')
+      alert('Please select both script type and duration to generate a script request for Mr. Script')
       return
     }
 
     // Pre-populate responses based on Quick Setup selections
     const quickSetupResponses: Record<string, string> = {}
+    const quickSetupService = getMrScriptServiceByResponse(selectedCeremonyStyle)
+    const shouldUseWeddingDetails = ["wedding", "vow_renewal"].includes(quickSetupService.id)
 
     if (selectedCeremonyStyle) {
       quickSetupResponses['ceremony-type'] = selectedCeremonyStyle
@@ -2049,13 +2477,21 @@ ${(userResponses['special-elements'] || selectedUnityCeremony) !== 'None' ? `â�
       quickSetupResponses['ceremony-duration'] = selectedCeremonyLength
     }
 
-    if (selectedUnityCeremony && selectedUnityCeremony !== "None") {
+    if (selectedOfficiantStyle) {
+      quickSetupResponses['officiant-style'] = selectedOfficiantStyle
+    }
+
+    if (storyNotes.trim()) {
+      quickSetupResponses['story-notes'] = storyNotes.trim()
+    }
+
+    if (shouldUseWeddingDetails && selectedUnityCeremony && selectedUnityCeremony !== "None") {
       quickSetupResponses['special-elements'] = selectedUnityCeremony
-    } else if (selectedUnityCeremony === "None") {
+    } else if (shouldUseWeddingDetails && selectedUnityCeremony === "None") {
       quickSetupResponses['special-elements'] = "None"
     }
 
-    if (selectedVowsType) {
+    if (shouldUseWeddingDetails && selectedVowsType) {
       // Map the vows selection to match the guided question options
       if (selectedVowsType === "Traditional") {
         quickSetupResponses['vows-type'] = "Traditional Vows"
@@ -2072,13 +2508,13 @@ ${(userResponses['special-elements'] || selectedUnityCeremony) !== 'None' ? `â�
     setUserResponses(quickSetupResponses)
 
     // Build description with all selections
-    let ceremonyDescription = `${selectedCeremonyStyle} ceremony script that's ${selectedCeremonyLength} long`
+    let ceremonyDescription = `${selectedCeremonyStyle} script that's ${selectedCeremonyLength} long`
 
-    if (selectedUnityCeremony && selectedUnityCeremony !== "None") {
+    if (shouldUseWeddingDetails && selectedUnityCeremony && selectedUnityCeremony !== "None") {
       ceremonyDescription += ` with a ${selectedUnityCeremony} unity ceremony`
     }
 
-    if (selectedVowsType) {
+    if (shouldUseWeddingDetails && selectedVowsType) {
       ceremonyDescription += ` featuring ${selectedVowsType} vows`
     }
 
@@ -2112,17 +2548,36 @@ Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo
         aiResponse += `\n\nFor your religious ceremony, I'll include appropriate blessings, scripture readings, and faith-based elements that honor your spiritual traditions.`
       }
 
+      const selectedService = getMrScriptServiceByResponse(selectedCeremonyStyle)
+      aiResponse = `Perfect! I have the first two important details from your Quick Setup:
+
+**Script Type**: ${selectedService.displayName}
+**Duration**: ${selectedCeremonyLength}
+**Tone Family**: ${selectedService.sensitivity === "grief" ? "Gentle / grief-aware" : "Warm / life ceremony"}
+**Suggested Structure**: ${selectedService.scriptSections.join(", ")}
+
+Based on this, I will keep the questions focused on the kind of ceremony you are creating.`
+
+      if (selectedService.sensitivity === "grief") {
+        aiResponse += `\n\nI will use a gentle, compassionate tone and avoid assuming religious beliefs unless you ask for them.`
+      }
+
       // Check if we need to ask about ceremony tone (since it's not covered in Quick Setup)
       const stillNeedTone = !quickSetupResponses['ceremony-tone']
 
       if (stillNeedTone) {
-        aiResponse += `\n\nTo complete your ceremony script, I just need to know: What tone would you like for the ceremony? Would you prefer it to be Formal and Traditional, Warm and Personal, Light and Joyful, Intimate and Romantic, or Fun and Casual?`
+        const activeQuestions = getActiveGuidedQuestions(quickSetupResponses)
+        const toneQuestion = activeQuestions[2]
+        aiResponse += `\n\nTo complete your script, I just need to know: ${toneQuestion.question}`
+        if (toneQuestion.options?.length) {
+          aiResponse += `\n\nYou can choose: ${toneQuestion.options.join(", ")}.`
+        }
 
         // Set up to ask only the remaining question
-        setCurrentQuestionIndex(2) // ceremony-tone is index 2
+        setCurrentQuestionIndex(2)
       } else {
         aiResponse += `\n\nI have everything I need! I'll now generate your complete ceremony script.`
-        setCurrentQuestionIndex(GUIDED_QUESTIONS.length) // Skip all questions
+        setCurrentQuestionIndex(getActiveGuidedQuestions(quickSetupResponses).length)
 
         // Automatically generate the script since we have all the info
         setTimeout(() => {
@@ -2771,6 +3226,13 @@ ${officiantLabel}`,
       month: 'short',
       day: 'numeric'
     })
+
+    setScriptVersionHistory(prev => [{
+      id: `${editingScript.id || "draft"}-${Date.now()}`,
+      title: editingScript.title || `Script ${currentDate}`,
+      savedAt: new Date().toLocaleString(),
+      wordCount: plainTextContent.split(/\s+/).filter(Boolean).length
+    }, ...prev].slice(0, 8))
 
     try {
       if (isNewScript) {
@@ -3723,42 +4185,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     if (isSendingMessage) return
     setIsSendingMessage(true)
 
-    const reminderMessage = `Payment Reminder\nSubject: ${paymentReminderForm.subject}\n\n${paymentReminderForm.body}`
-
     try {
-      if (currentUser?.id && editCoupleInfo?.id) {
-        const { data: savedMessage, error: saveError } = await supabase
-          .from("messages")
-          .insert([{
-            user_id: currentUser.id,
-            couple_id: editCoupleInfo.id,
-            sender: "officiant",
-            sender_name: officiantLabel,
-            content: reminderMessage,
-            read: true,
-            created_at: new Date().toISOString(),
-          }])
-          .select()
-
-        if (saveError) {
-          console.error("Failed to save payment reminder message:", saveError)
-        } else if (savedMessage?.[0]) {
-          setMessages(prev => {
-            const messageExists = prev.some((message) => String(message.id) === String(savedMessage[0].id))
-            if (messageExists) return prev
-
-            return [...prev, {
-              id: savedMessage[0].id,
-              sender: officiantLabel,
-              role: "officiant",
-              message: reminderMessage,
-              timestamp: "Just now",
-              avatar: "/api/placeholder/40/40"
-            }]
-          })
-        }
-      }
-
       const coupleName = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
 
       for (const email of recipientEmails) {
@@ -4181,10 +4608,12 @@ Note: This is an initial draft. Further development needed to incorporate specif
     { id: 3, title: "Rustic Barn Wedding", author: "Minister Lisa K.", price: 24, rating: 4.7, sales: 98 }
   ]
 
-  const handleAddCeremony = () => {
+  const handleAddCeremony = async () => {
+    const ceremonyConfig = getCeremonyTypeConfig(newCeremony.ceremonyType)
+
     // Validate that required fields are filled
     if (!newCeremony.ceremonyName || !newCeremony.brideName || !newCeremony.groomName) {
-      alert("Please fill in Ceremony Name, Bride Name, and Groom Name")
+      alert(`Please fill in Ceremony Name, ${ceremonyConfig.primaryRole} Name, and ${ceremonyConfig.secondaryRole} Name`)
       return
     }
 
@@ -4192,7 +4621,44 @@ Note: This is an initial draft. Further development needed to incorporate specif
     const ceremonyToSave = {
       ...newCeremony,
       id: Date.now(),
+      ceremonyType: newCeremony.ceremonyType,
+      ceremonyTypeLabel: ceremonyConfig.label,
       createdAt: new Date().toISOString()
+    }
+
+    const ceremonyNotes = [
+      newCeremony.notes,
+      `Ceremony type: ${ceremonyConfig.label}`,
+      newCeremony.primaryAge ? `${ceremonyConfig.primaryRole} age: ${newCeremony.primaryAge}` : "",
+      newCeremony.secondaryAge ? `${ceremonyConfig.secondaryRole} age: ${newCeremony.secondaryAge}` : "",
+    ].filter(Boolean).join("\n")
+
+    let savedCoupleId = Date.now()
+
+    if (currentUser?.id) {
+      const saveResult = await addCeremonyToDB(currentUser.id, {
+        brideName: newCeremony.brideName,
+        brideEmail: newCeremony.brideEmail,
+        bridePhone: newCeremony.bridePhone,
+        brideAddress: newCeremony.brideAddress,
+        groomName: newCeremony.groomName,
+        groomEmail: newCeremony.groomEmail,
+        groomPhone: newCeremony.groomPhone,
+        groomAddress: newCeremony.groomAddress,
+        venueName: newCeremony.venueName,
+        venueAddress: newCeremony.venueAddress,
+        ceremonyDate: newCeremony.ceremonyDate,
+        ceremonyTime: newCeremony.ceremonyTime,
+        expectedGuests: newCeremony.expectedGuests,
+        notes: ceremonyNotes,
+      })
+
+      if (!saveResult.ok) {
+        alert(saveResult.error || "Unable to save this ceremony. Please try again.")
+        return
+      }
+
+      savedCoupleId = saveResult.data?.id || savedCoupleId
     }
 
     setSavedCeremonies(prev => [...prev, ceremonyToSave])
@@ -4200,7 +4666,11 @@ Note: This is an initial draft. Further development needed to incorporate specif
 
     // Create the new couple object
     const newCouple = {
-      id: Date.now(), // Generate a unique ID
+      id: savedCoupleId,
+      ceremonyType: newCeremony.ceremonyType,
+      ceremonyTypeLabel: ceremonyConfig.label,
+      primaryAge: newCeremony.primaryAge,
+      secondaryAge: newCeremony.secondaryAge,
       brideName: newCeremony.brideName,
       brideEmail: newCeremony.brideEmail,
       bridePhone: newCeremony.bridePhone,
@@ -4211,7 +4681,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
       groomAddress: newCeremony.groomAddress,
       address: "",
       emergencyContact: "",
-      specialRequests: newCeremony.notes,
+      specialRequests: ceremonyNotes,
       isActive: true, // New ceremonies are active by default
       colors: getCoupleColors(allCouples.length + 1), // Assign consistent colors based on position
       weddingDetails: {
@@ -4262,6 +4732,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
 
     // Reset form and close dialog
     setNewCeremony({
+      ceremonyType: "wedding",
       ceremonyName: "",
       ceremonyDate: "",
       ceremonyTime: "",
@@ -4272,10 +4743,12 @@ Note: This is an initial draft. Further development needed to incorporate specif
       brideEmail: "",
       bridePhone: "",
       brideAddress: "",
+      primaryAge: "",
       groomName: "",
       groomEmail: "",
       groomPhone: "",
       groomAddress: "",
+      secondaryAge: "",
       totalAmount: "",
       depositAmount: "",
       finalPaymentDate: "",
@@ -4284,7 +4757,7 @@ Note: This is an initial draft. Further development needed to incorporate specif
     setShowAddCeremonyDialog(false)
 
     // Show success message
-    alert(`Ceremony "${ceremonyToSave.ceremonyName}" for ${newCeremony.brideName} & ${newCeremony.groomName} has been saved successfully!\n\nThis couple has been added to your ceremony list and you can now switch to them using the "Switch Ceremony" button.`)
+    alert(`Ceremony "${ceremonyToSave.ceremonyName}" has been saved successfully.\n\nIt has been added to your ceremony list and you can switch to it using the "Switch Ceremony" button.`)
   }
 
   const handleEditCoupleInfo = async () => {
@@ -4347,23 +4820,42 @@ Note: This is an initial draft. Further development needed to incorporate specif
       return
     }
 
+    if (!currentUser?.id) {
+      console.error("Cannot save wedding details: no signed-in user")
+      alert("Failed to save wedding details. Please sign in and try again.")
+      return
+    }
+
     const coupleId = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
-    const updates = {
+    const ceremonyUpdates = {
       venue_name: editWeddingDetails.venueName || null,
       venue_address: editWeddingDetails.venueAddress || null,
       wedding_date: editWeddingDetails.weddingDate || null,
       start_time: editWeddingDetails.startTime || null,
       end_time: editWeddingDetails.endTime || null,
-      expected_guests: editWeddingDetails.expectedGuests ? Number.parseInt(editWeddingDetails.expectedGuests, 10) : null,
-      notes: editWeddingDetails.officiantNotes || null
+      expected_guests: editWeddingDetails.expectedGuests || null,
     }
 
-    const result = await updateCoupleInDB(activeCoupleId, updates)
+    const ceremonyResult = await upsertCeremonyDetailsInDB(
+      currentUser.id,
+      activeCoupleId,
+      ceremonyUpdates
+    )
 
-    if (!result.ok) {
-      console.error("Failed to save wedding details:", result.error)
+    if (!ceremonyResult.ok) {
+      console.error("Failed to save wedding details:", ceremonyResult.error)
       alert("Failed to save wedding details. Please try again.")
       return
+    }
+
+    const coupleResult = await updateCoupleInDB(activeCoupleId, {
+      address: editWeddingDetails.venueAddress || null,
+      special_requests: editWeddingDetails.officiantNotes || null
+    })
+
+    if (!coupleResult.ok) {
+      console.error("Failed to save couple note/address fields:", coupleResult.error)
+      alert("Wedding details saved, but private notes could not be saved. Please try saving notes again.")
     }
 
     // Save the updated wedding details for the current couple
@@ -4374,8 +4866,10 @@ Note: This is an initial draft. Further development needed to incorporate specif
 
     // Update the wedding details in allCouples array
     const updatedCouples = [...allCouples]
-    updatedCouples[activeCoupleIndex] = {
-      ...updatedCouples[activeCoupleIndex],
+    const activeIndex = updatedCouples.findIndex((couple: any) => couple.id === activeCoupleId)
+    const indexToUpdate = activeIndex >= 0 ? activeIndex : activeCoupleIndex
+    updatedCouples[indexToUpdate] = {
+      ...updatedCouples[indexToUpdate],
       weddingDetails: { ...editWeddingDetails },
       address: editWeddingDetails.venueAddress || "",
       specialRequests: editWeddingDetails.officiantNotes || ""
@@ -5572,7 +6066,7 @@ SERVICES PROVIDED:
 ${invoiceForm.items.map(item =>
   `* ${item.service}
   Description: ${item.description}
-  Category: ${item.category || 'Wedding Services'}
+  Category: ${item.category || 'Ceremony Services'}
   Rate: ${item.quantity}x ${item.rate} = ${item.quantity * item.rate}`
 ).join('\n\n')}
 
@@ -5622,19 +6116,19 @@ ${officiantLabel}${officiantPhone ? `\n[SCRIPT]ž ${officiantPhone}` : ''}${offi
       return [
         `- ${item.service}`,
         item.description ? `  Description: ${item.description}` : '',
-        `  Category: ${item.category || 'Wedding Services'}`,
+        `  Category: ${item.category || 'Ceremony Services'}`,
         `  Quantity x Rate: ${item.quantity} x ${formatCurrency(item.rate)} = ${formatCurrency(lineTotal)}`,
       ].filter(Boolean).join('\n')
     }).join('\n\n')
 
     return `Dear ${getFirstName(editCoupleInfo?.brideName)} and ${getFirstName(editCoupleInfo?.groomName)},
 
-Congratulations on your upcoming wedding! Please find your ceremony services invoice below.
+Please find your ceremony services invoice below.
 
-Wedding Ceremony Invoice
+Ceremony Invoice
 
-Couple: ${invoiceForm.coupleName}
-Wedding date: ${weddingDate}
+Client / honoree names: ${invoiceForm.coupleName}
+Ceremony date: ${weddingDate}
 Venue: ${invoiceForm.venue || 'To be confirmed'}
 
 Invoice Details
@@ -5664,7 +6158,7 @@ ${invoiceForm.terms}
 Additional Notes
 ${invoiceForm.notes}
 
-We're honored to be part of your special day and look forward to creating a beautiful ceremony that reflects your love story!
+We're honored to be part of your special day and look forward to creating a meaningful ceremony.
 
 Warm regards,
 ${officiantLabel}${officiantPhone ? `\nPhone: ${officiantPhone}` : ''}${officiantEmail ? `\nEmail: ${officiantEmail}` : ''}${officiantProfile?.website ? `\nWebsite: ${officiantProfile.website}` : ''}`
@@ -5762,13 +6256,13 @@ ${officiantLabel}${officiantPhone ? `\nPhone: ${officiantPhone}` : ''}${offician
         },
         body: JSON.stringify({
           to: recipients,
-          subject: `Wedding Invoice ${invoiceForm.invoiceNumber}`,
+          subject: `Ceremony Invoice ${invoiceForm.invoiceNumber}`,
           message: invoiceContent,
           fromName: officiantName,
           coupleName: invoiceForm.coupleName,
           coupleId: editCoupleInfo?.id,
           officiantId: currentUser?.id,
-          emailTitle: "Wedding Invoice",
+          emailTitle: "Ceremony Invoice",
           actionUrl: paymentPortalUrl,
           actionLabel: "Make a payment",
           attachments: [
@@ -5955,6 +6449,71 @@ ${invoiceContent}`)
     setShowScriptEditorDialog(true)
   }
 
+  const cleanScriptText = (content: string) =>
+    content
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n\n")
+      .replace(/<p>/gi, "")
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .trim()
+
+  const handlePrintScript = () => {
+    const contentToPrint = scriptContent || generatedScriptContent
+    if (!contentToPrint.trim()) {
+      alert("Please generate or open a script before printing.")
+      return
+    }
+
+    const printWindow = window.open("", "_blank", "width=900,height=700")
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${editingScript?.title || "Ceremony Script"}</title>
+          <style>
+            body { font-family: Georgia, serif; font-size: 16px; line-height: 1.7; padding: 48px; color: #111827; }
+            h1 { font-family: Arial, sans-serif; font-size: 24px; margin-bottom: 8px; }
+            .meta { font-family: Arial, sans-serif; color: #4b5563; margin-bottom: 32px; }
+            @media print { body { padding: 24px; } }
+          </style>
+        </head>
+        <body>
+          <h1>${editingScript?.title || "Ceremony Script"}</h1>
+          <div class="meta">Prepared with Mr. Script</div>
+          <main>${contentToPrint}</main>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
+
+  const handleEmailCoupleScriptReview = () => {
+    const recipients = [editCoupleInfo?.brideEmail, editCoupleInfo?.groomEmail]
+      .filter(Boolean)
+      .join(",")
+
+    if (!recipients) {
+      alert("No couple email addresses are available for this ceremony.")
+      return
+    }
+
+    const subject = encodeURIComponent(`Script review: ${editingScript?.title || "Ceremony Script"}`)
+    const body = encodeURIComponent(`Hi ${getFirstName(editCoupleInfo?.brideName)} and ${getFirstName(editCoupleInfo?.groomName)},
+
+I prepared a ceremony script draft for your review.
+
+Please look it over and reply with any edits, favorite parts, details you would like added, or anything you would like softened or removed.
+
+Thank you,
+${officiantProfile?.name || "Your officiant"}`)
+
+    window.location.href = `mailto:${recipients}?subject=${subject}&body=${body}`
+  }
+
   // Handle script modification requests
   const handleScriptModification = (request: string) => {
     setIsTyping(true)
@@ -6004,11 +6563,19 @@ ${invoiceContent}`)
       setIsTyping(false)
     }, 1500)
   }
-
+  const activeGuidedQuestions = getActiveGuidedQuestions({
+    ...userResponses,
+    'ceremony-type': userResponses['ceremony-type'] || selectedCeremonyStyle
+  })
+  const selectedMrScriptService = getMrScriptServiceByResponse(userResponses['ceremony-type'] || selectedCeremonyStyle)
+  const storyPromptSuggestions = getMrScriptStoryPrompts(userResponses['ceremony-type'] || selectedCeremonyStyle)
 
   const portalContextValue = {
     getCoupleColors,
     GUIDED_QUESTIONS,
+    activeGuidedQuestions,
+    selectedMrScriptService,
+    storyPromptSuggestions,
     generateAIResponse,
     generateRecommendation,
     generateCompleteScript,
@@ -6101,6 +6668,8 @@ ${invoiceContent}`)
     setShowDashboardDialog,
     newCeremony,
     setNewCeremony,
+    ceremonyTypeOptions: CEREMONY_TYPE_OPTIONS,
+    getCeremonyTypeConfig,
     editCoupleInfo,
     setEditCoupleInfo,
     savedWeddingDetails,
@@ -6142,10 +6711,16 @@ ${invoiceContent}`)
     setSelectedUnityCeremony,
     selectedVowsType,
     setSelectedVowsType,
+    selectedOfficiantStyle,
+    setSelectedOfficiantStyle,
+    storyNotes,
+    setStoryNotes,
     hasGeneratedScript,
     setHasGeneratedScript,
     generatedScriptContent,
     setGeneratedScriptContent,
+    scriptVersionHistory,
+    setScriptVersionHistory,
     chatMessagesRef,
     loadMessages,
     formatMessageTime,
@@ -6207,6 +6782,8 @@ ${invoiceContent}`)
     increaseFontSize,
     decreaseFontSize,
     autoSave,
+    handlePrintScript,
+    handleEmailCoupleScriptReview,
     saveCursorPosition,
     restoreCursorPosition,
     handleEditScript,

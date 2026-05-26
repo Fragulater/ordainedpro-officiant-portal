@@ -38,24 +38,24 @@ export function PortalGenerateInvoiceDialog() {
           <DialogHeader>
             <DialogTitle className="text-green-900 flex items-center">
               <Receipt className="w-5 h-5 mr-2" />
-              Generate Wedding Invoice
+              Generate Ceremony Invoice
             </DialogTitle>
             <DialogDescription>
-              Create a professional invoice for wedding ceremony services
+              Create a professional invoice for ceremony services
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {/* Wedding & Invoice Header Information */}
+            {/* Ceremony & Invoice Header Information */}
             <div className="bg-gradient-to-r from-pink-50 to-blue-50 p-4 rounded-lg border border-pink-200">
               <h4 className="font-semibold text-pink-900 mb-3 flex items-center">
                 <Heart className="w-4 h-4 mr-2" />
-                Wedding Details
+                Ceremony Details
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="coupleName" className="text-sm font-medium text-gray-700">
-                    Couple Names
+                    Client / Honoree Names
                   </Label>
                   <Input
                     id="coupleName"
@@ -67,7 +67,7 @@ export function PortalGenerateInvoiceDialog() {
                 </div>
                 <div>
                   <Label htmlFor="weddingDate" className="text-sm font-medium text-gray-700">
-                    Wedding Date
+                    Ceremony Date
                   </Label>
                   <Input
                     id="weddingDate"
@@ -79,7 +79,7 @@ export function PortalGenerateInvoiceDialog() {
                 </div>
                 <div className="md:col-span-2">
                   <Label htmlFor="venue" className="text-sm font-medium text-gray-700">
-                    Wedding Venue
+                    Ceremony Venue
                   </Label>
                   <Input
                     id="venue"
@@ -145,9 +145,9 @@ export function PortalGenerateInvoiceDialog() {
                   <SelectValue placeholder="Select recipients" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="both">Both Bride & Groom ({editCoupleInfo.brideEmail}, {editCoupleInfo.groomEmail})</SelectItem>
-                  <SelectItem value="bride">Bride Only ({editCoupleInfo.brideEmail})</SelectItem>
-                  <SelectItem value="groom">Groom Only ({editCoupleInfo.groomEmail})</SelectItem>
+                  <SelectItem value="both">Both Contacts ({editCoupleInfo.brideEmail}, {editCoupleInfo.groomEmail})</SelectItem>
+                  <SelectItem value="bride">Primary Contact ({editCoupleInfo.brideEmail})</SelectItem>
+                  <SelectItem value="groom">Secondary Contact ({editCoupleInfo.groomEmail})</SelectItem>
                   <SelectItem value="custom">Custom Email Address</SelectItem>
                 </SelectContent>
               </Select>
@@ -163,7 +163,7 @@ export function PortalGenerateInvoiceDialog() {
             {/* Line Items */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-3 block">
-                Wedding Services & Items
+                Ceremony Services & Items
               </Label>
               <div className="space-y-4">
                 {invoiceForm.items.map((item, index) => (
@@ -179,7 +179,7 @@ export function PortalGenerateInvoiceDialog() {
                             )
                             setInvoiceForm({...invoiceForm, items: newItems})
                           }}
-                          placeholder="e.g., Wedding Ceremony Officiant"
+                          placeholder="e.g., Ceremony Officiant"
                           className="border-green-200"
                         />
                       </div>
@@ -431,7 +431,7 @@ export function PortalGenerateInvoiceDialog() {
                   id="terms"
                   value={invoiceForm.terms}
                   onChange={(e) => setInvoiceForm({...invoiceForm, terms: e.target.value})}
-                  placeholder="Wedding ceremony payment terms"
+                  placeholder="Ceremony payment terms"
                   rows={4}
                   className="mt-1 border-green-200 focus:border-green-500"
                 />
@@ -455,7 +455,7 @@ export function PortalGenerateInvoiceDialog() {
                   id="notes"
                   value={invoiceForm.notes}
                   onChange={(e) => setInvoiceForm({...invoiceForm, notes: e.target.value})}
-                  placeholder="Personal message to the couple or special instructions"
+                  placeholder="Personal message or special instructions"
                   rows={4}
                   className="mt-1 border-green-200 focus:border-green-500"
                 />

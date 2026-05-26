@@ -145,8 +145,8 @@ export function MeetingsTab() {
 
                 <Card className="border-blue-100 shadow-md">
                   <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50">
-                    <CardTitle className="text-purple-900">Wedding Events</CardTitle>
-                    <CardDescription>Rehearsal and ceremony schedule</CardDescription>
+                    <CardTitle className="text-purple-900">Events Schedule</CardTitle>
+                    <CardDescription>Rehearsal, ceremony, and service schedule</CardDescription>
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-4">
@@ -200,7 +200,7 @@ export function MeetingsTab() {
                       onClick={() => setShowAddEventDialog(true)}
                     >
                       <Plus className="w-4 h-4 mr-2" />
-                      Add Wedding Event
+                      Add Event
                     </Button>
                   </CardContent>
                 </Card>

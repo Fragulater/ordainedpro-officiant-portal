@@ -35,6 +35,8 @@ export function PortalHeader() {
     setShowDashboardDialog,
     newCeremony,
     setNewCeremony,
+    ceremonyTypeOptions,
+    getCeremonyTypeConfig,
     handleAddCeremony,
     handleSwitchCouple,
     toggleCeremonyStatus,
@@ -57,6 +59,8 @@ export function PortalHeader() {
       .find((name) => name && !name.includes("@")) || "Officiant"
   const officiantFirstName = officiantName === "Officiant" ? "Officiant" : officiantName.split(/\s+/)[0]
   const officiantLabel = officiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
+  const ceremonyConfig = getCeremonyTypeConfig?.(newCeremony?.ceremonyType)
+  const ceremonyOptions = ceremonyTypeOptions || []
 
   useEffect(() => {
     const closeProfileMenu = (event: MouseEvent) => {
@@ -94,9 +98,9 @@ export function PortalHeader() {
               <Dialog open={showAddCeremonyDialog} onOpenChange={setShowAddCeremonyDialog}>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Create New Wedding Ceremony</DialogTitle>
+                    <DialogTitle>{ceremonyConfig?.createTitle || "Create a New Ceremony"}</DialogTitle>
                     <DialogDescription>
-                      Fill in the details for the new wedding ceremony you'll be officiating.
+                      {ceremonyConfig?.createDescription || "Fill in the details for the ceremony you'll be officiating."}
                     </DialogDescription>
                   </DialogHeader>
 
@@ -106,12 +110,28 @@ export function PortalHeader() {
                       <h3 className="text-lg font-semibold text-blue-900">Ceremony Details</h3>
 
                       <div>
+                        <Label htmlFor="ceremonyType">Service Type</Label>
+                        <select
+                          id="ceremonyType"
+                          value={newCeremony.ceremonyType || "wedding"}
+                          onChange={(e) => setNewCeremony({...newCeremony, ceremonyType: e.target.value})}
+                          className="flex h-10 w-full rounded-md border border-blue-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          {ceremonyOptions.map((option: any) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
                         <Label htmlFor="ceremonyName">Ceremony Name</Label>
                         <Input
                           id="ceremonyName"
                           value={newCeremony.ceremonyName}
                           onChange={(e) => setNewCeremony({...newCeremony, ceremonyName: e.target.value})}
-                          placeholder="e.g., Sarah & David's Wedding"
+                          placeholder={ceremonyConfig?.ceremonyNamePlaceholder || "e.g., Sarah & David's Ceremony"}
                         />
                       </div>
 
@@ -169,64 +189,88 @@ export function PortalHeader() {
                       </div>
                     </div>
 
-                    {/* Couple Information */}
+                    {/* Participant Information */}
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold text-blue-900">Couple Information</h3>
+                      <h3 className="text-lg font-semibold text-blue-900">
+                        {ceremonyConfig?.participantHeader || "Participant Information"}
+                      </h3>
 
-                      {/* Bride Information */}
+                      {/* Primary participant information */}
                       <div className="bg-pink-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-pink-900 mb-3">Bride Information</h4>
+                        <h4 className="font-medium text-pink-900 mb-3">
+                          {ceremonyConfig?.primarySectionTitle || "Primary Contact Information"}
+                        </h4>
                         <div className="space-y-3">
                           <Input
                             value={newCeremony.brideName}
                             onChange={(e) => setNewCeremony({...newCeremony, brideName: e.target.value})}
-                            placeholder="Bride's full name"
+                            placeholder={ceremonyConfig?.primaryNamePlaceholder || "Primary contact full name"}
                           />
+                          {ceremonyConfig?.primaryAgeLabel && (
+                            <Input
+                              type="number"
+                              min="0"
+                              value={newCeremony.primaryAge || ""}
+                              onChange={(e) => setNewCeremony({...newCeremony, primaryAge: e.target.value})}
+                              placeholder={ceremonyConfig.primaryAgeLabel}
+                            />
+                          )}
                           <Input
                             type="email"
                             value={newCeremony.brideEmail}
                             onChange={(e) => setNewCeremony({...newCeremony, brideEmail: e.target.value})}
-                            placeholder="Bride's email"
+                            placeholder={ceremonyConfig?.primaryEmailPlaceholder || "Primary contact email"}
                           />
                           <Input
                             type="tel"
                             value={newCeremony.bridePhone}
                             onChange={(e) => setNewCeremony({...newCeremony, bridePhone: e.target.value})}
-                            placeholder="Bride's phone"
+                            placeholder={ceremonyConfig?.primaryPhonePlaceholder || "Primary contact phone"}
                           />
                           <Input
                             value={newCeremony.brideAddress}
                             onChange={(e) => setNewCeremony({...newCeremony, brideAddress: e.target.value})}
-                            placeholder="Bride's primary address"
+                            placeholder={ceremonyConfig?.primaryAddressPlaceholder || "Primary contact address"}
                           />
                         </div>
                       </div>
 
-                      {/* Groom Information */}
+                      {/* Secondary participant information */}
                       <div className="bg-blue-50 p-4 rounded-lg">
-                        <h4 className="font-medium text-blue-900 mb-3">Groom Information</h4>
+                        <h4 className="font-medium text-blue-900 mb-3">
+                          {ceremonyConfig?.secondarySectionTitle || "Participant Information"}
+                        </h4>
                         <div className="space-y-3">
                           <Input
                             value={newCeremony.groomName}
                             onChange={(e) => setNewCeremony({...newCeremony, groomName: e.target.value})}
-                            placeholder="Groom's full name"
+                            placeholder={ceremonyConfig?.secondaryNamePlaceholder || "Participant full name"}
                           />
+                          {ceremonyConfig?.secondaryAgeLabel && (
+                            <Input
+                              type="number"
+                              min="0"
+                              value={newCeremony.secondaryAge || ""}
+                              onChange={(e) => setNewCeremony({...newCeremony, secondaryAge: e.target.value})}
+                              placeholder={ceremonyConfig.secondaryAgeLabel}
+                            />
+                          )}
                           <Input
                             type="email"
                             value={newCeremony.groomEmail}
                             onChange={(e) => setNewCeremony({...newCeremony, groomEmail: e.target.value})}
-                            placeholder="Groom's email"
+                            placeholder={ceremonyConfig?.secondaryEmailPlaceholder || "Participant email"}
                           />
                           <Input
                             type="tel"
                             value={newCeremony.groomPhone}
                             onChange={(e) => setNewCeremony({...newCeremony, groomPhone: e.target.value})}
-                            placeholder="Groom's phone"
+                            placeholder={ceremonyConfig?.secondaryPhonePlaceholder || "Participant phone"}
                           />
                           <Input
                             value={newCeremony.groomAddress}
                             onChange={(e) => setNewCeremony({...newCeremony, groomAddress: e.target.value})}
-                            placeholder="Groom's primary address"
+                            placeholder={ceremonyConfig?.secondaryAddressPlaceholder || "Participant address"}
                           />
                         </div>
                       </div>
@@ -307,6 +351,7 @@ export function PortalHeader() {
                         .filter(couple => couple.isActive)
                         .map((couple, index) => {
                           const actualIndex = allCouples.findIndex(c => c.id === couple.id)
+                          const switchConfig = getCeremonyTypeConfig?.(couple?.ceremonyType)
                           return (
                       <Card
                         key={couple.id}
@@ -343,8 +388,10 @@ export function PortalHeader() {
                                       </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                      <p className="font-medium text-gray-900">{couple?.brideName || 'Bride'}</p>
-                                      <p className={`text-xs ${couple.colors?.brideText || 'text-pink-600'}`}>Bride</p>
+                                      <p className="font-medium text-gray-900">{couple?.brideName || switchConfig?.primaryRole || 'Primary Contact'}</p>
+                                      <p className={`text-xs ${couple.colors?.brideText || 'text-pink-600'}`}>
+                                        {switchConfig?.primaryRole || "Primary Contact"}
+                                      </p>
                                     </div>
                                   </div>
                                   <div className="ml-12 text-sm space-y-1">
@@ -368,8 +415,10 @@ export function PortalHeader() {
                                       </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                      <p className="font-medium text-gray-900">{couple?.groomName || 'Groom'}</p>
-                                      <p className={`text-xs ${couple.colors?.groomText || 'text-blue-600'}`}>Groom</p>
+                                      <p className="font-medium text-gray-900">{couple?.groomName || switchConfig?.secondaryRole || 'Participant'}</p>
+                                      <p className={`text-xs ${couple.colors?.groomText || 'text-blue-600'}`}>
+                                        {switchConfig?.secondaryRole || "Participant"}
+                                      </p>
                                     </div>
                                   </div>
                                   <div className="ml-12 text-sm space-y-1">
@@ -507,8 +556,10 @@ export function PortalHeader() {
                                       </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                      <p className="font-medium text-gray-900">{couple?.brideName || 'Bride'}</p>
-                                      <p className={`text-xs ${couple.colors?.brideText || 'text-pink-600'}`}>Bride</p>
+                                      <p className="font-medium text-gray-900">{couple?.brideName || getCeremonyTypeConfig?.(couple?.ceremonyType)?.primaryRole || 'Primary Contact'}</p>
+                                      <p className={`text-xs ${couple.colors?.brideText || 'text-pink-600'}`}>
+                                        {getCeremonyTypeConfig?.(couple?.ceremonyType)?.primaryRole || "Primary Contact"}
+                                      </p>
                                     </div>
                                   </div>
                                   <div className="ml-12 text-sm space-y-1">
@@ -532,8 +583,10 @@ export function PortalHeader() {
                                       </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                      <p className="font-medium text-gray-900">{couple?.groomName || 'Groom'}</p>
-                                      <p className={`text-xs ${couple.colors?.groomText || 'text-blue-600'}`}>Groom</p>
+                                      <p className="font-medium text-gray-900">{couple?.groomName || getCeremonyTypeConfig?.(couple?.ceremonyType)?.secondaryRole || 'Participant'}</p>
+                                      <p className={`text-xs ${couple.colors?.groomText || 'text-blue-600'}`}>
+                                        {getCeremonyTypeConfig?.(couple?.ceremonyType)?.secondaryRole || "Participant"}
+                                      </p>
                                     </div>
                                   </div>
                                   <div className="ml-12 text-sm space-y-1">

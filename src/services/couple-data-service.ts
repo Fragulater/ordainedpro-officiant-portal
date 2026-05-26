@@ -34,6 +34,7 @@ export interface Couple {
   groom_phone?: string | null
   bride_address?: string | null
   groom_address?: string | null
+  address?: string | null
   emergency_contact?: string | null
   special_requests?: string | null
   venue_name?: string | null
@@ -41,10 +42,11 @@ export interface Couple {
   wedding_date?: string | null
   start_time?: string | null
   end_time?: string | null
-  expected_guests?: number | null
+  expected_guests?: string | number | null
   notes?: string | null
   is_active?: boolean
   created_at?: string
+  ceremonies?: CeremonyDetails[] | CeremonyDetails | null
 }
 
 export interface Task {
@@ -63,6 +65,20 @@ export interface Task {
   reminder_sent?: boolean
   reminder_sent_at?: string
   created_at?: string
+}
+
+export interface CeremonyDetails {
+  id?: number
+  couple_id: number
+  user_id: string
+  venue_name?: string | null
+  venue_address?: string | null
+  wedding_date?: string | null
+  start_time?: string | null
+  end_time?: string | null
+  expected_guests?: string | number | null
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Meeting {
@@ -206,7 +222,7 @@ export async function loadCouples(userId: string): Promise<{ ok: boolean; data?:
   try {
     const { data, error } = await supabase
       .from("couples")
-      .select("*")
+      .select("*, ceremonies(*)")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
 
@@ -215,10 +231,66 @@ export async function loadCouples(userId: string): Promise<{ ok: boolean; data?:
       return { ok: false, error: error.message }
     }
 
-    console.log("[OK] Loaded", data?.length || 0, "couples")
-    return { ok: true, data: data || [] }
+    const normalizedCouples = (data || []).map((couple: any) => {
+      const ceremony = Array.isArray(couple.ceremonies)
+        ? couple.ceremonies[0]
+        : couple.ceremonies
+
+      return {
+        ...couple,
+        venue_name: couple.venue_name ?? ceremony?.venue_name ?? null,
+        venue_address: couple.venue_address ?? ceremony?.venue_address ?? couple.address ?? null,
+        wedding_date: couple.wedding_date ?? ceremony?.wedding_date ?? null,
+        start_time: couple.start_time ?? ceremony?.start_time ?? null,
+        end_time: couple.end_time ?? ceremony?.end_time ?? null,
+        expected_guests: couple.expected_guests ?? ceremony?.expected_guests ?? null,
+      }
+    })
+
+    console.log("[OK] Loaded", normalizedCouples.length, "couples")
+    return { ok: true, data: normalizedCouples }
   } catch (err: any) {
     console.error("[ERROR] Exception loading couples:", err)
+    return { ok: false, error: err.message }
+  }
+}
+
+export async function upsertCeremonyDetails(
+  userId: string,
+  coupleId: number,
+  updates: Partial<CeremonyDetails>
+): Promise<{ ok: boolean; data?: CeremonyDetails; error?: string }> {
+  try {
+    const payload = {
+      couple_id: coupleId,
+      user_id: userId,
+      venue_name: updates.venue_name || null,
+      venue_address: updates.venue_address || null,
+      wedding_date: updates.wedding_date || null,
+      start_time: updates.start_time || null,
+      end_time: updates.end_time || null,
+      expected_guests:
+        updates.expected_guests !== undefined && updates.expected_guests !== null
+          ? String(updates.expected_guests)
+          : null,
+      updated_at: new Date().toISOString(),
+    }
+
+    const { data, error } = await supabase
+      .from("ceremonies")
+      .upsert(payload, { onConflict: "couple_id" })
+      .select()
+      .single()
+
+    if (error) {
+      console.error("[ERROR] Error upserting ceremony details:", error)
+      return { ok: false, error: error.message }
+    }
+
+    console.log("[OK] Ceremony details upserted for couple:", coupleId)
+    return { ok: true, data }
+  } catch (err: any) {
+    console.error("[ERROR] Exception upserting ceremony details:", err)
     return { ok: false, error: err.message }
   }
 }

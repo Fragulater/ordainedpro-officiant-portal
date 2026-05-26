@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Plus, Clock, Heart, Star, DollarSign, ShoppingCart, Edit, Share, Eye, TrendingUp, Upload, Download, Trash2, Archive } from "lucide-react"
+import { FileText, Plus, Star, DollarSign, ShoppingCart, Edit, Eye, TrendingUp, Upload, Download, Trash2 } from "lucide-react"
 import { useRef, useState } from "react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
@@ -40,9 +40,6 @@ export function ScriptMarketplaceTab() {
     handleViewScript,
     handleDownloadScript,
     handleDeleteScript,
-    handleArchiveCoupleFromScript,
-    handleCreateNewScript,
-    handleShareScript,
     handleUploadMarketplaceScript,
     handlePublishScriptToMarketplace,
     handleUnpublishScriptFromMarketplace,
@@ -59,7 +56,6 @@ export function ScriptMarketplaceTab() {
     mainMarketplaceScriptCount,
     accountCreatedAt,
     scriptSales,
-    coupleScripts,
     myScripts,
     popularScripts,
   } = useCommunicationPortal()
@@ -401,136 +397,6 @@ export function ScriptMarketplaceTab() {
                             </div>
                           </div>
                         ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* My Couple's Scripts */}
-                  <Card className="border-pink-100 shadow-md bg-gradient-to-r from-pink-50 to-rose-50">
-                    <CardHeader className="bg-gradient-to-r from-pink-50 to-rose-50">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-pink-900 flex items-center">
-                            <Heart className="w-5 h-5 mr-2" />
-                            My Couple's Scripts
-                          </CardTitle>
-                          <CardDescription className="text-pink-700">Script drafts for Sarah Johnson & David Chen's wedding</CardDescription>
-                        </div>
-                        <Badge className="bg-pink-100 text-pink-800 border-pink-200">
-                          3 drafts
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <div className="space-y-4">
-                        {/* Sarah & David Script Drafts */}
-                        {coupleScripts.filter((script: any) => script.coupleId).map((script: any) => (
-                          <div key={script.id} className="border border-pink-200 rounded-xl p-4 bg-white hover:bg-pink-50 transition-colors">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className="w-12 h-12 bg-gradient-to-br from-pink-100 to-rose-200 rounded-xl flex items-center justify-center">
-                                  <FileText className="w-6 h-6 text-pink-600" />
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-gray-900">{script.title}</p>
-                                  <div className="flex items-center space-x-4 mt-1">
-                                    <Badge variant="outline" className="text-xs border-pink-200 text-pink-700">
-                                      {script.type}
-                                    </Badge>
-                                    <Badge variant="outline" className={`text-xs ${
-                                      script.status === 'Latest Draft' ? 'border-green-200 text-green-700' :
-                                      script.status === 'In Review' ? 'border-yellow-200 text-yellow-700' :
-                                      'border-gray-200 text-gray-700'
-                                    }`}>
-                                      {script.status}
-                                    </Badge>
-                                    <div className="flex items-center space-x-1 text-sm text-gray-500">
-                                      <Clock className="w-3 h-3" />
-                                      <span>Modified: {script.lastModified}</span>
-                                    </div>
-                                  </div>
-                                  <p className="text-sm text-gray-600 mt-1">{script.description}</p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm font-medium text-pink-700">Sarah & David</p>
-                                <div className="flex space-x-2 mt-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-pink-200 text-pink-700 hover:bg-pink-50"
-                                    onClick={() => handleEditScript(script)}
-                                    title="Edit script"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-pink-200 text-pink-700 hover:bg-pink-50"
-                                    onClick={() => handleViewScript(script)}
-                                    title="View script"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-pink-200 text-pink-700 hover:bg-pink-50"
-                                    onClick={() => handleDownloadScript(script)}
-                                    title="Download script"
-                                  >
-                                    <Download className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-red-200 text-red-700 hover:bg-red-50"
-                                    onClick={() => handleDeleteScript(script)}
-                                    title="Delete script"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="bg-pink-500 hover:bg-pink-600"
-                                    onClick={() => handleShareScript(script)}
-                                    title="Share script with couple"
-                                  >
-                                    <Share className="w-4 h-4" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-orange-200 text-orange-700 hover:bg-orange-50"
-                                    onClick={handleArchiveCoupleFromScript}
-                                    title="Archive script and couple profile"
-                                  >
-                                    <Archive className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* Add New Script Button */}
-                        <div className="border-2 border-dashed border-pink-200 rounded-xl p-6 text-center hover:border-pink-300 transition-colors">
-                          <div className="flex flex-col items-center">
-                            <div className="w-12 h-12 bg-pink-100 rounded-xl flex items-center justify-center mb-3">
-                              <Plus className="w-6 h-6 text-pink-600" />
-                            </div>
-                            <p className="font-medium text-gray-900 mb-1">Create New Script Draft</p>
-                            <p className="text-sm text-gray-500 mb-3">Start a new ceremony script for Sarah & David</p>
-                            <Button
-                              className="bg-pink-500 hover:bg-pink-600"
-                              onClick={handleCreateNewScript}
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              New Script
-                            </Button>
-                          </div>
-                        </div>
                       </div>
                     </CardContent>
                   </Card>
