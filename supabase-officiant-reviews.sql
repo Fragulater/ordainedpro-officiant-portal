@@ -43,3 +43,4 @@ create policy "Officiants can view their own reviews"
 
 grant select on public.officiant_reviews to anon;
 grant select on public.officiant_reviews to authenticated;
+grant select, insert, update, delete on table public.officiant_reviews to service_role;

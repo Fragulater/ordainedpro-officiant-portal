@@ -54,3 +54,5 @@ create policy "Officiants can delete their vendors"
 
 grant select, insert, update, delete on public.officiant_vendors to authenticated;
 grant usage, select on sequence public.officiant_vendors_id_seq to authenticated;
+grant select, insert, update, delete on table public.officiant_vendors to service_role;
+grant usage, select on sequence public.officiant_vendors_id_seq to service_role;

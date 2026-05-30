@@ -30,6 +30,13 @@ CREATE TABLE IF NOT EXISTS public.legal_acceptances (
 ALTER TABLE public.legal_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.legal_acceptances ENABLE ROW LEVEL SECURITY;
 
+GRANT SELECT ON TABLE public.legal_documents TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.legal_documents TO service_role;
+GRANT SELECT, INSERT ON TABLE public.legal_acceptances TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.legal_acceptances TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.legal_documents_id_seq TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.legal_acceptances_id_seq TO authenticated, service_role;
+
 DROP POLICY IF EXISTS "Anyone can view published legal documents" ON public.legal_documents;
 CREATE POLICY "Anyone can view published legal documents"
   ON public.legal_documents FOR SELECT

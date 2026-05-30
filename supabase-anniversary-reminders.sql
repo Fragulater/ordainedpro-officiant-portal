@@ -62,6 +62,8 @@ CREATE POLICY "Users can delete their own anniversary reminders"
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON anniversary_reminders TO authenticated;
 GRANT USAGE, SELECT ON SEQUENCE anniversary_reminders_id_seq TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.anniversary_reminders TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.anniversary_reminders_id_seq TO service_role;
 
 CREATE TABLE IF NOT EXISTS anniversary_settings (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -100,3 +102,4 @@ CREATE POLICY "Users can update their own anniversary settings"
   WITH CHECK (auth.uid() = user_id);
 
 GRANT SELECT, INSERT, UPDATE ON anniversary_settings TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.anniversary_settings TO service_role;

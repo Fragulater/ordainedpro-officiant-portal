@@ -114,6 +114,9 @@ CREATE TABLE payments (
   due_date DATE,
   paid_date DATE,
   payment_method TEXT,
+  refund_fee_rate DECIMAL(5,4),
+  refund_fee_amount DECIMAL(10,2),
+  total_officiant_charge DECIMAL(10,2),
   notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -198,6 +201,29 @@ ALTER TABLE scripts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
+
+-- Explicit Data API grants.
+-- Supabase no longer exposes new public tables automatically in new projects,
+-- and this becomes enforced for new tables in existing projects on 2026-10-30.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.profiles TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.couples TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.ceremonies TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.subscriptions TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.messages TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.payments TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.scripts TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.documents TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.tasks TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.meetings TO authenticated, service_role;
+
+GRANT USAGE, SELECT ON SEQUENCE public.couples_id_seq TO authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.ceremonies_id_seq TO authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.messages_id_seq TO authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.payments_id_seq TO authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.scripts_id_seq TO authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.documents_id_seq TO authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.tasks_id_seq TO authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.meetings_id_seq TO authenticated, service_role;
 
 -- Profiles policies
 CREATE POLICY "Users can view their own profile"

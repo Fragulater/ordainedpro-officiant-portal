@@ -34,6 +34,11 @@ CREATE TABLE IF NOT EXISTS public.script_sales (
 
 ALTER TABLE public.script_sales ENABLE ROW LEVEL SECURITY;
 
+GRANT SELECT ON TABLE public.scripts TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.scripts TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.script_sales TO authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.script_sales_id_seq TO authenticated, service_role;
+
 DROP POLICY IF EXISTS "Users can view own script sales" ON public.script_sales;
 CREATE POLICY "Users can view own script sales"
   ON public.script_sales FOR SELECT

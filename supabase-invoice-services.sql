@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS public.invoice_service_items (
 
 ALTER TABLE public.invoice_service_items ENABLE ROW LEVEL SECURITY;
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.invoice_service_items TO authenticated, service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.invoice_service_items_id_seq TO authenticated, service_role;
+
 DROP POLICY IF EXISTS "Users can view own invoice services" ON public.invoice_service_items;
 CREATE POLICY "Users can view own invoice services"
   ON public.invoice_service_items FOR SELECT
