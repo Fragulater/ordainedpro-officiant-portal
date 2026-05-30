@@ -1,0 +1,12 @@
+.env
+.env.*
+.git
+.next
+.node-localstorage*
+.same
+.backups
+backup
+CLONED
+node_modules
+deploy-*.zip
+tsconfig.tsbuildinfo

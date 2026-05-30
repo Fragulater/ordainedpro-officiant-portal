@@ -21,6 +21,11 @@
 # production
 /build
 /backup
+/.backups
+/CLONED
+
+# local uploads / generated deploy artifacts
+deploy-*.zip
 
 # misc
 .DS_Store
