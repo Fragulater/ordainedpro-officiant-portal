@@ -18,6 +18,7 @@ export interface SubscriptionFeatures {
   wedding_details: boolean
   add_ceremony: boolean
   my_profile: boolean
+  public_profile: boolean
   messages: boolean
   files: boolean
   tasks: boolean
@@ -64,6 +65,7 @@ const defaultSubscription: Subscription = {
     wedding_details: true,
     add_ceremony: true,
     my_profile: true,
+    public_profile: true,
     messages: false,
     files: false,
     tasks: false,

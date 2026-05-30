@@ -13,8 +13,6 @@ type ReminderTask = {
     | {
         bride_name?: string | null
         groom_name?: string | null
-        bride_email?: string | null
-        groom_email?: string | null
       }
     | null
   officiant_profiles:
@@ -72,9 +70,7 @@ export async function checkAndSendTaskReminders() {
       couple_id,
       couples (
         bride_name,
-        groom_name,
-        bride_email,
-        groom_email
+        groom_name
       ),
       officiant_profiles!tasks_user_id_fkey (
         full_name,
@@ -110,14 +106,10 @@ export async function checkAndSendTaskReminders() {
     try {
       const couple = task.couples
       const officiant = task.officiant_profiles
-      const recipients = [
-        couple?.bride_email,
-        couple?.groom_email,
-        officiant?.email,
-      ].filter(Boolean) as string[]
+      const recipients = [officiant?.email].filter(Boolean) as string[]
 
       if (recipients.length === 0) {
-        results.push({ taskId: task.id, status: "skipped", reason: "no recipients" })
+        results.push({ taskId: task.id, status: "skipped", reason: "no officiant email" })
         continue
       }
 
@@ -145,7 +137,7 @@ export async function checkAndSendTaskReminders() {
               </div>
               <div style="padding: 30px; background: #f8fafc;">
                 <p style="font-size: 16px; color: #374151;">
-                  Hello! This is a reminder about an upcoming task for the wedding of
+                  Hello! This is your private reminder about an upcoming task for
                   <strong>${couple?.bride_name || "Partner 1"} & ${couple?.groom_name || "Partner 2"}</strong>.
                 </p>
                 <div style="background: white; border-radius: 12px; padding: 20px; margin: 20px 0; border-left: 4px solid #3b82f6;">
@@ -156,7 +148,7 @@ export async function checkAndSendTaskReminders() {
                   ${task.details ? `<p style="margin: 8px 0; color: #6b7280;"><strong>Details:</strong> ${task.details}</p>` : ""}
                 </div>
                 <p style="font-size: 14px; color: #6b7280; text-align: center;">
-                  This reminder was sent by ${officiant?.full_name || "your wedding officiant"}.
+                  This task reminder is only sent to the officiant and is not sent to the couple or client.
                 </p>
               </div>
             </div>

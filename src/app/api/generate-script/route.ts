@@ -4,6 +4,10 @@ import {
   getMrScriptServiceByResponse,
   type MrScriptService,
 } from "@/data/mr-script-services";
+import {
+  formatReadingsForPrompt,
+  getReadingRecommendations,
+} from "@/data/ceremony-readings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,6 +35,7 @@ type ScriptGenerationBody = {
   storyNotes?: string;
   coreDetails?: string;
   specialInclusions?: string;
+  lovedOneHonorStyle?: string;
   avoidances?: string;
   unityCeremony?: string;
   vowsType?: string;
@@ -38,10 +43,12 @@ type ScriptGenerationBody = {
   readingText?: string;
   religiousElements?: string;
   culturalTraditions?: string;
+  ceremonyProfileContext?: Record<string, any>;
   refinementInstructions?: string;
   regenerateSegmentIndex?: number;
   existingSegments?: string[];
   segmentInstructions?: string;
+  usePremiumModel?: boolean;
 };
 
 const WORDS_PER_MINUTE = 130;
@@ -114,12 +121,15 @@ const getSubjectName = (body: ScriptGenerationBody, service: MrScriptService) =>
 };
 
 const getSensitivityInstructions = (service: MrScriptService) => {
+  const serviceToneRules = service.toneRules || [];
+
   if (service.sensitivity === "grief") {
     return [
       "Use a gentle, compassionate, grounded tone.",
       "Offer comfort without sounding salesy, cheerful, or performative.",
       "Do not assume religious beliefs. Include spiritual or religious language only if the details request it.",
       "Use careful language around loss, family grief, remembrance, and legacy.",
+      ...serviceToneRules,
     ];
   }
 
@@ -128,6 +138,7 @@ const getSensitivityInstructions = (service: MrScriptService) => {
       "Use warm, joyful, polished language that still sounds natural when spoken aloud.",
       "Keep the ceremony personal and human, not generic or overly ornate.",
       "Include stage directions only where they help the officiant perform the ceremony.",
+      ...serviceToneRules,
     ];
   }
 
@@ -135,15 +146,35 @@ const getSensitivityInstructions = (service: MrScriptService) => {
     "Use a respectful, flexible tone that matches the life moment described by the user.",
     "Do not assume religion, culture, relationship structure, or legal meaning unless provided.",
     "Keep the script useful for an officiant to read aloud.",
+    ...serviceToneRules,
   ];
 };
 
 const getServiceBoundaries = (service: MrScriptService) => {
+  const sharedBoundaries = [
+    service.legalStatus === "possibly" || service.legalStatus === "yes"
+      ? "Mention legal requirements only generally and remind the officiant to confirm local requirements; do not provide legal advice."
+      : "",
+    service.religiousOrCultural === "required"
+      ? "Religious or cultural wording must be treated as user-provided or family-approved; do not invent sacred authority, exact ritual rules, or closed-tradition language."
+      : "Religious or cultural language is optional. Include it only when the submitted details request it.",
+    service.virtualAvailable === "depends"
+      ? "If this could be virtual, remind the officiant that legal or ceremonial validity may depend on location and ceremony type."
+      : "",
+    service.canBeWritingOnly && !service.writingOnly
+      ? "This service can also be written as a standalone script, insert, speech, or outline if the user asks for writing-only help."
+      : "",
+    service.officiantRequirements?.length
+      ? `Officiant requirements to respect: ${service.officiantRequirements.join(" ")}`
+      : "",
+  ].filter(Boolean);
+
   if (service.id === "wedding") {
     return [
       "Wedding-specific language such as vows, rings, declaration of intent, and pronouncement is allowed when appropriate.",
       "Use partner language unless the submitted names or details clearly require different wording.",
       "Mention legal requirements only generally; do not give legal advice.",
+      ...sharedBoundaries,
     ];
   }
 
@@ -152,6 +183,7 @@ const getServiceBoundaries = (service: MrScriptService) => {
       "This is a recommitment ceremony, not a new legal marriage ceremony.",
       "Do not include legal pronouncement language.",
       "Renewed vows, optional ring rededication, family recognition, and anniversary reflection are appropriate.",
+      ...sharedBoundaries,
     ];
   }
 
@@ -159,17 +191,20 @@ const getServiceBoundaries = (service: MrScriptService) => {
     return [
       "This may be a speech, eulogy, toast, vows, reading, or outline rather than a full ceremony.",
       "Write the requested piece directly and avoid adding unrelated ceremony structure.",
+      ...sharedBoundaries,
     ];
   }
 
   return [
     "Do not include wedding-only language such as marriage pronouncement, ring exchange, vows, bride/groom assumptions, or legal marriage language unless the user explicitly asks for it.",
     "Use the service category and details to choose appropriate ceremony wording.",
+    ...sharedBoundaries,
   ];
 };
 
 const buildContextBlock = (body: ScriptGenerationBody, service: MrScriptService) => {
   const responses = body.userResponses || {};
+  const profileContext = body.ceremonyProfileContext || {};
   const subjectName = getSubjectName(body, service);
   const date = normalize(body.ceremonyDate) || normalize(body.weddingDate) || "date to be confirmed";
   const venue = normalize(body.venue) || "location to be confirmed";
@@ -179,10 +214,48 @@ const buildContextBlock = (body: ScriptGenerationBody, service: MrScriptService)
       .map(([key, value]) => `${key.replace(/^intake-/, "").replace(/-/g, " ")}: ${value}`)
       .join("\n") || "No additional intake details provided yet.";
 
+  const profileFacts = Array.isArray(profileContext.knownFacts)
+    ? profileContext.knownFacts.filter(Boolean).map((fact) => `- ${fact}`).join("\n")
+    : "";
+  const readingRecommendations = getReadingRecommendations({
+    ceremonyType: service.id,
+    tone: body.ceremonyTone || responses["ceremony-tone"],
+    specialInclusions: [
+      body.specialInclusions,
+      responses["special-inclusions"],
+      body.lovedOneHonorStyle,
+      responses["loved-one-honor-style"],
+      body.unityCeremony,
+      responses["special-elements"],
+    ].filter(Boolean).join(" "),
+    faithPreference: [
+      body.religiousElements,
+      body.culturalTraditions,
+      responses["core-details"],
+    ].filter(Boolean).join(" "),
+    limit: 4,
+  });
+
   return [
     `Service: ${service.displayName}`,
     `Service category: ${service.category}`,
+    service.clientFacingDescription ? `Client-facing service description: ${service.clientFacingDescription}` : "",
+    `Legal ceremony status: ${service.legalStatus}`,
+    `Grief-related: ${service.griefRelated ? "yes" : "no"}`,
+    `Writing-only service: ${service.writingOnly ? "yes" : "no"}`,
+    `Religious or cultural elements: ${service.religiousOrCultural || "optional"}`,
+    `Virtual availability: ${service.virtualAvailable}`,
+    service.defaultDuration ? `Default service duration: ${service.defaultDuration}` : "",
+    service.suggestedChecklist?.length ? `Suggested checklist items:\n${safeList(service.suggestedChecklist)}` : "",
     `Subject / people involved: ${subjectName}`,
+    profileContext.ceremonyLabel ? `Profile ceremony label: ${profileContext.ceremonyLabel}` : "",
+    profileContext.partner1Name ? `Profile partner/contact 1: ${profileContext.partner1Name}` : "",
+    profileContext.partner2Name ? `Profile partner/contact 2: ${profileContext.partner2Name}` : "",
+    profileContext.honoreeName ? `Profile honoree: ${profileContext.honoreeName}` : "",
+    profileContext.childName ? `Profile child: ${profileContext.childName}` : "",
+    profileContext.deceasedName ? `Profile deceased/loved one: ${profileContext.deceasedName}` : "",
+    profileContext.parentGuardianNames ? `Profile parent/guardian names: ${profileContext.parentGuardianNames}` : "",
+    profileContext.primaryContactName ? `Profile primary family contact: ${profileContext.primaryContactName}` : "",
     `Date: ${date}`,
     `Location: ${venue}`,
     `Target length: ${body.ceremonyLength || responses["ceremony-duration"] || "20-30 minutes"}`,
@@ -191,13 +264,16 @@ const buildContextBlock = (body: ScriptGenerationBody, service: MrScriptService)
     `Core details: ${body.coreDetails || responses["core-details"] || "No extra core details provided yet."}`,
     `Story notes: ${body.storyNotes || responses["story-notes"] || "No story notes provided yet."}`,
     `Special inclusions: ${body.specialInclusions || responses["special-inclusions"] || "No special inclusions provided yet."}`,
+    `Loved one remembrance preference: ${body.lovedOneHonorStyle || responses["loved-one-honor-style"] || "No remembrance preference provided yet. If loved ones are honored but names are not confirmed, use general inclusive language rather than naming specific people."}`,
     `Service-specific intake:\n${intakeResponses}`,
     `Avoidances: ${body.avoidances || responses["avoidances"] || "No avoidances provided yet."}`,
     `Unity / ritual notes: ${body.unityCeremony || responses["special-elements"] || "None specified"}`,
     `Vow / promise notes: ${body.vowsType || responses["vows-type"] || "None specified"}`,
     `Reading notes: ${body.readingText || body.readingStyle || "None specified"}`,
+    `Recommended safe reading library options:\n${formatReadingsForPrompt(readingRecommendations)}`,
     `Religious / cultural notes: ${[body.religiousElements, body.culturalTraditions].filter(Boolean).join("; ") || "None specified"}`,
-  ].join("\n");
+    profileFacts ? `Known profile facts:\n${profileFacts}` : "",
+  ].filter(Boolean).join("\n");
 };
 
 const buildSegmentPrompt = (
@@ -257,7 +333,16 @@ ${customInstructions ? `SPECIAL INSTRUCTIONS FOR THIS SEGMENT:\n${customInstruct
 Now write segment ${segmentIndex + 1}: ${segment.name}.`;
 };
 
-async function callOpenAI(prompt: string, service: MrScriptService) {
+const getOpenAIModel = (usePremiumModel?: boolean) => {
+  if (usePremiumModel) {
+    return process.env.OPENAI_PREMIUM_MODEL || process.env.OPENAI_MODEL || "gpt-5.5";
+  }
+
+  return process.env.OPENAI_MODEL || "gpt-5.4-mini";
+};
+
+async function callOpenAI(prompt: string, service: MrScriptService, usePremiumModel?: boolean) {
+  const model = getOpenAIModel(usePremiumModel);
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -265,7 +350,7 @@ async function callOpenAI(prompt: string, service: MrScriptService) {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      model,
       messages: [
         {
           role: "system",
@@ -321,7 +406,7 @@ async function generateSegment(
     customInstructions
   );
 
-  return callOpenAI(prompt, service);
+  return callOpenAI(prompt, service, body.usePremiumModel);
 }
 
 function buildFinalScript(
@@ -405,6 +490,8 @@ export async function POST(request: NextRequest) {
         segments: updatedSegments,
         regeneratedIndex: index,
         serviceId: service.id,
+        model: getOpenAIModel(body.usePremiumModel),
+        premiumModelUsed: Boolean(body.usePremiumModel),
       });
     }
 
@@ -428,6 +515,8 @@ export async function POST(request: NextRequest) {
       serviceName: service.displayName,
       segmentPlan: segments,
       availableServices: MR_SCRIPT_SERVICES.map((item) => item.id),
+      model: getOpenAIModel(body.usePremiumModel),
+      premiumModelUsed: Boolean(body.usePremiumModel),
     });
   } catch (error) {
     console.error("Error generating script:", error);

@@ -1,7 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
+function getServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceKey) return null
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+function calculateApplicationFee(amount: number) {
+  const percent = Number(process.env.STRIPE_PLATFORM_INVOICE_FEE_PERCENT || 0)
+  const fixed = Number(process.env.STRIPE_PLATFORM_INVOICE_FEE_FIXED_CENTS || 0)
+  const percentFee = Number.isFinite(percent) && percent > 0 ? Math.round(amount * 100 * (percent / 100)) : 0
+  const fixedFee = Number.isFinite(fixed) && fixed > 0 ? Math.round(fixed) : 0
+  return Math.max(percentFee + fixedFee, 0)
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
@@ -27,10 +47,39 @@ export async function POST(request: NextRequest) {
   const amount = Number(body.amount || 0)
   const paymentId = String(body.paymentId || "")
   const invoiceNumber = String(body.invoiceNumber || "Invoice")
+  const officiantId = String(body.officiantId || "")
 
-  if (!paymentId || !Number.isFinite(amount) || amount <= 0) {
+  if (!paymentId || !officiantId || !Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json(
       { error: "Missing required invoice payment information." },
+      { status: 400 }
+    )
+  }
+
+  const supabase = getServiceClient()
+  if (!supabase) {
+    return NextResponse.json(
+      { error: "Server payment records are not configured." },
+      { status: 501 }
+    )
+  }
+
+  const { data: connectAccount, error: connectError } = await supabase
+    .from("stripe_connect_accounts")
+    .select("stripe_account_id,charges_enabled,onboarding_complete")
+    .eq("user_id", officiantId)
+    .maybeSingle()
+
+  if (connectError) {
+    return NextResponse.json({ error: connectError.message }, { status: 500 })
+  }
+
+  if (!connectAccount?.stripe_account_id || !connectAccount.charges_enabled) {
+    return NextResponse.json(
+      {
+        error:
+          "This officiant has not finished Stripe payout setup yet. Please contact the officiant before paying online.",
+      },
       { status: 400 }
     )
   }
@@ -56,13 +105,16 @@ export async function POST(request: NextRequest) {
   if (body.officiantId) params.set("metadata[officiantId]", String(body.officiantId))
   if (body.coupleEmail) params.set("customer_email", String(body.coupleEmail))
 
+  const applicationFeeAmount = calculateApplicationFee(amount)
+  params.set("payment_intent_data[transfer_data][destination]", connectAccount.stripe_account_id)
+  if (applicationFeeAmount > 0) {
+    params.set("payment_intent_data[application_fee_amount]", String(applicationFeeAmount))
+    params.set("metadata[platformFeeCents]", String(applicationFeeAmount))
+  }
+
   const headers: Record<string, string> = {
     Authorization: `Bearer ${stripeSecretKey}`,
     "Content-Type": "application/x-www-form-urlencoded",
-  }
-
-  if (body.stripeAccountId) {
-    headers["Stripe-Account"] = String(body.stripeAccountId)
   }
 
   const stripeResponse = await fetch("https://api.stripe.com/v1/checkout/sessions", {

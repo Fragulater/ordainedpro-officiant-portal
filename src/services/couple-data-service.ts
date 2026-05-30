@@ -146,6 +146,9 @@ export interface Payment {
   due_date?: string
   paid_date?: string
   payment_method?: string | null
+  refund_fee_rate?: number | null
+  refund_fee_amount?: number | null
+  total_officiant_charge?: number | null
   notes?: string | null
   created_at?: string
 }
@@ -827,6 +830,9 @@ export async function addPayment(userId: string, coupleId: number, paymentData: 
   paymentType?: string
   status?: string
   dueDate?: string
+  refundFeeRate?: number
+  refundFeeAmount?: number
+  totalOfficiantCharge?: number
 }): Promise<{ ok: boolean; data?: Payment; error?: string }> {
   try {
     const { data, error } = await supabase
@@ -839,6 +845,9 @@ export async function addPayment(userId: string, coupleId: number, paymentData: 
         status: paymentData.status || "pending",
         due_date: paymentData.dueDate || null,
         payment_method: paymentData.paymentType || "invoice",
+        refund_fee_rate: paymentData.refundFeeRate ?? null,
+        refund_fee_amount: paymentData.refundFeeAmount ?? null,
+        total_officiant_charge: paymentData.totalOfficiantCharge ?? null,
         notes: paymentData.description,
       })
       .select()
