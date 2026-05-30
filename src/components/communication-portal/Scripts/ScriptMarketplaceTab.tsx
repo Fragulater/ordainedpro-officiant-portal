@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Plus, Star, DollarSign, ShoppingCart, Edit, Eye, TrendingUp, Upload, Download, Trash2 } from "lucide-react"
+import { ExternalLink, FileText, Plus, Star, DollarSign, ShoppingCart, Edit, Eye, TrendingUp, Upload, Download, Trash2 } from "lucide-react"
 import { useRef, useState } from "react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
@@ -442,8 +442,20 @@ export function ScriptMarketplaceTab() {
                   {/* Browse Scripts */}
                   <Card className="border-blue-100 shadow-md">
                     <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-                      <CardTitle className="text-blue-900">Browse Script Marketplace</CardTitle>
-                      <CardDescription>Discover and purchase scripts from other experienced officiants</CardDescription>
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <CardTitle className="text-blue-900">Browse Script Marketplace</CardTitle>
+                          <CardDescription>Discover and purchase scripts from other experienced officiants</CardDescription>
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="shrink-0 border-blue-200 text-blue-700 hover:bg-blue-50"
+                          onClick={() => window.open("https://scripts.ordainedpro.com", "_blank", "noopener,noreferrer")}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          View Marketplace
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent className="p-6">
                       <div className="space-y-4">

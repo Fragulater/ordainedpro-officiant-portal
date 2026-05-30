@@ -27,7 +27,17 @@ export function PortalScheduleMeetingDialog() {
     ]
       .map((name) => name?.trim())
       .find((name) => name && !name.includes("@")) || "Officiant"
-  const coupleEmails = [editCoupleInfo.brideEmail || "", editCoupleInfo.groomEmail || ""]
+  const coupleAttendees = [
+    {
+      name: editCoupleInfo.brideName || "Primary contact",
+      email: editCoupleInfo.brideEmail || "",
+    },
+    {
+      name: editCoupleInfo.groomName || "Secondary contact",
+      email: editCoupleInfo.groomEmail || "",
+    },
+  ].filter((attendee) => attendee.email)
+  const coupleEmails = coupleAttendees.map((attendee) => attendee.email)
   const dialogKey = [
     editCoupleInfo.id,
     editCoupleInfo.brideName,
@@ -45,6 +55,7 @@ export function PortalScheduleMeetingDialog() {
         onScheduleMeeting={handleScheduleMeeting}
         coupleId={editCoupleInfo.id}
         coupleEmails={coupleEmails}
+        coupleAttendees={coupleAttendees}
         coupleName={`${editCoupleInfo.brideName?.split(' ')[0] || 'Bride'} & ${editCoupleInfo.groomName?.split(' ')[0] || 'Groom'}`}
         officiantName={officiantName}
         officiantEmail={officiantProfile?.email || currentUser?.email || ""}

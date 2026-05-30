@@ -1,5 +1,6 @@
 "use client";
 
+import NextLink from "next/link";
 import { useState, useRef, useEffect } from "react";
 import {
   Dialog,
@@ -62,9 +63,12 @@ import {
   Crown,
   Sparkles,
   CreditCard,
+  ExternalLink,
   Check,
   BriefcaseBusiness,
   RotateCcw,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -170,6 +174,7 @@ interface OfficiantDashboardDialogProps {
   onDocumentDownload?: (documentId: string) => void;
   onDocumentDelete?: (documentId: string) => void;
   onDocumentAssignToCouple?: (documentId: string, coupleId: number) => void;
+  onDocumentUpload?: (file: File) => Promise<void>;
   initialView?:
     | "dashboard"
     | "ceremonies"
@@ -221,6 +226,16 @@ interface OfficiantProfile {
   videoUrl: string;
 }
 
+interface StripeConnectAccount {
+  stripe_account_id: string;
+  charges_enabled: boolean;
+  payouts_enabled: boolean;
+  details_submitted: boolean;
+  onboarding_complete: boolean;
+  country?: string | null;
+  default_currency?: string | null;
+}
+
 const parseLocalDateOnly = (dateString?: string) => {
   if (!dateString) return null;
   const [datePart] = dateString.split("T");
@@ -267,6 +282,7 @@ export function OfficiantDashboardDialog({
   onDocumentDownload,
   onDocumentDelete,
   onDocumentAssignToCouple,
+  onDocumentUpload,
   initialView = "dashboard",
 }: OfficiantDashboardDialogProps) {
   // Subscription information
@@ -291,6 +307,8 @@ export function OfficiantDashboardDialog({
   const [showAddCeremonyDialog, setShowAddCeremonyDialog] = useState(false);
   const [documentToAssign, setDocumentToAssign] = useState<string | null>(null);
   const [assignCoupleId, setAssignCoupleId] = useState("");
+  const documentUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [publicProfileCopied, setPublicProfileCopied] = useState(false);
@@ -307,6 +325,27 @@ export function OfficiantDashboardDialog({
   const [anniversarySettingsStatus, setAnniversarySettingsStatus] = useState<"idle" | "saved" | "error">("idle");
   const [updatingAnniversaryId, setUpdatingAnniversaryId] = useState<string | number | null>(null);
   const [anniversaryReminderPersistenceReady, setAnniversaryReminderPersistenceReady] = useState(true);
+  const [stripeConnectAccount, setStripeConnectAccount] = useState<StripeConnectAccount | null>(null);
+  const [stripeConnectLoading, setStripeConnectLoading] = useState(false);
+  const [stripeConnectStatus, setStripeConnectStatus] = useState<"idle" | "ready" | "needs_onboarding" | "error">("idle");
+  const [stripeConnectMessage, setStripeConnectMessage] = useState("");
+
+  const handleDashboardDocumentUpload = async (file?: File) => {
+    if (!file || !onDocumentUpload) return;
+
+    setIsUploadingDocument(true);
+    try {
+      await onDocumentUpload(file);
+    } catch (error) {
+      console.error("Failed to upload dashboard document:", error);
+      alert(error instanceof Error ? error.message : "Unable to upload this document.");
+    } finally {
+      setIsUploadingDocument(false);
+      if (documentUploadInputRef.current) {
+        documentUploadInputRef.current.value = "";
+      }
+    }
+  };
   // Form state for Add New Ceremony - mirrors Communication Portal
   const [newCeremony, setNewCeremony] = useState({
     ceremonyName: "",
@@ -746,6 +785,120 @@ ${officiantFullName}`;
     } catch (error) {
       console.error("Unable to save anniversary settings:", error);
       setAnniversarySettingsStatus("error");
+    }
+  };
+
+  const getStripeConnectAccessToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || "";
+  };
+
+  const refreshStripeConnectStatus = async () => {
+    if (!user?.id) return;
+
+    try {
+      setStripeConnectLoading(true);
+      setStripeConnectMessage("");
+      const token = await getStripeConnectAccessToken();
+
+      if (!token) {
+        setStripeConnectStatus("error");
+        setStripeConnectMessage("Please sign in again before setting up payouts.");
+        return;
+      }
+
+      const response = await fetch("/api/stripe/connect/account", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to load Stripe payout status.");
+      }
+
+      const account = data.account as StripeConnectAccount | null;
+      setStripeConnectAccount(account);
+      setStripeConnectStatus(account?.onboarding_complete ? "ready" : "needs_onboarding");
+    } catch (error: any) {
+      console.error("Unable to refresh Stripe Connect status:", error);
+      setStripeConnectStatus("error");
+      setStripeConnectMessage(error?.message || "Unable to load Stripe payout status.");
+    } finally {
+      setStripeConnectLoading(false);
+    }
+  };
+
+  const handleStartStripeConnectOnboarding = async () => {
+    if (!user?.id) return;
+
+    try {
+      setStripeConnectLoading(true);
+      setStripeConnectMessage("");
+      const token = await getStripeConnectAccessToken();
+
+      if (!token) {
+        setStripeConnectStatus("error");
+        setStripeConnectMessage("Please sign in again before setting up payouts.");
+        return;
+      }
+
+      const response = await fetch("/api/stripe/connect/account", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Unable to start Stripe payout setup.");
+      }
+
+      window.location.href = data.url;
+    } catch (error: any) {
+      console.error("Unable to start Stripe Connect onboarding:", error);
+      setStripeConnectStatus("error");
+      setStripeConnectMessage(error?.message || "Unable to start Stripe payout setup.");
+    } finally {
+      setStripeConnectLoading(false);
+    }
+  };
+
+  const handleOpenStripeExpressDashboard = async () => {
+    if (!user?.id) return;
+
+    try {
+      setStripeConnectLoading(true);
+      setStripeConnectMessage("");
+      const token = await getStripeConnectAccessToken();
+
+      if (!token) {
+        setStripeConnectStatus("error");
+        setStripeConnectMessage("Please sign in again before opening Stripe.");
+        return;
+      }
+
+      const response = await fetch("/api/stripe/connect/dashboard", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Unable to open Stripe Express dashboard.");
+      }
+
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch (error: any) {
+      console.error("Unable to open Stripe Express dashboard:", error);
+      setStripeConnectStatus("error");
+      setStripeConnectMessage(error?.message || "Unable to open Stripe Express dashboard.");
+    } finally {
+      setStripeConnectLoading(false);
     }
   };
 
@@ -1196,6 +1349,13 @@ ${officiantFullName}`;
     };
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    if (open && activeView === "settings" && user?.id) {
+      refreshStripeConnectStatus();
+    }
+  }, [open, activeView, user?.id]);
+
   const filteredCeremonies = ceremonies.filter((ceremony) => {
     const matchesFilter =
       ceremonyFilter === "All" || ceremony.status === ceremonyFilter;
@@ -3142,6 +3302,59 @@ ${officiantFullName}`;
                       </CardContent>
                     </Card>
 
+                    {/* Video Upload */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Video</CardTitle>
+                        <CardDescription>
+                          Upload a video introducing yourself (max 200MB)
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {!profile.videoUrl ? (
+                          <div>
+                            <label htmlFor="video-upload">
+                              <Button
+                                variant="outline"
+                                className="w-full"
+                                asChild
+                              >
+                                <span>
+                                  <Upload className="w-4 h-4 mr-2" />
+                                  Upload Video (Max 200MB)
+                                </span>
+                              </Button>
+                            </label>
+                            <input
+                              id="video-upload"
+                              type="file"
+                              className="hidden"
+                              accept="video/*"
+                              onChange={handleVideoUpload}
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <video
+                              src={profile.videoUrl}
+                              controls
+                              className="w-full rounded-lg"
+                            />
+                            <Button
+                              variant="destructive"
+                              onClick={() =>
+                                handleProfileUpdate("videoUrl", "")
+                              }
+                              className="w-full mt-3"
+                            >
+                              <X className="w-4 h-4 mr-2" />
+                              Remove Video
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
                     {/* Photo Gallery */}
                     <Card>
                       <CardHeader>
@@ -3205,59 +3418,6 @@ ${officiantFullName}`;
                       </CardContent>
                     </Card>
 
-                    {/* Video Upload */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Introduction Video</CardTitle>
-                        <CardDescription>
-                          Upload a video introducing yourself (max 200MB)
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {!profile.videoUrl ? (
-                          <div>
-                            <label htmlFor="video-upload">
-                              <Button
-                                variant="outline"
-                                className="w-full"
-                                asChild
-                              >
-                                <span>
-                                  <Upload className="w-4 h-4 mr-2" />
-                                  Upload Video (Max 200MB)
-                                </span>
-                              </Button>
-                            </label>
-                            <input
-                              id="video-upload"
-                              type="file"
-                              className="hidden"
-                              accept="video/*"
-                              onChange={handleVideoUpload}
-                            />
-                          </div>
-                        ) : (
-                          <div>
-                            <video
-                              src={profile.videoUrl}
-                              controls
-                              className="w-full rounded-lg"
-                            />
-                            <Button
-                              variant="destructive"
-                              onClick={() =>
-                                handleProfileUpdate("videoUrl", "")
-                              }
-                              className="w-full mt-3"
-                            >
-                              <X className="w-4 h-4 mr-2" />
-                              Remove Video
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
                     {/* Save Button */}
                     <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:justify-end">
                       <p
@@ -3296,12 +3456,38 @@ ${officiantFullName}`;
             {/* Documents View */}
             {activeView === "documents" && (
               <div className="p-8">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">
-                  Documents
-                </h2>
-                <p className="text-gray-600 mb-6">
-                  Review and manage your uploaded contracts
-                </p>
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">
+                      Documents
+                    </h2>
+                    <p className="text-gray-600">
+                      Review and manage your uploaded contracts and saved files
+                    </p>
+                  </div>
+                  <div>
+                    <input
+                      ref={documentUploadInputRef}
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.mp3,.mp4,.mov,.zip,.ppt,.pptx,.xls,.xlsx"
+                      onChange={(event) => handleDashboardDocumentUpload(event.target.files?.[0])}
+                    />
+                    <Button
+                      type="button"
+                      className="bg-blue-500 hover:bg-blue-600"
+                      disabled={isUploadingDocument || !onDocumentUpload}
+                      onClick={() => documentUploadInputRef.current?.click()}
+                    >
+                      {isUploadingDocument ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4 mr-2" />
+                      )}
+                      {isUploadingDocument ? "Uploading..." : "Upload"}
+                    </Button>
+                  </div>
+                </div>
 
                 {/* Documents Grid */}
                 <div className="grid grid-cols-1 gap-4 mb-6 lg:grid-cols-2">
@@ -3519,9 +3705,11 @@ ${officiantFullName}`;
                           </CardDescription>
                         </div>
                         {isAspirant && (
-                          <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white">
-                            <Sparkles className="w-4 h-4 mr-2" />
-                            Upgrade Now
+                          <Button asChild className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white">
+                            <NextLink href="/subscription/checkout?plan=professional&source=dashboard">
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Upgrade Now
+                            </NextLink>
                           </Button>
                         )}
                       </div>
@@ -3581,14 +3769,16 @@ ${officiantFullName}`;
                                         : "text-gray-400"
                                     }
                                   >
-                                    {feature
-                                      .split("_")
-                                      .map(
-                                        (word) =>
-                                          word.charAt(0).toUpperCase() +
-                                          word.slice(1)
-                                      )
-                                      .join(" ")}
+                                    {feature === "public_profile"
+                                      ? "Public Officiant Profile"
+                                      : feature
+                                          .split("_")
+                                          .map(
+                                            (word) =>
+                                              word.charAt(0).toUpperCase() +
+                                              word.slice(1)
+                                          )
+                                          .join(" ")}
                                   </span>
                                 </div>
                               )
@@ -3640,6 +3830,112 @@ ${officiantFullName}`;
                           </p>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="mb-6 border-2 border-emerald-200 shadow-lg">
+                    <CardHeader className="bg-gradient-to-r from-emerald-50 to-green-50">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <CardTitle className="flex items-center space-x-2 text-xl text-emerald-950">
+                            <CreditCard className="h-6 w-6 text-emerald-600" />
+                            <span>Stripe Payouts</span>
+                          </CardTitle>
+                          <CardDescription className="mt-1">
+                            Connect Stripe so script sales and ceremony invoice payments can be deposited to your bank account.
+                          </CardDescription>
+                        </div>
+                        <Badge
+                          className={
+                            stripeConnectAccount?.onboarding_complete
+                              ? "bg-green-100 text-green-800"
+                              : "bg-amber-100 text-amber-800"
+                          }
+                        >
+                          {stripeConnectAccount?.onboarding_complete
+                            ? "Payouts Ready"
+                            : stripeConnectAccount
+                            ? "Setup Incomplete"
+                            : "Not Connected"}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4 p-6">
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <div className="rounded-lg border bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Charges</p>
+                          <p className="mt-2 flex items-center gap-2 text-sm font-semibold">
+                            {stripeConnectAccount?.charges_enabled ? (
+                              <Check className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <X className="h-4 w-4 text-gray-400" />
+                            )}
+                            {stripeConnectAccount?.charges_enabled ? "Enabled" : "Not ready"}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Payouts</p>
+                          <p className="mt-2 flex items-center gap-2 text-sm font-semibold">
+                            {stripeConnectAccount?.payouts_enabled ? (
+                              <Check className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <X className="h-4 w-4 text-gray-400" />
+                            )}
+                            {stripeConnectAccount?.payouts_enabled ? "Enabled" : "Not ready"}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border bg-white p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Account</p>
+                          <p className="mt-2 truncate text-sm font-semibold text-gray-900">
+                            {stripeConnectAccount?.stripe_account_id || "Connect required"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
+                        OrdainedPro will create the checkout, collect any configured platform fee, and route the remaining funds to the officiant's connected Stripe account. Stripe controls bank verification, tax details, and payout timing.
+                      </div>
+
+                      {stripeConnectMessage && (
+                        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                          {stripeConnectMessage}
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-3 sm:flex-row">
+                        <Button
+                          className="bg-emerald-600 text-white hover:bg-emerald-700"
+                          onClick={handleStartStripeConnectOnboarding}
+                          disabled={stripeConnectLoading}
+                        >
+                          {stripeConnectLoading ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <CreditCard className="mr-2 h-4 w-4" />
+                          )}
+                          {stripeConnectAccount ? "Continue Stripe Setup" : "Set Up Payouts"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                          onClick={refreshStripeConnectStatus}
+                          disabled={stripeConnectLoading}
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Refresh Status
+                        </Button>
+                        {stripeConnectAccount?.onboarding_complete && (
+                          <Button
+                            variant="outline"
+                            className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                            onClick={handleOpenStripeExpressDashboard}
+                            disabled={stripeConnectLoading}
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Open Stripe Dashboard
+                          </Button>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -3716,8 +4012,8 @@ ${officiantFullName}`;
                                 </span>
                               </div>
                               <div className="flex items-start space-x-2">
-                                <X className="w-5 h-5 text-gray-300 mt-0.5" />
-                                <span className="text-sm text-gray-400">
+                                <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                                <span className="text-sm text-gray-700">
                                   Public officiant profile
                                 </span>
                               </div>
@@ -3818,7 +4114,13 @@ ${officiantFullName}`;
                               <div className="flex items-start space-x-2">
                                 <Check className="w-5 h-5 text-green-500 mt-0.5" />
                                 <span className="text-sm text-gray-700">
-                                  Public officiant page, ratings, and reviews
+                                  Public officiant profile
+                                </span>
+                              </div>
+                              <div className="flex items-start space-x-2">
+                                <Check className="w-5 h-5 text-green-500 mt-0.5" />
+                                <span className="text-sm text-gray-700">
+                                  Review requests and star ratings
                                 </span>
                               </div>
                               <div className="flex items-start space-x-2">
@@ -3843,9 +4145,11 @@ ${officiantFullName}`;
                             <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
                               If you switch from Aspirant to Professional, the Professional subscription starts right away. Transitional subscription changes are not prorated, credited, or refunded.
                             </div>
-                            <Button className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white">
-                              <Crown className="w-4 h-4 mr-2" />
-                              Upgrade to Professional
+                            <Button asChild className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white">
+                              <NextLink href="/subscription/checkout?plan=professional&source=dashboard-pricing">
+                                <Crown className="w-4 h-4 mr-2" />
+                                Upgrade to Professional
+                              </NextLink>
                             </Button>
                           </CardContent>
                         </Card>

@@ -56,12 +56,56 @@ import {
   getMrScriptServiceByResponse,
   getMrScriptStoryPrompts,
 } from "@/data/mr-script-services"
+import {
+  formatReadingsForPrompt,
+  getReadingRecommendations,
+} from "@/data/ceremony-readings"
 
 // Safe helper to get first name from a full name (null-safe)
 const getFirstName = (fullName: string | null | undefined): string => {
   if (!fullName || typeof fullName !== 'string') return 'Partner'
   return fullName.split(' ')[0] || 'Partner'
 }
+
+const launchArchiveConfettiOnce = (ceremonyId: number | string) => {
+  if (typeof window === "undefined") return
+
+  const storageKey = `ordainedpro-archive-confetti-${ceremonyId}`
+  if (window.localStorage.getItem(storageKey)) {
+    window.localStorage.removeItem(storageKey)
+  }
+
+  window.localStorage.setItem(storageKey, "shown")
+
+  confetti({
+    particleCount: 90,
+    spread: 70,
+    origin: { y: 0.58 },
+    colors: ["#2563eb", "#ec4899", "#f59e0b", "#10b981"],
+  })
+
+  setTimeout(() => {
+    confetti({
+      particleCount: 45,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0, y: 0.65 },
+      colors: ["#2563eb", "#ec4899", "#f59e0b", "#10b981"],
+    })
+  }, 180)
+
+  setTimeout(() => {
+    confetti({
+      particleCount: 45,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1, y: 0.65 },
+      colors: ["#2563eb", "#ec4899", "#f59e0b", "#10b981"],
+    })
+  }, 320)
+}
+
+const PREMIUM_SCRIPT_LIMIT = 3
 
 type CeremonyTypeConfig = {
   value: string
@@ -111,8 +155,8 @@ const CEREMONY_TYPE_OPTIONS: CeremonyTypeConfig[] = [
   },
   {
     value: "quinceanera",
-    label: "Quinceañera / Coming of Age",
-    createTitle: "Create a New Quinceañera",
+    label: "QuinceaÃ±era / Coming of Age",
+    createTitle: "Create a New QuinceaÃ±era",
     createDescription: "Fill in the details for the coming-of-age ceremony you'll be officiating.",
     participantHeader: "Honoree & Parent/Guardian Information",
     peopleCardTitle: "Honoree & Parent/Guardian",
@@ -129,7 +173,7 @@ const CEREMONY_TYPE_OPTIONS: CeremonyTypeConfig[] = [
     primaryAddressPlaceholder: "Honoree primary address",
     secondaryAddressPlaceholder: "Parent/guardian primary address",
     primaryAgeLabel: "Honoree Age",
-    ceremonyNamePlaceholder: "e.g., Isabella's Quinceañera",
+    ceremonyNamePlaceholder: "e.g., Isabella's QuinceaÃ±era",
   },
   {
     value: "celebration_of_life",
@@ -219,14 +263,56 @@ const CEREMONY_TYPE_OPTIONS: CeremonyTypeConfig[] = [
   },
 ]
 
+const normalizeCeremonyTypeText = (value?: string | null) =>
+  String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ã±|Ã±/gi, "n")
+
+const resolveCeremonyTypeValue = (value?: string | null) => {
+  const normalized = normalizeCeremonyTypeText(value)
+
+  if (!normalized) return "wedding"
+
+  const directMatch = CEREMONY_TYPE_OPTIONS.find((option) => (
+    normalizeCeremonyTypeText(option.value) === normalized ||
+    normalizeCeremonyTypeText(option.label) === normalized
+  ))
+
+  if (directMatch) return directMatch.value
+
+  if (/(quince|coming\s*of\s*age|sweet\s*16|sweet sixteen|honoree)/.test(normalized)) {
+    return "quinceanera"
+  }
+
+  if (/(baby|child|naming|blessing)/.test(normalized)) {
+    return "baby_blessing"
+  }
+
+  if (/(celebration\s*of\s*life|memorial|funeral|wake|remembrance|deceased)/.test(normalized)) {
+    return "celebration_of_life"
+  }
+
+  if (/(vow|renewal)/.test(normalized)) {
+    return "vow_renewal"
+  }
+
+  if (/(wedding|marriage|commitment)/.test(normalized)) {
+    return "wedding"
+  }
+
+  return "other"
+}
+
 const getCeremonyTypeConfig = (type?: string) =>
-  CEREMONY_TYPE_OPTIONS.find((option) => option.value === type) || CEREMONY_TYPE_OPTIONS[0]
+  CEREMONY_TYPE_OPTIONS.find((option) => option.value === resolveCeremonyTypeValue(type)) || CEREMONY_TYPE_OPTIONS[0]
 
 const getCeremonyTypeFromNotes = (notes?: string | null) => {
   if (!notes) return "wedding"
   const match = notes.match(/^Ceremony type:\s*(.+)$/im)
   const label = match?.[1]?.trim()
-  return CEREMONY_TYPE_OPTIONS.find((option) => option.label === label)?.value || "wedding"
+  return resolveCeremonyTypeValue(label || notes)
 }
 
 const getCeremonyAgeFromNotes = (notes: string | null | undefined, role?: string) => {
@@ -268,6 +354,10 @@ const formatMeetingDateTime = (meeting: { date?: string; time?: string | null })
 
 const getPaymentDateValue = (payment: any) => new Date(payment.dueDate || payment.paidDate || payment.createdAt || payment.date || Date.now())
 
+const REFUND_FEE_RATE = 0.05
+
+const roundCurrency = (amount: number) => Math.round(amount * 100) / 100
+
 const isRefundPayment = (payment: any) =>
   payment?.status === "refunded" || String(payment?.type || payment?.payment_method || "").toLowerCase() === "refund"
 
@@ -282,6 +372,7 @@ const calculatePaymentSummary = (records: any[]) => {
   const totalCharged = charges.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
   const totalPaid = paidRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
   const totalRefunded = refundRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+  const totalRefundFees = refundRecords.reduce((sum, payment) => sum + Number(payment.refundFee || payment.refund_fee_amount || 0), 0)
   const netPaid = Math.max(0, totalPaid - totalRefunded)
   const totalAmount = totalCharged > 0 ? totalCharged : netPaid
   const balance = Math.max(0, totalAmount - netPaid)
@@ -293,6 +384,7 @@ const calculatePaymentSummary = (records: any[]) => {
     totalAmount,
     totalPaid: netPaid,
     totalRefunded,
+    totalRefundFees,
     balance,
     finalPaymentDue: nextCharge?.dueDate || nextCharge?.due_date || "",
     paymentStatus: balance === 0 && totalAmount > 0 ? "paid_in_full" : netPaid > 0 ? "deposit_paid" : "pending"
@@ -627,6 +719,128 @@ const getActiveGuidedQuestions = (responses: Record<string, string> = {}): Quest
   ]
 }
 
+const getGuidedDetailResponseKey = (questionId: string, detailIndex: number) =>
+  `${questionId}-detail-${detailIndex + 1}`
+
+const getGuidedDetailQuestions = (question: Question, responses: Record<string, string>): string[] => {
+  if (question.id !== "core-details") return []
+
+  const service = getMrScriptServiceByResponse(responses["ceremony-type"])
+  return service.requiredQuestions.slice(0, 4)
+}
+
+const getFirstUnansweredGuidedDetailIndex = (question: Question, responses: Record<string, string>) => {
+  const detailQuestions = getGuidedDetailQuestions(question, responses)
+  return detailQuestions.findIndex((_, index) => {
+    const savedAnswer = responses[getGuidedDetailResponseKey(question.id, index)]
+    return !savedAnswer || !savedAnswer.trim()
+  })
+}
+
+const hasUnansweredGuidedDetails = (question: Question, responses: Record<string, string>) => {
+  const detailQuestions = getGuidedDetailQuestions(question, responses)
+  if (!detailQuestions.length) return false
+  return getFirstUnansweredGuidedDetailIndex(question, responses) !== -1
+}
+
+const buildGuidedDetailSummary = (question: Question, responses: Record<string, string>) => {
+  const detailQuestions = getGuidedDetailQuestions(question, responses)
+  const answeredDetails = detailQuestions
+    .map((detail, index) => {
+      const answer = responses[getGuidedDetailResponseKey(question.id, index)]
+      return answer?.trim() ? `${detail} ${answer.trim()}` : ""
+    })
+    .filter(Boolean)
+
+  return answeredDetails.join("\n")
+}
+
+const buildGuidedDetailPrompt = (
+  question: Question,
+  responses: Record<string, string>,
+  prefix = "Great."
+) => {
+  const detailQuestions = getGuidedDetailQuestions(question, responses)
+  const nextDetailIndex = getFirstUnansweredGuidedDetailIndex(question, responses)
+  if (!detailQuestions.length || nextDetailIndex === -1) return null
+
+  const nextQuestion = detailQuestions[nextDetailIndex]
+  return `${prefix} ${nextQuestion} If this isn't applicable, you can say skip.`
+}
+
+const PENDING_LOVED_ONE_HONOR_KEY = "pending-loved-one-honor-follow-up"
+const LOVED_ONE_HONOR_STYLE_KEY = "loved-one-honor-style"
+
+const isNegativeResponse = (value: string) =>
+  /\b(no|none|not applicable|n\/a|skip|nope)\b/i.test(value.trim())
+
+const alreadyClarifiedLovedOneHonor = (value: string) =>
+  /\b(general|generally|all loved ones|all those|everyone|those who passed|loved ones who have passed|do not name|don't name|no names|by name|named|mention .+ by name)\b/i.test(value)
+
+const shouldAskLovedOneHonorFollowUp = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed || isNegativeResponse(trimmed) || alreadyClarifiedLovedOneHonor(trimmed)) return false
+
+  return /\b(yes|honou?r|remember|remembrance|memorial|tribute|loved one|loved ones|passed|passed away|deceased|late|in memory)\b/i.test(trimmed)
+}
+
+const isClarificationRequest = (value: string) =>
+  /\b(what|what's|whats|explain|example|examples|mean|means|would be|could be|help me understand|not sure|i don't understand|i dont understand)\b/i.test(value.trim())
+
+const buildClarificationAnswer = (value: string) => {
+  const lowerValue = value.toLowerCase()
+  const answers: string[] = []
+
+  if (/\breadings?\b/.test(lowerValue)) {
+    answers.push("A reading is a short passage read during the ceremony. It could be a poem, scripture, a quote, a favorite book excerpt, or a few meaningful lines about love and commitment.")
+  }
+
+  if (/\bprayers?\b|\bblessing\b/.test(lowerValue)) {
+    answers.push("A prayer or blessing can be faith-based, spiritual, or very simple. For example, it might ask for peace, guidance, joy, protection, or strength for the couple and their family.")
+  }
+
+  if (/\bremembrance\b|\bremember\b|\bloved one\b|\bloved ones\b|\bpassed\b|\bdeceased\b|\bmemorial\b/.test(lowerValue)) {
+    answers.push("A remembrance is a brief moment to honor loved ones who have passed. It can mention someone by name, or it can stay general, such as honoring all loved ones who are present in spirit.")
+  }
+
+  if (/\bcultural\b|\btraditions?\b|\btradition\b/.test(lowerValue)) {
+    answers.push("A cultural tradition is a meaningful ritual, custom, symbol, reading, music choice, family blessing, clothing item, language, or ceremony element connected to the couple's heritage, family, or community.")
+  }
+
+  if (/\bfamily involvement\b|\bfamily\b|\bparents?\b|\bchildren\b|\bchild\b|\bguest\b/.test(lowerValue)) {
+    answers.push("Family involvement means inviting important people to participate. They might read a passage, give a blessing, light a candle, present rings, walk someone in, share a short tribute, or take part in a unity moment.")
+  }
+
+  if (/\bunity\b|\bcandle\b|\bsand\b|\bhandfasting\b|\britual\b/.test(lowerValue)) {
+    answers.push("A unity ceremony is a symbolic action showing two lives or families coming together. Common examples include a unity candle, sand ceremony, handfasting, wine blending, tree planting, or family blessing.")
+  }
+
+  if (/\bvows?\b|\bpromise\b|\bpromises\b/.test(lowerValue)) {
+    answers.push("Vows are the promises spoken by the couple. They can be traditional, personal, short and simple, spiritual, funny, emotional, or a mix of styles.")
+  }
+
+  if (/\bpoem\b|\bpoems\b|\bpoetry\b|\bbible\b|\bverse\b|\bverses\b|\bsong\b|\blyrics\b/.test(lowerValue)) {
+    const recommendations = getReadingRecommendations({
+      ceremonyType: lowerValue.includes("memorial") || lowerValue.includes("passed") ? "celebration_of_life" : "wedding",
+      specialInclusions: lowerValue,
+      faithPreference: lowerValue,
+      limit: 3,
+    })
+    answers.push([
+      "Mr. Script can suggest public-domain poems, KJV Bible verses, original OrdainedPro readings, and safe placeholders for song lyrics.",
+      "For modern song lyrics or copyrighted poems, the safest workflow is to have the officiant or couple paste text they have permission to use. Mr. Script can then place it into the ceremony and write original transitions around it.",
+      `Good safe options include:\n${formatReadingsForPrompt(recommendations)}`
+    ].join("\n\n"))
+  }
+
+  return answers.length
+    ? answers.join("\n\n")
+    : "That means any meaningful ceremony element the couple may want included, such as a reading, prayer, remembrance, cultural tradition, family participation, music cue, unity ceremony, or special story."
+}
+
+const getSpecialInclusionsPrompt = () =>
+  "Would you like readings, prayers, remembrance, cultural traditions, family involvement, music, stories, or any special ceremony moments included? You can name any that apply, say none, or ask me what any of those mean."
+
 // AI Assistant Functions
 const generateAIResponse = (question: Question, previousResponses: Record<string, string>): string => {
   if (question.id === "ceremony-type") {
@@ -648,10 +862,15 @@ const generateAIResponse = (question: Question, previousResponses: Record<string
 
   if (question.id === "core-details") {
     const service = getMrScriptServiceByResponse(previousResponses["ceremony-type"])
+    const nextDetailPrompt = buildGuidedDetailPrompt(
+      question,
+      previousResponses,
+      "Let's take these one at a time."
+    )
     return [
       `Now I want to understand the heart of this ${service.shortName.toLowerCase()} script.`,
       question.question,
-      service.requiredQuestions.slice(0, 4).map((detail) => `- ${detail}`).join("\n")
+      nextDetailPrompt || service.requiredQuestions.slice(0, 4).map((detail) => `- ${detail}`).join("\n")
     ].filter(Boolean).join('\n\n')
   }
 
@@ -674,7 +893,9 @@ const generateAIResponse = (question: Question, previousResponses: Record<string
   if (question.id === "special-inclusions" || question.id === "avoidances") {
     return [
       question.question,
-      question.aiRecommendation || ""
+      question.id === "special-inclusions"
+        ? getSpecialInclusionsPrompt()
+        : question.aiRecommendation || ""
     ].filter(Boolean).join('\n\n')
   }
 
@@ -685,7 +906,7 @@ const generateAIResponse = (question: Question, previousResponses: Record<string
 
     `${question.question}`,
 
-    question.aiRecommendation ? `’¡ ${question.aiRecommendation}` : ''
+    question.aiRecommendation ? `â€™Â¡ ${question.aiRecommendation}` : ''
   ].filter(Boolean)
 
   return responses.join('\n\n')
@@ -706,7 +927,7 @@ const generateRecommendation = (responses: Record<string, string>): string => {
   }
 
   if (false && ceremonyType) {
-    recommendation += `[SCRIPT] **Ceremony Style**: Since you've chosen a ${ceremonyType.toLowerCase()} ceremony, `
+    recommendation += `[SCRIPT]Â **Ceremony Style**: Since you've chosen a ${ceremonyType.toLowerCase()} ceremony, `
     if (ceremonyType === 'Traditional') {
       recommendation += "I'll include classic elements like traditional vows, ring exchange, and formal language.\n\n"
     } else if (ceremonyType === 'Modern') {
@@ -717,7 +938,7 @@ const generateRecommendation = (responses: Record<string, string>): string => {
   }
 
   if (duration) {
-    recommendation += `â° **Timing**: For a ${duration.toLowerCase()} ceremony, I'll structure the script with appropriate pacing and content.\n\n`
+    recommendation += `Ã¢ÂÂ° **Timing**: For a ${duration.toLowerCase()} ceremony, I'll structure the script with appropriate pacing and content.\n\n`
   }
 
   if (tone) {
@@ -726,6 +947,10 @@ const generateRecommendation = (responses: Record<string, string>): string => {
 
   if (service.sensitivity === "grief") {
     recommendation += "Because this is grief-related, I will keep the language gentle, compassionate, and never assume religious beliefs.\n\n"
+  }
+
+  if (responses["profile-context-summary"]) {
+    recommendation += `**Details already pulled from this profile**:\n${responses["profile-context-summary"]}\n\n`
   }
 
   recommendation += "Would you like me to start generating your personalized script now? I can always adjust it based on any additional preferences you have."
@@ -744,6 +969,7 @@ const generateCompleteScript = (responses: Record<string, string>, coupleInfo: a
   const coreDetails = responses['core-details'] || ''
   const storyNotes = responses['story-notes'] || ''
   const specialInclusions = responses['special-inclusions'] || ''
+  const lovedOneHonorStyle = responses[LOVED_ONE_HONOR_STYLE_KEY] || ''
   const avoidances = responses['avoidances'] || ''
   const officiantStyle = responses['officiant-style'] || 'Warm, natural, and professional'
 
@@ -782,6 +1008,7 @@ Officiant Style: ${officiantStyle}
 Core Details: ${coreDetails || "Add the names, setting, relationships, stories, and purpose of this script."}
 Story Notes: ${storyNotes || "No story details were provided yet. Keep the draft high-level and leave room for personal details."}
 Special Inclusions: ${specialInclusions || "No specific readings, traditions, music, prayers, or people were listed yet."}
+Loved One Remembrance: ${lovedOneHonorStyle || "No remembrance preference was listed yet."}
 Avoidances: ${avoidances || "No avoidances were listed yet."}
 
 ${sensitivityNote}
@@ -822,6 +1049,8 @@ Generated by Mr. Script for ${brideName} & ${groomName}
 ${venue} - ${date}
 Officiant Style: ${officiantStyle}
 Story Notes: ${storyNotes || "No couple story notes provided yet."}
+Special Inclusions: ${specialInclusions || "No special inclusions provided yet."}
+Loved One Remembrance: ${lovedOneHonorStyle || "No remembrance preference provided yet."}
 
 PROCESSIONAL
 [Music begins as wedding party enters]
@@ -834,6 +1063,10 @@ ${brideName} and ${groomName}, you have chosen to share your lives together, and
 ${storyNotes ? `COUPLE STORY
 [Use this story material naturally in the ceremony. Keep it spoken, warm, and concise.]
 ${storyNotes}
+` : ''}
+
+${lovedOneHonorStyle ? `LOVED ONE REMEMBRANCE
+[Include a brief, sensitive remembrance. Use this direction: ${lovedOneHonorStyle}. If specific names are not confirmed, keep the language general so no family member or loved one is unintentionally excluded.]
 ` : ''}
 
 DECLARATION OF INTENT
@@ -1178,7 +1411,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const [showSwitchCeremonyDialog, setShowSwitchCeremonyDialog] = useState(false)
   const [showArchivedCeremoniesDialog, setShowArchivedCeremoniesDialog] = useState(false)
   const [showDashboardDialog, setShowDashboardDialog] = useState(false)
-  const [dashboardInitialView, setDashboardInitialView] = useState<"dashboard" | "ceremonies" | "profile" | "calendar" | "documents" | "settings">("dashboard")
+  const [dashboardInitialView, setDashboardInitialView] = useState<"dashboard" | "ceremonies" | "profile" | "calendar" | "documents" | "vendors" | "refunds" | "settings">("dashboard")
 
   // Form states for Add New Ceremony
   const [newCeremony, setNewCeremony] = useState({
@@ -1219,6 +1452,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const currentCeremonyType = editCoupleInfo?.ceremonyType || getCeremonyTypeFromNotes(editCoupleInfo?.specialRequests)
   const currentCeremonyConfig = getCeremonyTypeConfig(currentCeremonyType)
   const isCurrentCeremonyWedding = currentCeremonyType === "wedding"
+  const premiumScriptStorageKey = editCoupleInfo?.id
+    ? `ordainedpro-premium-script-uses-${editCoupleInfo.id}`
+    : ""
 
   // Form states for Edit Wedding Details - set when couples load from database
   const [editWeddingDetails, setEditWeddingDetails] = useState({
@@ -1272,6 +1508,8 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   // Generated script tracking
   const [hasGeneratedScript, setHasGeneratedScript] = useState(false)
   const [generatedScriptContent, setGeneratedScriptContent] = useState("")
+  const [premiumScriptUses, setPremiumScriptUses] = useState(0)
+  const premiumScriptUsesRemaining = Math.max(0, PREMIUM_SCRIPT_LIMIT - premiumScriptUses)
   const [scriptVersionHistory, setScriptVersionHistory] = useState<Array<{
     id: string
     title: string
@@ -1303,7 +1541,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   // Log saved ceremonies for debugging
   useEffect(() => {
     if (savedCeremonies.length > 0) {
-      console.log("[SCRIPT]‹ Saved Ceremonies:", savedCeremonies)
+      console.log("[SCRIPT]â€¹ Saved Ceremonies:", savedCeremonies)
     }
   }, [savedCeremonies])
 
@@ -1317,7 +1555,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
           console.log("No user session found")
           return
         }
-        console.log("âœ… Loaded user:", user.id)
+        console.log("Ã¢Å“â€¦ Loaded user:", user.id)
         setCurrentUser(user)
 
         // Load officiant profile
@@ -1328,7 +1566,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
           .single()
 
         if (profile) {
-          console.log("âœ… Loaded profile:", profile.business_name)
+          console.log("Ã¢Å“â€¦ Loaded profile:", profile.business_name)
           setOfficiantProfile(profile)
         }
       } catch (err) {
@@ -1350,6 +1588,16 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     window.addEventListener("ordainedpro:profile-updated", handleProfileUpdated)
     return () => window.removeEventListener("ordainedpro:profile-updated", handleProfileUpdated)
   }, [])
+
+  useEffect(() => {
+    if (!premiumScriptStorageKey || typeof window === "undefined") {
+      setPremiumScriptUses(0)
+      return
+    }
+
+    const storedUses = Number(window.localStorage.getItem(premiumScriptStorageKey) || "0")
+    setPremiumScriptUses(Number.isFinite(storedUses) ? Math.min(PREMIUM_SCRIPT_LIMIT, Math.max(0, storedUses)) : 0)
+  }, [premiumScriptStorageKey])
 
   // Load couples from database
   useEffect(() => {
@@ -1413,9 +1661,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
           officiantNotes: ""
         })
         setActiveCoupleIndex(selectedCoupleIndex >= 0 ? selectedCoupleIndex : 0)
-        console.log("âœ… Loaded", transformedCouples.length, "couples from database")
+        console.log("Ã¢Å“â€¦ Loaded", transformedCouples.length, "couples from database")
       } else {
-        console.log("[SCRIPT]­ No couples found in database")
+        console.log("[SCRIPT]Â­ No couples found in database")
         setAllCouples([])
       }
 
@@ -1430,7 +1678,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser || !editCoupleInfo?.id) return
 
     try {
-      console.log("[SCRIPT]¨ Loading messages for couple:", editCoupleInfo.id)
+      console.log("[SCRIPT]Â¨ Loading messages for couple:", editCoupleInfo.id)
 
       const { data: messagesData, error } = await supabase
         .from("messages")
@@ -1440,12 +1688,12 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         .order("created_at", { ascending: true })
 
       if (error) {
-        console.error("âŒ Error loading messages:", error)
+        console.error("Ã¢ÂÅ’ Error loading messages:", error)
         return
       }
 
       if (messagesData && messagesData.length > 0) {
-        console.log("âœ… Loaded", messagesData.length, "messages")
+        console.log("Ã¢Å“â€¦ Loaded", messagesData.length, "messages")
 
         // Transform to display format
         const formattedMessages = messagesData.map((msg: any) => ({
@@ -1459,11 +1707,11 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
         setMessages(formattedMessages)
       } else {
-        console.log("[SCRIPT]­ No messages found for this couple")
+        console.log("[SCRIPT]Â­ No messages found for this couple")
         setMessages([])
       }
     } catch (err) {
-      console.error("âŒ Error in loadMessages:", err)
+      console.error("Ã¢ÂÅ’ Error in loadMessages:", err)
     }
   }, [currentUser, editCoupleInfo?.id])
 
@@ -1545,7 +1793,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id || !editCoupleInfo?.id) return
 
     setIsLoadingTasks(true)
-    console.log("[SCRIPT]‹ Loading tasks for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]â€¹ Loading tasks for couple:", editCoupleInfo.id)
 
     const result = await loadTasksFromDB(currentUser.id, editCoupleInfo.id)
 
@@ -1565,9 +1813,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         createdDate: t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : ""
       }))
       setTasks(transformedTasks)
-      console.log("âœ… Loaded", transformedTasks.length, "tasks for couple", editCoupleInfo.id)
+      console.log("Ã¢Å“â€¦ Loaded", transformedTasks.length, "tasks for couple", editCoupleInfo.id)
     } else {
-      console.log("[SCRIPT]­ No tasks found or error for couple", editCoupleInfo.id)
+      console.log("[SCRIPT]Â­ No tasks found or error for couple", editCoupleInfo.id)
       setTasks([])
     }
 
@@ -1583,7 +1831,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id || !editCoupleInfo?.id) return
 
     setIsLoadingFiles(true)
-    console.log("[SCRIPT] Loading files for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]Â Loading files for couple:", editCoupleInfo.id)
 
     const result = await loadFilesFromDB(currentUser.id, editCoupleInfo.id)
 
@@ -1600,9 +1848,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         category: f.category
       }))
       setFiles(transformedFiles)
-      console.log("âœ… Loaded", transformedFiles.length, "files for couple", editCoupleInfo.id)
+      console.log("Ã¢Å“â€¦ Loaded", transformedFiles.length, "files for couple", editCoupleInfo.id)
     } else {
-      console.log("[SCRIPT]­ No files found or error for couple", editCoupleInfo.id)
+      console.log("[SCRIPT]Â­ No files found or error for couple", editCoupleInfo.id)
       setFiles([])
     }
 
@@ -1618,7 +1866,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id || !editCoupleInfo?.id) return
 
     setIsLoadingMeetings(true)
-    console.log("[SCRIPT]… Loading meetings for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]â€¦ Loading meetings for couple:", editCoupleInfo.id)
 
     const result = await loadMeetingsFromDB(currentUser.id, editCoupleInfo.id)
 
@@ -1643,9 +1891,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         responseDeadline: m.response_deadline || ""
       }))
       setMeetings(transformedMeetings)
-      console.log("âœ… Loaded", transformedMeetings.length, "meetings for couple", editCoupleInfo.id)
+      console.log("Ã¢Å“â€¦ Loaded", transformedMeetings.length, "meetings for couple", editCoupleInfo.id)
     } else {
-      console.log("[SCRIPT]­ No meetings found or error for couple", editCoupleInfo.id)
+      console.log("[SCRIPT]Â­ No meetings found or error for couple", editCoupleInfo.id)
       setMeetings([])
     }
 
@@ -1661,7 +1909,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id || !editCoupleInfo?.id) return
 
     setIsLoadingContracts(true)
-    console.log("[SCRIPT]œ Loading contracts for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]Å“ Loading contracts for couple:", editCoupleInfo.id)
 
     const result = await loadContractsFromDB(currentUser.id, editCoupleInfo.id)
 
@@ -1692,9 +1940,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         : contractRecords.filter((record: any) => !isOrdainedProDefaultContract(transformContractRecord(record)))
       const transformedContracts = visibleContractRecords.map(transformContractRecord)
       setContracts(transformedContracts)
-      console.log("âœ… Loaded", transformedContracts.length, "contracts for couple", editCoupleInfo.id)
+      console.log("Ã¢Å“â€¦ Loaded", transformedContracts.length, "contracts for couple", editCoupleInfo.id)
     } else {
-      console.log("[SCRIPT]­ No contracts found or error for couple", editCoupleInfo.id)
+      console.log("[SCRIPT]Â­ No contracts found or error for couple", editCoupleInfo.id)
       setContracts([])
     }
 
@@ -1710,7 +1958,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id || !editCoupleInfo?.id) return
 
     setIsLoadingPayments(true)
-    console.log("’° Loading payments for couple:", editCoupleInfo.id)
+    console.log("â€™Â° Loading payments for couple:", editCoupleInfo.id)
 
     const result = await loadPaymentsFromDB(currentUser.id, editCoupleInfo.id)
 
@@ -1721,12 +1969,18 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         return {
           id: p.id,
           date: p.paid_date || p.due_date || new Date(p.created_at).toLocaleDateString(),
+          createdAt: p.created_at || "",
           amount: p.amount,
           type: isRefundRow ? "Refund" : p.invoice_number || p.description || "Invoice",
           method: isRefundRow ? "Refund" : p.status === "paid" ? "Completed" : "Pending",
           status: isRefundRow ? "refunded" : p.status,
+          invoiceNumber: p.invoice_number || "",
+          paymentType: p.payment_method || p.payment_type || "",
           description: p.notes || p.description || p.invoice_number || "Ceremony invoice",
-          dueDate: p.due_date
+          dueDate: p.due_date,
+          refundFeeRate: Number(p.refund_fee_rate || 0),
+          refundFee: Number(p.refund_fee_amount || 0),
+          totalOfficiantCharge: Number(p.total_officiant_charge || 0)
         }
       })
       setPaymentHistory(transformedPayments)
@@ -1737,19 +1991,21 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         totalAmount: paymentSummary.totalAmount,
         depositPaid: paymentSummary.totalPaid,
         balance: paymentSummary.balance,
+        refundFeesCharged: paymentSummary.totalRefundFees,
         depositDate: transformedPayments.find((payment: any) => isPaidPayment(payment))?.date || "",
         finalPaymentDue: paymentSummary.finalPaymentDue,
         paymentStatus: paymentSummary.paymentStatus
       })
 
-      console.log("âœ… Loaded", transformedPayments.length, "payments for couple", editCoupleInfo.id)
+      console.log("Ã¢Å“â€¦ Loaded", transformedPayments.length, "payments for couple", editCoupleInfo.id)
     } else {
-      console.log("[SCRIPT]­ No payments found or error for couple", editCoupleInfo.id)
+      console.log("[SCRIPT]Â­ No payments found or error for couple", editCoupleInfo.id)
       setPaymentHistory([])
       setPaymentInfo({
         totalAmount: 0,
         depositPaid: 0,
         balance: 0,
+        refundFeesCharged: 0,
         depositDate: "",
         finalPaymentDue: "",
         paymentStatus: "pending"
@@ -1780,6 +2036,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         dueDate: payment.due_date || "",
         paidDate: payment.paid_date || payment.created_at || "",
         createdAt: payment.created_at || "",
+        refundFeeRate: Number(payment.refund_fee_rate || 0),
+        refundFee: Number(payment.refund_fee_amount || 0),
+        totalOfficiantCharge: Number(payment.total_officiant_charge || 0),
       })))
     } else {
       setAllPaymentRecords([])
@@ -1812,7 +2071,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     if (!currentUser?.id) return
 
     setIsLoadingScripts(true)
-    console.log("[SCRIPT]œ Loading scripts for user:", currentUser.id)
+    console.log("[SCRIPT]Å“ Loading scripts for user:", currentUser.id)
 
     const result = await loadScriptsFromDB(currentUser.id, editCoupleInfo?.id)
 
@@ -1851,9 +2110,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         stripePriceId: s.stripe_price_id
       }))
       setCoupleScripts(transformedScripts)
-      console.log("âœ… Loaded", transformedScripts.length, "scripts from database")
+      console.log("Ã¢Å“â€¦ Loaded", transformedScripts.length, "scripts from database")
     } else {
-      console.log("[SCRIPT]­ No scripts found or error")
+      console.log("[SCRIPT]Â­ No scripts found or error")
       // Keep default demo scripts if no database scripts
     }
 
@@ -1933,13 +2192,13 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
   const getEventTypeIcon = (type: string) => {
     switch (type) {
-      case 'meeting': return '[HANDSHAKE]'
-      case 'task': return 'âœ…'
+      case 'meeting': return '[HANDSHAKE]Â'
+      case 'task': return 'Ã¢Å“â€¦'
       case 'rehearsal': return '[STYLE]'
-      case 'ceremony': return '’’'
-      case 'preparation': return '[WARNING]™ï¸'
-      case 'follow-up': return '[SCRIPT]ž'
-      default: return '[SCRIPT]…'
+      case 'ceremony': return 'â€™â€™'
+      case 'preparation': return '[WARNING]â„¢Ã¯Â¸Â'
+      case 'follow-up': return '[SCRIPT]Å¾'
+      default: return '[SCRIPT]â€¦'
     }
   }
 
@@ -2226,6 +2485,202 @@ Mr. Script - Your Personal Wedding Script Creator`
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
+  const getMrScriptProfileService = () => {
+    const profileType = resolveCeremonyTypeValue(currentCeremonyType || editCoupleInfo?.ceremonyTypeLabel)
+
+    if (profileType === "quinceanera") return "Coming-of-Age"
+    if (profileType === "celebration_of_life") return "Celebration of Life"
+    if (profileType === "baby_blessing") return "Baby Blessing"
+    if (profileType === "vow_renewal") return "Vow Renewal"
+    if (profileType === "wedding") return "Wedding"
+    return currentCeremonyConfig?.label || "Custom Life Ceremony"
+  }
+
+  const buildMrScriptProfileContext = () => {
+    const profileType = resolveCeremonyTypeValue(currentCeremonyType || editCoupleInfo?.ceremonyTypeLabel)
+    const serviceOption = getMrScriptProfileService()
+    const ceremonyLabel = currentCeremonyConfig?.label || editCoupleInfo?.ceremonyTypeLabel || "Ceremony"
+    const partner1Name = editCoupleInfo?.brideName || ""
+    const partner2Name = editCoupleInfo?.groomName || ""
+    const coupleNames = [partner1Name, partner2Name].filter(Boolean).join(" & ")
+    const isMinorCeremony = profileType === "quinceanera" || profileType === "baby_blessing"
+    const isMemorialCeremony = profileType === "celebration_of_life"
+    const honoreeName = isMinorCeremony
+      ? (editCoupleInfo?.honoreeName || editCoupleInfo?.honoreeFullName || partner1Name)
+      : ""
+    const childName = profileType === "baby_blessing"
+      ? (editCoupleInfo?.childName || honoreeName || partner1Name)
+      : ""
+    const deceasedName = isMemorialCeremony
+      ? (editCoupleInfo?.deceasedName || editCoupleInfo?.deceasedFullName || partner2Name || partner1Name)
+      : ""
+    const primaryContactName = isMemorialCeremony
+      ? (partner1Name || partner2Name)
+      : ""
+    const parentGuardianNames = isMinorCeremony
+      ? [editCoupleInfo?.parentGuardianName, partner2Name, partner1Name !== honoreeName ? partner1Name : ""]
+          .filter(Boolean)
+          .filter((name, index, all) => all.indexOf(name) === index)
+          .join(" & ")
+      : ""
+    const subjectName =
+      profileType === "wedding" || profileType === "vow_renewal"
+        ? coupleNames
+        : deceasedName || childName || honoreeName || coupleNames || ceremonyLabel
+    const ceremonyDate = editWeddingDetails?.weddingDate || ""
+    const ceremonyTime = editWeddingDetails?.startTime || ""
+    const venueName = editWeddingDetails?.venueName || ""
+    const venueAddress = editWeddingDetails?.venueAddress || editCoupleInfo?.address || ""
+    const expectedGuests = editWeddingDetails?.expectedGuests || ""
+    const specialRequests = editCoupleInfo?.specialRequests || ""
+    const detailsAny = editWeddingDetails as any
+    const privateNotes = editWeddingDetails?.officiantNotes || detailsAny?.privateNotes || ""
+    const honoreeAge = editCoupleInfo?.honoreeAge || editCoupleInfo?.age || getCeremonyAgeFromNotes(specialRequests, "Honoree")
+
+    const knownFacts = [
+      `Ceremony type: ${ceremonyLabel}`,
+      subjectName ? `Primary subject: ${subjectName}` : "",
+      profileType === "wedding" && coupleNames ? `Couple: ${coupleNames}` : "",
+      profileType === "vow_renewal" && coupleNames ? `Couple: ${coupleNames}` : "",
+      honoreeName ? `Honoree: ${honoreeName}` : "",
+      honoreeAge ? `Honoree age: ${honoreeAge}` : "",
+      childName ? `Child: ${childName}` : "",
+      parentGuardianNames ? `Parent/guardian names: ${parentGuardianNames}` : "",
+      deceasedName ? `Deceased/loved one: ${deceasedName}` : "",
+      primaryContactName ? `Primary family contact: ${primaryContactName}` : "",
+      ceremonyDate ? `Ceremony date: ${ceremonyDate}` : "",
+      ceremonyTime ? `Ceremony time: ${ceremonyTime}` : "",
+      venueName ? `Venue: ${venueName}` : "",
+      venueAddress ? `Venue address: ${venueAddress}` : "",
+      expectedGuests ? `Expected guests: ${expectedGuests}` : "",
+      specialRequests ? `Profile notes: ${specialRequests}` : "",
+      privateNotes ? `Officiant private notes: ${privateNotes}` : "",
+    ].filter(Boolean)
+
+    const responsePrefill: Record<string, string> = {
+      "ceremony-type": serviceOption,
+      "profile-context-summary": knownFacts.map((fact) => `- ${fact}`).join("\n"),
+    }
+
+    if (subjectName) {
+      responsePrefill["core-details"] = knownFacts.join("\n")
+    }
+
+    if ((profileType === "wedding" || profileType === "vow_renewal") && coupleNames) {
+      responsePrefill[getGuidedDetailResponseKey("core-details", 0)] = coupleNames
+    } else if (profileType === "quinceanera" && honoreeName) {
+      responsePrefill[getGuidedDetailResponseKey("core-details", 0)] = honoreeName
+    } else if (profileType === "celebration_of_life" && deceasedName) {
+      responsePrefill[getGuidedDetailResponseKey("core-details", 0)] = deceasedName
+    } else if (profileType === "baby_blessing" && childName) {
+      responsePrefill[getGuidedDetailResponseKey("core-details", 0)] = childName
+    }
+
+    if (specialRequests || privateNotes) {
+      responsePrefill["story-notes"] = [specialRequests, privateNotes].filter(Boolean).join("\n\n")
+    }
+
+    if (honoreeName) responsePrefill["honoree-name"] = honoreeName
+    if (childName) responsePrefill["child-name"] = childName
+    if (deceasedName) responsePrefill["loved-one-name"] = deceasedName
+    if (parentGuardianNames) responsePrefill["intake-family-traditions"] = `Family or guardian names already in profile: ${parentGuardianNames}`
+    if (profileType === "wedding" && coupleNames) responsePrefill["intake-relationship-story"] = `Couple names already in profile: ${coupleNames}`
+    if (profileType === "celebration_of_life" && deceasedName) responsePrefill["intake-life-story"] = `Loved one named in profile: ${deceasedName}`
+    if (profileType === "baby_blessing" && childName) responsePrefill["intake-child-family"] = `Child named in profile: ${childName}${parentGuardianNames ? `; parents/guardians: ${parentGuardianNames}` : ""}`
+
+    return {
+      profileType,
+      serviceOption,
+      ceremonyLabel,
+      subjectName,
+      partner1Name,
+      partner2Name,
+      honoreeName,
+      childName,
+      deceasedName,
+      parentGuardianNames,
+      primaryContactName,
+      ceremonyDate,
+      ceremonyTime,
+      venueName,
+      venueAddress,
+      expectedGuests,
+      specialRequests,
+      privateNotes,
+      knownFacts,
+      responsePrefill,
+    }
+  }
+
+  const buildQuickSetupResponses = (baseResponses: Record<string, string> = {}) => {
+    const quickSetupResponses: Record<string, string> = {
+      ...baseResponses,
+    }
+    const quickSetupService = getMrScriptServiceByResponse(selectedCeremonyStyle)
+    const shouldUseWeddingDetails = ["wedding", "vow_renewal"].includes(quickSetupService.id)
+
+    if (selectedCeremonyStyle) {
+      quickSetupResponses['ceremony-type'] = selectedCeremonyStyle
+    }
+
+    if (selectedCeremonyLength) {
+      quickSetupResponses['ceremony-duration'] = selectedCeremonyLength
+    }
+
+    if (selectedOfficiantStyle) {
+      quickSetupResponses['ceremony-tone'] = selectedOfficiantStyle
+      quickSetupResponses['officiant-style'] = selectedOfficiantStyle
+    }
+
+    if (storyNotes.trim()) {
+      quickSetupResponses['story-notes'] = storyNotes.trim()
+    }
+
+    if (shouldUseWeddingDetails && selectedUnityCeremony && selectedUnityCeremony !== "None") {
+      quickSetupResponses['special-elements'] = selectedUnityCeremony
+      quickSetupResponses[getGuidedDetailResponseKey("core-details", 3)] = "Yes"
+    } else if (shouldUseWeddingDetails && selectedUnityCeremony === "None") {
+      quickSetupResponses['special-elements'] = "None"
+      quickSetupResponses[getGuidedDetailResponseKey("core-details", 3)] = "No"
+    }
+
+    if (shouldUseWeddingDetails && selectedVowsType) {
+      if (selectedVowsType === "Traditional") {
+        quickSetupResponses['vows-type'] = "Traditional Vows"
+      } else if (selectedVowsType === "Personal") {
+        quickSetupResponses['vows-type'] = "Personal Written Vows"
+      } else if (selectedVowsType === "Personal and Modern") {
+        quickSetupResponses['vows-type'] = "Mix of Both"
+      } else {
+        quickSetupResponses['vows-type'] = selectedVowsType
+      }
+
+      quickSetupResponses[getGuidedDetailResponseKey("core-details", 2)] =
+        selectedVowsType === "None" ? "No" : quickSetupResponses['vows-type']
+    }
+
+    const quickSetupFacts = [
+      selectedCeremonyStyle ? `Script type: ${quickSetupService.displayName}` : "",
+      selectedCeremonyLength ? `Ceremony length: ${selectedCeremonyLength}` : "",
+      selectedOfficiantStyle ? `Officiant style: ${selectedOfficiantStyle}` : "",
+      shouldUseWeddingDetails && selectedUnityCeremony ? `Unity ceremony: ${selectedUnityCeremony}` : "",
+      shouldUseWeddingDetails && selectedVowsType ? `Vows: ${selectedVowsType}` : "",
+      storyNotes.trim() ? `Story notes: ${storyNotes.trim()}` : "",
+    ].filter(Boolean)
+
+    if (quickSetupFacts.length) {
+      quickSetupResponses['quick-setup-summary'] = quickSetupFacts.map((fact) => `- ${fact}`).join("\n")
+    }
+
+    const coreQuestion = getActiveGuidedQuestions(quickSetupResponses).find((question) => question.id === "core-details")
+    if (coreQuestion && !hasUnansweredGuidedDetails(coreQuestion, quickSetupResponses)) {
+      const coreSummary = buildGuidedDetailSummary(coreQuestion, quickSetupResponses)
+      if (coreSummary) quickSetupResponses['core-details'] = coreSummary
+    }
+
+    return quickSetupResponses
+  }
+
   const handleModeSelect = (mode: "guided" | "expert") => {
     setScriptMode(mode)
 
@@ -2240,18 +2695,33 @@ Mr. Script - Your Personal Wedding Script Creator`
 
   // AI Chatbot Handler Functions
   const initializeChatbot = () => {
+    const profileContext = buildMrScriptProfileContext()
+    const startingResponses = buildQuickSetupResponses(profileContext.responsePrefill)
+    const activeQuestions = getActiveGuidedQuestions(startingResponses)
+    const rawFirstUnansweredIndex = activeQuestions.findIndex((question) =>
+      !startingResponses[question.id] || hasUnansweredGuidedDetails(question, startingResponses)
+    )
+    const firstUnansweredIndex = rawFirstUnansweredIndex === -1 ? 0 : rawFirstUnansweredIndex
+    const openingQuestion = activeQuestions[firstUnansweredIndex] || activeQuestions[0]
+    const profileIntro = profileContext.knownFacts.length
+      ? [
+          "I pulled these details from the active profile so you do not have to retype them:",
+          profileContext.knownFacts.slice(0, 8).map((fact) => `- ${fact}`).join("\n"),
+          "If any of that is wrong, just tell me and I will use your correction for the script."
+        ].join("\n\n")
+      : ""
+
     setChatMessages([])
-    setCurrentQuestionIndex(0)
-    setUserResponses({})
+    setCurrentQuestionIndex(firstUnansweredIndex)
+    setUserResponses(startingResponses)
 
     setIsTyping(true)
     setTimeout(() => {
-      const openingQuestion = getActiveGuidedQuestions({})[0]
       setChatMessages([
         {
           id: `ai-opening-${Date.now()}`,
           type: 'ai',
-          content: generateAIResponse(openingQuestion, {}),
+          content: [profileIntro, generateAIResponse(openingQuestion, startingResponses)].filter(Boolean).join("\n\n"),
           timestamp: new Date(),
           questionId: openingQuestion.id
         }
@@ -2261,28 +2731,29 @@ Mr. Script - Your Personal Wedding Script Creator`
   }
 
   const askNextQuestion = (questionIndex: number, responseOverrides: Record<string, string> = userResponses) => {
-    const activeQuestions = getActiveGuidedQuestions(responseOverrides)
+    const mergedResponses = buildQuickSetupResponses(responseOverrides)
+    const activeQuestions = getActiveGuidedQuestions(mergedResponses)
 
     if (questionIndex >= activeQuestions.length) {
       // All questions completed, generate recommendation
-      generateFinalRecommendation(responseOverrides)
+      generateFinalRecommendation(mergedResponses)
       return
     }
 
     const question = activeQuestions[questionIndex]
 
     // Skip questions that have already been answered via Quick Setup
-    if (responseOverrides[question.id]) {
+    if (mergedResponses[question.id] && !hasUnansweredGuidedDetails(question, mergedResponses)) {
       // Question already answered, move to next one
       setCurrentQuestionIndex(prev => prev + 1)
-      askNextQuestion(questionIndex + 1, responseOverrides)
+      askNextQuestion(questionIndex + 1, mergedResponses)
       return
     }
 
     setIsTyping(true)
 
     setTimeout(() => {
-      const aiResponse = generateAIResponse(question, responseOverrides)
+      const aiResponse = generateAIResponse(question, mergedResponses)
       const questionMessage: ChatMessage = {
         id: `ai-${Date.now()}`,
         type: 'ai',
@@ -2294,6 +2765,155 @@ Mr. Script - Your Personal Wedding Script Creator`
       setChatMessages(prev => [...prev, questionMessage])
       setIsTyping(false)
     }, 1000)
+  }
+
+  const handleGuidedDetailResponse = (response: string) => {
+    const mergedUserResponses = buildQuickSetupResponses(userResponses)
+    const currentQuestion = getActiveGuidedQuestions(mergedUserResponses)[currentQuestionIndex]
+    if (!currentQuestion || !hasUnansweredGuidedDetails(currentQuestion, mergedUserResponses)) return false
+
+    const detailIndex = getFirstUnansweredGuidedDetailIndex(currentQuestion, mergedUserResponses)
+    if (detailIndex === -1) return false
+
+    const answer = response.trim().toLowerCase() === "skip" ? "Skipped" : response.trim()
+    const detailKey = getGuidedDetailResponseKey(currentQuestion.id, detailIndex)
+    const nextResponses = {
+      ...mergedUserResponses,
+      [detailKey]: answer
+    }
+    nextResponses[currentQuestion.id] = buildGuidedDetailSummary(currentQuestion, nextResponses)
+    setUserResponses(nextResponses)
+
+    const nextDetailPrompt = buildGuidedDetailPrompt(currentQuestion, nextResponses)
+
+    setTimeout(() => {
+      if (nextDetailPrompt) {
+        setIsTyping(true)
+        setTimeout(() => {
+          const assistantMessage: ChatMessage = {
+            id: `ai-detail-${Date.now()}`,
+            type: 'ai',
+            content: nextDetailPrompt,
+            timestamp: new Date(),
+            questionId: currentQuestion.id
+          }
+
+          setChatMessages(prev => [...prev, assistantMessage])
+          setIsTyping(false)
+        }, 500)
+        return
+      }
+
+      setCurrentQuestionIndex(prev => prev + 1)
+      askNextQuestion(currentQuestionIndex + 1, nextResponses)
+    }, 300)
+
+    return true
+  }
+
+  const handleLovedOneHonorFollowUp = (response: string) => {
+    const mergedUserResponses = buildQuickSetupResponses(userResponses)
+    const activeQuestions = getActiveGuidedQuestions(mergedUserResponses)
+    const currentQuestion = activeQuestions[currentQuestionIndex]
+    const trimmedResponse = response.trim()
+
+    if (mergedUserResponses[PENDING_LOVED_ONE_HONOR_KEY] === "true") {
+      const remembrancePreference = isNegativeResponse(trimmedResponse)
+        ? "Keep the loved one remembrance general and do not mention specific names."
+        : trimmedResponse
+      const priorInclusions = mergedUserResponses['special-inclusions'] || ""
+      const nextResponses = {
+        ...mergedUserResponses,
+        [PENDING_LOVED_ONE_HONOR_KEY]: "",
+        [LOVED_ONE_HONOR_STYLE_KEY]: remembrancePreference,
+        'special-inclusions': [
+          priorInclusions,
+          `Loved one remembrance preference: ${remembrancePreference}`
+        ].filter(Boolean).join("\n")
+      }
+
+      setUserResponses(nextResponses)
+
+      setTimeout(() => {
+        setCurrentQuestionIndex(prev => prev + 1)
+        askNextQuestion(currentQuestionIndex + 1, nextResponses)
+      }, 500)
+
+      return true
+    }
+
+    if (currentQuestion?.id !== "special-inclusions") return false
+    if (!shouldAskLovedOneHonorFollowUp(trimmedResponse)) return false
+
+    const nextResponses = {
+      ...mergedUserResponses,
+      [PENDING_LOVED_ONE_HONOR_KEY]: "true",
+      'special-inclusions': trimmedResponse
+    }
+
+    setUserResponses(nextResponses)
+
+    setTimeout(() => {
+      setIsTyping(true)
+      setTimeout(() => {
+        const assistantMessage: ChatMessage = {
+          id: `ai-loved-one-${Date.now()}`,
+          type: 'ai',
+          content: [
+            "Of course. Would you like me to mention a loved one by name, or keep the remembrance general for all loved ones who have passed?",
+            "Sometimes general language is safest, because if one person is named and another important loved one is not, it can unintentionally hurt or offend someone.",
+            "You can reply with the name to include, say \"keep it general,\" or say skip."
+          ].join("\n\n"),
+          timestamp: new Date(),
+          questionId: currentQuestion.id
+        }
+
+        setChatMessages(prev => [...prev, assistantMessage])
+        setIsTyping(false)
+      }, 500)
+    }, 300)
+
+    return true
+  }
+
+  const handleClarificationRequest = (response: string) => {
+    if (!isClarificationRequest(response)) return false
+
+    const mergedUserResponses = buildQuickSetupResponses(userResponses)
+    const activeQuestions = getActiveGuidedQuestions(mergedUserResponses)
+    const currentQuestion = activeQuestions[currentQuestionIndex]
+    if (!currentQuestion && mergedUserResponses[PENDING_LOVED_ONE_HONOR_KEY] !== "true") return false
+
+    const detailPrompt = currentQuestion
+      ? buildGuidedDetailPrompt(currentQuestion, mergedUserResponses, "Back to the question:")
+      : null
+    const repeatPrompt =
+      mergedUserResponses[PENDING_LOVED_ONE_HONOR_KEY] === "true"
+        ? "Would you like me to mention a loved one by name, or keep the remembrance general for all loved ones who have passed?"
+        : currentQuestion?.id === "special-inclusions"
+          ? getSpecialInclusionsPrompt()
+          : detailPrompt || (currentQuestion ? generateAIResponse(currentQuestion, mergedUserResponses) : "")
+
+    setTimeout(() => {
+      setIsTyping(true)
+      setTimeout(() => {
+        const assistantMessage: ChatMessage = {
+          id: `ai-clarify-${Date.now()}`,
+          type: 'ai',
+          content: [
+            buildClarificationAnswer(response),
+            repeatPrompt
+          ].filter(Boolean).join("\n\n"),
+          timestamp: new Date(),
+          questionId: currentQuestion?.id
+        }
+
+        setChatMessages(prev => [...prev, assistantMessage])
+        setIsTyping(false)
+      }, 500)
+    }, 300)
+
+    return true
   }
 
   const handleChatSubmit = () => {
@@ -2308,8 +2928,24 @@ Mr. Script - Your Personal Wedding Script Creator`
 
     setChatMessages(prev => [...prev, userMessage])
 
-    // Check if user wants to generate the script
     const lowerInput = chatInput.toLowerCase()
+
+    if (handleClarificationRequest(chatInput)) {
+      setChatInput("")
+      return
+    }
+
+    if (handleGuidedDetailResponse(chatInput)) {
+      setChatInput("")
+      return
+    }
+
+    if (handleLovedOneHonorFollowUp(chatInput)) {
+      setChatInput("")
+      return
+    }
+
+    // Check if user wants to generate the script
     if (lowerInput.includes('yes') || lowerInput.includes('generate script') || lowerInput.includes('create script') || lowerInput.includes('make script')) {
       setChatInput("")
       generateAndSaveScript()
@@ -2364,6 +3000,18 @@ Mr. Script - Your Personal Wedding Script Creator`
       return
     }
 
+    if (handleClarificationRequest(response)) {
+      return
+    }
+
+    if (handleGuidedDetailResponse(response)) {
+      return
+    }
+
+    if (handleLovedOneHonorFollowUp(response)) {
+      return
+    }
+
     // Save user response
     const currentQuestion = getActiveGuidedQuestions(userResponses)[currentQuestionIndex]
     const nextResponses = currentQuestion
@@ -2411,20 +3059,34 @@ Mr. Script - Your Personal Wedding Script Creator`
     }, 1500)
   }
 
-  const generateAndSaveScript = async () => {
+  const generateAndSaveScript = async (usePremiumModel = false) => {
+    if (usePremiumModel) {
+      if (!premiumScriptStorageKey) {
+        alert("Please select a ceremony profile before using Premium Polish.")
+        return
+      }
+
+      if (premiumScriptUses >= PREMIUM_SCRIPT_LIMIT) {
+        alert(`Premium Polish has already been used ${PREMIUM_SCRIPT_LIMIT} times for this profile.`)
+        return
+      }
+    }
+
     setIsTyping(true)
 
-    const service = getMrScriptServiceByResponse(userResponses['ceremony-type'] || selectedCeremonyStyle)
-    const responseMap: Record<string, string> = {
+    const profileContext = buildMrScriptProfileContext()
+    const service = getMrScriptServiceByResponse(userResponses['ceremony-type'] || selectedCeremonyStyle || profileContext.serviceOption)
+    const responseMap: Record<string, string> = buildQuickSetupResponses({
+      ...profileContext.responsePrefill,
       ...userResponses,
-      'ceremony-type': userResponses['ceremony-type'] || selectedCeremonyStyle,
+      'ceremony-type': userResponses['ceremony-type'] || selectedCeremonyStyle || profileContext.serviceOption,
       'ceremony-duration': userResponses['ceremony-duration'] || selectedCeremonyLength,
       'ceremony-tone': userResponses['ceremony-tone'] || selectedOfficiantStyle,
       'officiant-style': userResponses['officiant-style'] || selectedOfficiantStyle,
-      'story-notes': userResponses['story-notes'] || storyNotes,
+      'story-notes': userResponses['story-notes'] || storyNotes || profileContext.responsePrefill["story-notes"],
       'special-elements': userResponses['special-elements'] || selectedUnityCeremony,
       'vows-type': userResponses['vows-type'] || selectedVowsType,
-    }
+    })
     const fallbackScript = generateCompleteScript(responseMap, editCoupleInfo, editWeddingDetails)
 
     try {
@@ -2439,14 +3101,17 @@ Mr. Script - Your Personal Wedding Script Creator`
           officiantStyle: responseMap['officiant-style'],
           brideName: editCoupleInfo?.brideName || "",
           groomName: editCoupleInfo?.groomName || "",
-          subjectName: [editCoupleInfo?.brideName, editCoupleInfo?.groomName].filter(Boolean).join(" & "),
+          subjectName: profileContext.subjectName || [editCoupleInfo?.brideName, editCoupleInfo?.groomName].filter(Boolean).join(" & "),
           venue: editWeddingDetails?.venueName || "",
           weddingDate: editWeddingDetails?.weddingDate || "",
           ceremonyDate: editWeddingDetails?.weddingDate || "",
+          ceremonyProfileContext: profileContext,
+          usePremiumModel,
           userResponses: responseMap,
           storyNotes: responseMap['story-notes'],
           coreDetails: responseMap['core-details'],
           specialInclusions: responseMap['special-inclusions'],
+          lovedOneHonorStyle: responseMap[LOVED_ONE_HONOR_STYLE_KEY],
           avoidances: responseMap['avoidances'],
           unityCeremony: responseMap['special-elements'],
           vowsType: responseMap['vows-type'],
@@ -2454,11 +3119,25 @@ Mr. Script - Your Personal Wedding Script Creator`
       })
 
       if (!response.ok) {
-        throw new Error(await response.text())
+        let errorDetails = await response.text()
+        try {
+          const parsedError = JSON.parse(errorDetails)
+          errorDetails = parsedError.details || parsedError.error || errorDetails
+        } catch {
+          // Keep the raw response text when the server does not return JSON.
+        }
+        throw new Error(errorDetails)
       }
 
       const data = await response.json()
       const completeScript = data.script || fallbackScript
+      if (usePremiumModel) {
+        const nextPremiumUses = Math.min(PREMIUM_SCRIPT_LIMIT, premiumScriptUses + 1)
+        setPremiumScriptUses(nextPremiumUses)
+        if (premiumScriptStorageKey && typeof window !== "undefined") {
+          window.localStorage.setItem(premiumScriptStorageKey, String(nextPremiumUses))
+        }
+      }
       const segmentNames =
         data.segmentPlan?.map((segment: { name: string }) => `- ${segment.name}`) ||
         service.scriptSections.map((section) => `- ${section}`)
@@ -2469,12 +3148,14 @@ Mr. Script - Your Personal Wedding Script Creator`
       const scriptGeneratedMessage: ChatMessage = {
         id: `ai-script-generated-${Date.now()}`,
         type: 'ai',
-        content: `**Your ${service.shortName.toLowerCase()} script has been generated!**
+        content: `**Your ${service.shortName.toLowerCase()} script has been ${usePremiumModel ? "polished with the premium model" : "generated"}!**
 
-I've created a first draft for a ${service.displayName.toLowerCase()} using the service type, tone, length, sensitivity needs, and story details you provided.
+I've ${usePremiumModel ? "created a more polished version" : "created a first draft"} for a ${service.displayName.toLowerCase()} using the service type, tone, length, sensitivity needs, and story details you provided.
 
 The draft was built in ${data.segmentPlan?.length || service.scriptSections.length} focused section(s):
 ${segmentNames.join("\n")}
+
+${usePremiumModel ? `Premium Polish uses remaining for this profile: ${Math.max(0, PREMIUM_SCRIPT_LIMIT - (premiumScriptUses + 1))}.` : ""}
 
 **Your script is ready!** Click the "Generate Final Script" button below to open it in the full editor where you can make any final adjustments.`,
         timestamp: new Date()
@@ -2483,6 +3164,10 @@ ${segmentNames.join("\n")}
       setChatMessages(prev => [...prev, scriptGeneratedMessage])
     } catch (error) {
       console.error("Mr. Script API generation failed, using local fallback:", error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const configurationHint = /OPENAI_API_KEY|api key/i.test(errorMessage)
+        ? "The full Mr. Script engine is missing `OPENAI_API_KEY` on the server. Add it to `.env.local` for local testing and to your deployment environment, then restart/redeploy."
+        : `The full Mr. Script engine returned this error: ${errorMessage}`
 
       setGeneratedScriptContent(fallbackScript)
       setHasGeneratedScript(true)
@@ -2492,7 +3177,11 @@ ${segmentNames.join("\n")}
         type: 'ai',
         content: `**Your ${service.shortName.toLowerCase()} script has been generated locally.**
 
-I could not reach the full Mr. Script generation engine, so I created a structured starter draft instead. You can still open it in the editor and refine it.`,
+I could not reach the full Mr. Script generation engine, so I created a structured starter draft instead.
+
+${configurationHint}
+
+You can still open this starter draft in the editor and refine it.`,
         timestamp: new Date()
       }
 
@@ -2523,12 +3212,12 @@ I could not reach the full Mr. Script generation engine, so I created a structur
 I've created a beautiful ${userResponses['ceremony-type'] || selectedCeremonyStyle} ceremony script for ${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}.
 
 The script includes:
-âœ… Opening words and processional
-âœ… Declaration of intent
-âœ… ${userResponses['vows-type'] || selectedVowsType} vows
-${(userResponses['special-elements'] || selectedUnityCeremony) !== 'None' ? `âœ… ${userResponses['special-elements'] || selectedUnityCeremony} unity ceremony` : ''}
-âœ… Ring exchange ceremony
-âœ… Pronouncement and recessional
+Ã¢Å“â€¦ Opening words and processional
+Ã¢Å“â€¦ Declaration of intent
+Ã¢Å“â€¦ ${userResponses['vows-type'] || selectedVowsType} vows
+${(userResponses['special-elements'] || selectedUnityCeremony) !== 'None' ? `Ã¢Å“â€¦ ${userResponses['special-elements'] || selectedUnityCeremony} unity ceremony` : ''}
+Ã¢Å“â€¦ Ring exchange ceremony
+Ã¢Å“â€¦ Pronouncement and recessional
 
 **Your script is ready!** Click the "Generate Final Script" button below to open it in the full editor where you can make any final adjustments.`,
         timestamp: new Date()
@@ -2569,44 +3258,10 @@ ${service.scriptSections.map((section) => `- ${section}`).join("\n")}
     }
 
     // Pre-populate responses based on Quick Setup selections
-    const quickSetupResponses: Record<string, string> = {}
+    const profileContext = buildMrScriptProfileContext()
+    const quickSetupResponses = buildQuickSetupResponses(profileContext.responsePrefill)
     const quickSetupService = getMrScriptServiceByResponse(selectedCeremonyStyle)
     const shouldUseWeddingDetails = ["wedding", "vow_renewal"].includes(quickSetupService.id)
-
-    if (selectedCeremonyStyle) {
-      quickSetupResponses['ceremony-type'] = selectedCeremonyStyle
-    }
-
-    if (selectedCeremonyLength) {
-      quickSetupResponses['ceremony-duration'] = selectedCeremonyLength
-    }
-
-    if (selectedOfficiantStyle) {
-      quickSetupResponses['officiant-style'] = selectedOfficiantStyle
-    }
-
-    if (storyNotes.trim()) {
-      quickSetupResponses['story-notes'] = storyNotes.trim()
-    }
-
-    if (shouldUseWeddingDetails && selectedUnityCeremony && selectedUnityCeremony !== "None") {
-      quickSetupResponses['special-elements'] = selectedUnityCeremony
-    } else if (shouldUseWeddingDetails && selectedUnityCeremony === "None") {
-      quickSetupResponses['special-elements'] = "None"
-    }
-
-    if (shouldUseWeddingDetails && selectedVowsType) {
-      // Map the vows selection to match the guided question options
-      if (selectedVowsType === "Traditional") {
-        quickSetupResponses['vows-type'] = "Traditional Vows"
-      } else if (selectedVowsType === "Personal") {
-        quickSetupResponses['vows-type'] = "Personal Written Vows"
-      } else if (selectedVowsType === "Personal and Modern") {
-        quickSetupResponses['vows-type'] = "Mix of Both"
-      } else {
-        quickSetupResponses['vows-type'] = selectedVowsType
-      }
-    }
 
     // Set the responses immediately
     setUserResponses(quickSetupResponses)
@@ -2636,10 +3291,10 @@ ${service.scriptSections.map((section) => `- ${section}`).join("\n")}
     setTimeout(() => {
       let aiResponse = `Perfect! I have all the key details from your Quick Setup:
 
-âœ… **Ceremony Style**: ${selectedCeremonyStyle}
-âœ… **Duration**: ${selectedCeremonyLength}
-âœ… **Unity Ceremony**: ${selectedUnityCeremony || "None selected"}
-âœ… **Vows**: ${selectedVowsType || "Not specified"}
+Ã¢Å“â€¦ **Ceremony Style**: ${selectedCeremonyStyle}
+Ã¢Å“â€¦ **Duration**: ${selectedCeremonyLength}
+Ã¢Å“â€¦ **Unity Ceremony**: ${selectedUnityCeremony || "None selected"}
+Ã¢Å“â€¦ **Vows**: ${selectedVowsType || "Not specified"}
 
 Based on these selections, I'll create a beautiful ceremony for ${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}. Let me focus on the remaining details to perfect your script:`
 
@@ -2666,19 +3321,24 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
         aiResponse += `\n\nI will use a gentle, compassionate tone and avoid assuming religious beliefs unless you ask for them.`
       }
 
-      // Check if we need to ask about ceremony tone (since it's not covered in Quick Setup)
-      const stillNeedTone = !quickSetupResponses['ceremony-tone']
+      if (quickSetupResponses['quick-setup-summary']) {
+        aiResponse += `\n\nI also have these Quick Setup details:\n${quickSetupResponses['quick-setup-summary']}`
+      }
 
-      if (stillNeedTone) {
-        const activeQuestions = getActiveGuidedQuestions(quickSetupResponses)
-        const toneQuestion = activeQuestions[2]
-        aiResponse += `\n\nTo complete your script, I just need to know: ${toneQuestion.question}`
-        if (toneQuestion.options?.length) {
-          aiResponse += `\n\nYou can choose: ${toneQuestion.options.join(", ")}.`
+      const activeQuestions = getActiveGuidedQuestions(quickSetupResponses)
+      const nextQuestionIndex = activeQuestions.findIndex((question) =>
+        !quickSetupResponses[question.id] || hasUnansweredGuidedDetails(question, quickSetupResponses)
+      )
+
+      if (nextQuestionIndex !== -1) {
+        const nextQuestion = activeQuestions[nextQuestionIndex]
+        aiResponse += `\n\nTo complete your script, I just need to know:\n\n${generateAIResponse(nextQuestion, quickSetupResponses)}`
+
+        if (nextQuestion.options?.length) {
+          aiResponse += `\n\nYou can choose: ${nextQuestion.options.join(", ")}.`
         }
 
-        // Set up to ask only the remaining question
-        setCurrentQuestionIndex(2)
+        setCurrentQuestionIndex(nextQuestionIndex)
       } else {
         aiResponse += `\n\nI have everything I need! I'll now generate your complete ceremony script.`
         setCurrentQuestionIndex(getActiveGuidedQuestions(quickSetupResponses).length)
@@ -2829,10 +3489,10 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
           const result = await autoSaveScriptToDB(editingScript.id, currentContent)
           if (result.ok) {
             console.log(`Auto-saved "${editingScript.title}" to database at ${timestamp}`)
-            alert(`’¾ Auto-saved "${editingScript.title}" to server at ${timestamp}`)
+            alert(`â€™Â¾ Auto-saved "${editingScript.title}" to server at ${timestamp}`)
           } else {
             console.error("Failed to auto-save to database:", result.error)
-            alert(`[WARNING] ï¸ Failed to auto-save to server. Please try again.`)
+            alert(`[WARNING]Â Ã¯Â¸Â Failed to auto-save to server. Please try again.`)
           }
         } else {
           // New script - need to save first
@@ -2998,21 +3658,21 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
       if (result.ok) {
         setCoupleScripts(prev => prev.filter(s => String(s.id) !== String(script.id)))
         setGeneratedScripts(prev => prev.filter(s => String(s.id) !== String(script.id)))
-        console.log('âœ… Script deleted from database:', script.title)
+        console.log('Ã¢Å“â€¦ Script deleted from database:', script.title)
       } else {
-        console.error('âŒ Failed to delete script:', result.error)
+        console.error('Ã¢ÂÅ’ Failed to delete script:', result.error)
         alert(`Failed to delete script: ${result.error}`)
       }
     } else {
       // Remove from generated scripts (local state only)
       setGeneratedScripts(prev => prev.filter(s => String(s.id) !== String(script.id)))
-      console.log('âœ… Generated script removed:', script.title)
+      console.log('Ã¢Å“â€¦ Generated script removed:', script.title)
     }
   }
 
   const handleRecordPayment = async () => {
     if (!currentUser?.id || !editCoupleInfo?.id) {
-      console.error("âŒ Cannot record payment: No user or couple selected")
+      console.error("Cannot record payment: No user or couple selected")
       return
     }
 
@@ -3030,19 +3690,30 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
       return
     }
 
-    console.log("’° Recording payment for couple:", editCoupleInfo.id)
+    if (isRefund && amount > paymentInfo.depositPaid) {
+      alert(`Refund amount (${amount}) cannot exceed total paid (${paymentInfo.depositPaid})`)
+      return
+    }
 
-    // Save to database
+    const refundFeeAmount = isRefund ? roundCurrency(amount * REFUND_FEE_RATE) : 0
+    const totalOfficiantCharge = isRefund ? roundCurrency(amount + refundFeeAmount) : 0
+
+    console.log("Recording payment for couple:", editCoupleInfo.id)
+
     const result = await addPaymentToDB(currentUser.id, editCoupleInfo.id, {
-      description: isRefund ? `Refund - ${newPayment.notes || "Manual refund"}` : amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
+      description: isRefund
+        ? `Refund - ${newPayment.notes || "Manual refund"} | Officiant refund fee: $${refundFeeAmount.toFixed(2)} | Total officiant charge: $${totalOfficiantCharge.toFixed(2)}`
+        : amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
       amount: amount,
       paymentType: isRefund ? "refund" : newPayment.method,
       status: "paid",
-      dueDate: newPayment.date
+      dueDate: newPayment.date,
+      refundFeeRate: isRefund ? REFUND_FEE_RATE : undefined,
+      refundFeeAmount: isRefund ? refundFeeAmount : undefined,
+      totalOfficiantCharge: isRefund ? totalOfficiantCharge : undefined,
     })
 
     if (result.ok && result.data) {
-      // Create new payment record for local state
       const payment = {
         id: result.data.id,
         date: new Date(newPayment.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
@@ -3050,24 +3721,28 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
         type: isRefund ? "Refund" : amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
         method: newPayment.method,
         status: isRefund ? "refunded" : "paid",
-        notes: newPayment.notes
+        notes: newPayment.notes,
+        refundFeeRate: isRefund ? REFUND_FEE_RATE : undefined,
+        refundFee: isRefund ? refundFeeAmount : undefined,
+        totalOfficiantCharge: isRefund ? totalOfficiantCharge : undefined,
       }
 
-      // Update payment history
       setPaymentHistory(prev => [...prev, payment])
 
-      // Update payment info
       const newDepositPaid = isRefund ? Math.max(0, paymentInfo.depositPaid - amount) : paymentInfo.depositPaid + amount
       const newBalance = isRefund ? paymentInfo.balance + amount : Math.max(0, paymentInfo.balance - amount)
+      const newRefundFeesCharged = isRefund
+        ? roundCurrency((paymentInfo.refundFeesCharged || 0) + refundFeeAmount)
+        : paymentInfo.refundFeesCharged || 0
 
       setPaymentInfo(prev => ({
         ...prev,
         depositPaid: newDepositPaid,
         balance: newBalance,
+        refundFeesCharged: newRefundFeesCharged,
         paymentStatus: newBalance === 0 ? "paid_in_full" : prev.paymentStatus
       }))
 
-      // Reset form and close dialog
       setNewPayment({
         amount: "",
         date: new Date().toISOString().split('T')[0],
@@ -3078,21 +3753,19 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
       setShowRecordPaymentDialog(false)
       loadFinancialPaymentsForUser()
 
-      // Show success message
-      console.log("âœ… Payment recorded:", payment)
+      console.log("Payment recorded:", payment)
       if (isRefund) {
-        console.log(`Refund of ${amount} recorded successfully.`)
+        alert(`Refund of ${amount} recorded successfully.\n\nOfficiant refund fee (5%): ${refundFeeAmount.toFixed(2)}\nTotal officiant charge: ${totalOfficiantCharge.toFixed(2)}\nNew balance due: ${newBalance}`)
       } else if (newBalance === 0) {
         alert("Payment recorded successfully! This ceremony is now PAID IN FULL! [CELEBRATE]")
       } else {
         alert(`Payment of ${amount} recorded successfully!\n\nRemaining balance: ${newBalance}`)
       }
     } else {
-      console.error("âŒ Failed to record payment:", result.error)
+      console.error("Failed to record payment:", result.error)
       alert("Failed to record payment. Please try again.")
     }
   }
-
   const handleUploadScript = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -3310,12 +3983,12 @@ ${officiantLabel}`,
     const MAX_CHARACTERS = 50000 // Increased for database storage
 
     if (plainTextContent.length < MIN_CHARACTERS) {
-      alert(`âŒ Script must be at least ${MIN_CHARACTERS} characters long.\n\nCurrent length: ${plainTextContent.length} characters\nPlease add more content before saving.`)
+      alert(`Ã¢ÂÅ’ Script must be at least ${MIN_CHARACTERS} characters long.\n\nCurrent length: ${plainTextContent.length} characters\nPlease add more content before saving.`)
       return
     }
 
     if (plainTextContent.length > MAX_CHARACTERS) {
-      alert(`âŒ Script cannot exceed ${MAX_CHARACTERS} characters.\n\nCurrent length: ${plainTextContent.length} characters\nPlease reduce the content before saving.`)
+      alert(`Ã¢ÂÅ’ Script cannot exceed ${MAX_CHARACTERS} characters.\n\nCurrent length: ${plainTextContent.length} characters\nPlease reduce the content before saving.`)
       return
     }
 
@@ -3352,8 +4025,8 @@ ${officiantLabel}`,
             lastModified: currentDate
           }
           setCoupleScripts(prevScripts => [newScript, ...prevScripts])
-          console.log('âœ… New script created in database:', result.data.id)
-          alert(`âœ… Script "${editingScript.title}" created successfully!\n\nSaved to server on: ${currentDate}\nContent: ${plainTextContent.length} characters`)
+          console.log('Ã¢Å“â€¦ New script created in database:', result.data.id)
+          alert(`Ã¢Å“â€¦ Script "${editingScript.title}" created successfully!\n\nSaved to server on: ${currentDate}\nContent: ${plainTextContent.length} characters`)
         } else {
           throw new Error(result.error || 'Failed to create script')
         }
@@ -3378,8 +4051,8 @@ ${officiantLabel}`,
                 : script
             )
           )
-          console.log('âœ… Script updated in database:', editingScript.id)
-          alert(`âœ… Script "${editingScript.title}" saved successfully!\n\nSaved to server on: ${currentDate}\nContent: ${plainTextContent.length} characters`)
+          console.log('Ã¢Å“â€¦ Script updated in database:', editingScript.id)
+          alert(`Ã¢Å“â€¦ Script "${editingScript.title}" saved successfully!\n\nSaved to server on: ${currentDate}\nContent: ${plainTextContent.length} characters`)
         } else {
           throw new Error(result.error || 'Failed to update script')
         }
@@ -3390,8 +4063,8 @@ ${officiantLabel}`,
       setScriptContent("")
       setEditorFontSize(16)
     } catch (err: any) {
-      console.error('âŒ Error saving script:', err)
-      alert(`[WARNING] ï¸ Failed to save script to server.\n\nError: ${err.message}\n\nPlease try again.`)
+      console.error('Ã¢ÂÅ’ Error saving script:', err)
+      alert(`[WARNING]Â Ã¯Â¸Â Failed to save script to server.\n\nError: ${err.message}\n\nPlease try again.`)
     }
   }
 
@@ -3646,7 +4319,7 @@ ${shareScriptForm.body}`)
 
     // Add to messaging platform
     setMessageAttachments([contractAttachment])
-    setNewMessage(`[SCRIPT]§ Email sent to: ${recipient}\n[SCRIPT]„ Subject: ${emailForm.subject}\n\n${emailForm.body}`)
+    setNewMessage(`[SCRIPT]Â§ Email sent to: ${recipient}\n[SCRIPT]â€ž Subject: ${emailForm.subject}\n\n${emailForm.body}`)
     setShowAttachments(true)
 
     // Auto-send the message
@@ -3922,22 +4595,55 @@ ${shareScriptForm.body}`)
     const balanceDue = paymentInfo.balance || invoiceForm.balanceDue || 0
     const balanceDueDate = paymentInfo.finalPaymentDue || invoiceForm.dueDate || ""
     const venueAddress = editWeddingDetails.venueAddress || editCoupleInfo?.address || ""
+    const detailsAny = editWeddingDetails as any
+    const defaultsAny = contractPrefillDefaults as any
+    const currentType = editCoupleInfo?.ceremonyType || editCoupleInfo?.ceremonyTypeLabel || ""
+    const isMinorCeremony = /(sweet|quince|quincea|coming|baby|blessing|minor|child|honoree)/i.test(currentType)
+    const isMemorialCeremony = /(funeral|memorial|celebration.*life|life.*celebration|wake|remembrance)/i.test(currentType)
+    const honoreeName = isMinorCeremony ? brideName : ""
+    const parentGuardian1Name = isMinorCeremony ? groomName || brideName : ""
+    const parentGuardian2Name = isMinorCeremony && groomName && brideName !== groomName ? brideName : ""
+    const deceasedName = isMemorialCeremony ? groomName || brideName : ""
+    const primaryFamilyContactName = isMemorialCeremony ? brideName || groomName : ""
+    const secondaryFamilyContactName = isMemorialCeremony && groomName && brideName !== groomName ? groomName : ""
+    const getFirst = (name: string) => name.trim().split(/\s+/)[0] || ""
 
     return {
       agreement_date: formatContractDate(new Date().toISOString()),
       officiant_business_name: officiantProfile?.business_name || officiantProfile?.company_name || officiantLabel,
       officiant_name: officiantProfile?.full_name || officiantProfile?.name || officiantName,
+      officiant_phone: officiantProfile?.phone || "",
+      officiant_email: officiantProfile?.email || currentUser?.email || "",
+      officiant_business_address: contractPrefillDefaults.officiantAddress || [officiantProfile?.city, officiantProfile?.state].filter(Boolean).join(", "),
       couple_names: coupleNames,
       partner_1_name: brideName,
       partner_2_name: groomName,
       wedding_date: formatContractDate(editWeddingDetails.weddingDate),
       wedding_time: formatContractTime(editWeddingDetails.startTime),
+      ceremony_type: editCoupleInfo?.ceremonyTypeLabel || currentType || "Wedding",
+      contract_version: "OrdainedPro custom contract",
       venue_name: editWeddingDetails.venueName || "",
       venue_address: venueAddress,
+      venue_city: detailsAny.venueCity || "",
+      venue_state: detailsAny.venueState || "",
+      venue_zip: detailsAny.venueZip || "",
+      venue_contact_name: detailsAny.venueContactName || "",
+      venue_contact_phone: detailsAny.venueContactPhone || "",
+      planner_coordinator_name: detailsAny.plannerName || detailsAny.coordinatorName || "",
+      planner_coordinator_phone: detailsAny.plannerPhone || detailsAny.coordinatorPhone || "",
+      rehearsal_date: formatContractDate(detailsAny.rehearsalDate),
+      rehearsal_time: formatContractTime(detailsAny.rehearsalTime),
+      rehearsal_location: detailsAny.rehearsalLocation || "",
       total_fee: formatContractMoney(totalAmount),
       deposit_amount: formatContractMoney(depositAmount),
       balance_due: formatContractMoney(balanceDue),
       balance_due_date: formatContractDate(balanceDueDate),
+      payment_method: invoiceForm.paymentMethods || "",
+      late_fee: formatContractMoney(contractPrefillDefaults.lateFeeHalfHour),
+      travel_fee: formatContractMoney(defaultsAny.travelFee),
+      add_on_fees: formatContractMoney(defaultsAny.addOnFees),
+      rehearsal_fee: formatContractMoney(defaultsAny.rehearsalFee),
+      package_name: defaultsAny.packageName || "",
       payment_methods: invoiceForm.paymentMethods || "",
       payment_deadlines: balanceDueDate
         ? `Final balance is due by ${formatContractDate(balanceDueDate)}.`
@@ -3952,11 +4658,57 @@ ${shareScriptForm.body}`)
       additional_travel_terms: "",
       special_requests_deadline: "three weeks prior to the ceremony date",
       officiant_arrival_window: "20 minutes",
+      additional_mileage_rate: formatContractMoney(contractPrefillDefaults.mileageRate).replace(/^\$/, ""),
+      arrival_time_before_ceremony: contractPrefillDefaults.arrivalMinutes,
+      late_grace_period: contractPrefillDefaults.lateGraceMinutes,
+      extra_waiting_fee: formatContractMoney(contractPrefillDefaults.lateFeeHalfHour),
       photo_video_permission_terms: "",
+      attorney_review_acknowledgment: "Attorney review acknowledged by the officiant.",
+      custom_contract_acknowledgment: "Custom contract responsibility acknowledged by the officiant.",
+      photo_video_permission: "",
+      cancellation_policy: invoiceForm.terms || "",
+      refund_policy: invoiceForm.terms || "",
+      special_terms: editCoupleInfo?.specialRequests || "",
+      parent_guardian_1_name: parentGuardian1Name,
+      parent_guardian_2_name: parentGuardian2Name,
+      parent_guardian_1_phone: isMinorCeremony ? editCoupleInfo?.groomPhone || editCoupleInfo?.bridePhone || "" : "",
+      parent_guardian_2_phone: isMinorCeremony ? editCoupleInfo?.bridePhone || "" : "",
+      parent_guardian_1_email: isMinorCeremony ? editCoupleInfo?.groomEmail || editCoupleInfo?.brideEmail || "" : "",
+      parent_guardian_2_email: isMinorCeremony ? editCoupleInfo?.brideEmail || "" : "",
+      parent_guardian_1_relationship: "",
+      parent_guardian_2_relationship: "",
+      parent_guardian_mailing_address: mailingAddress,
+      honoree_full_name: honoreeName,
+      honoree_first_name: getFirst(honoreeName),
+      honoree_age: editCoupleInfo?.age || editCoupleInfo?.honoreeAge || "",
+      honoree_birthday: formatContractDate(editCoupleInfo?.birthday || editCoupleInfo?.honoreeBirthday),
+      honoree_celebration_type: editCoupleInfo?.ceremonyTypeLabel || currentType || "",
+      honoree_pronouns: editCoupleInfo?.pronouns || "",
+      honoree_special_notes: editCoupleInfo?.specialRequests || "",
+      deceased_full_name: deceasedName,
+      deceased_first_name: getFirst(deceasedName),
+      deceased_date_of_birth: formatContractDate(editCoupleInfo?.dateOfBirth || editCoupleInfo?.deceasedDateOfBirth),
+      deceased_date_of_passing: formatContractDate(editCoupleInfo?.dateOfPassing || editCoupleInfo?.deceasedDateOfPassing),
+      memorial_service_date: formatContractDate(editWeddingDetails.weddingDate),
+      memorial_service_time: formatContractTime(editWeddingDetails.startTime),
+      memorial_venue_name: editWeddingDetails.venueName || "",
+      memorial_venue_address: venueAddress,
+      primary_family_contact_name: primaryFamilyContactName,
+      secondary_family_contact_name: secondaryFamilyContactName,
+      primary_family_contact_phone: isMemorialCeremony ? editCoupleInfo?.bridePhone || editCoupleInfo?.groomPhone || "" : "",
+      primary_family_contact_email: isMemorialCeremony ? editCoupleInfo?.brideEmail || editCoupleInfo?.groomEmail || "" : "",
       partner_1_signature_date: "",
       partner_1_signature: "",
       partner_2_signature_date: "",
       partner_2_signature: "",
+      parent_guardian_1_signature_date: "",
+      parent_guardian_1_signature: "",
+      parent_guardian_2_signature_date: "",
+      parent_guardian_2_signature: "",
+      primary_family_contact_signature_date: "",
+      primary_family_contact_signature: "",
+      secondary_family_contact_signature_date: "",
+      secondary_family_contact_signature: "",
       couple_email: coupleEmail,
       couple_mailing_address: mailingAddress,
       officiant_signature_date: "",
@@ -3974,7 +4726,6 @@ ${shareScriptForm.body}`)
       full_day_fee: formatContractMoney(contractPrefillDefaults.fullDayFee).replace(/^\$/, ""),
       included_miles: contractPrefillDefaults.includedMiles || (officiantProfile?.travel_radius_miles ? String(officiantProfile.travel_radius_miles) : ""),
       officiant_addr: contractPrefillDefaults.officiantAddress || [officiantProfile?.city, officiantProfile?.state].filter(Boolean).join(", "),
-      mileage_rate: formatContractMoney(contractPrefillDefaults.mileageRate).replace(/^\$/, ""),
       arrival_minutes: contractPrefillDefaults.arrivalMinutes,
       rehearsal_arrival_minutes: contractPrefillDefaults.rehearsalArrivalMinutes,
       bride_phone: editCoupleInfo?.bridePhone || "",
@@ -4255,9 +5006,9 @@ ${shareScriptForm.body}`)
         closing: "It is an honor to support your family with this service.",
       },
       quinceanera: {
-        subject: "Payment Reminder - Quinceañera Ceremony",
+        subject: "Payment Reminder - QuinceaÃ±era Ceremony",
         intro: "I hope the celebration planning is going smoothly.",
-        reminder: "This is a friendly reminder regarding your upcoming payment for the quinceañera ceremony services.",
+        reminder: "This is a friendly reminder regarding your upcoming payment for the quinceaÃ±era ceremony services.",
         due: "Please submit the remaining balance by the due date so the ceremony arrangements can remain confirmed.",
         closing: "Looking forward to helping make this celebration meaningful and memorable!",
       },
@@ -4398,11 +5149,11 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
 
   const handleContractUploaded = async (contractData: Omit<Contract, 'id' | 'createdDate'>) => {
     if (!currentUser?.id || !editCoupleInfo?.id) {
-      console.error("âŒ Cannot upload contract: No user or couple selected")
+      console.error("Ã¢ÂÅ’ Cannot upload contract: No user or couple selected")
       return
     }
 
-    console.log("[SCRIPT]œ Uploading contract for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]Å“ Uploading contract for couple:", editCoupleInfo.id)
 
     const uploadedFile = contractData.file
     if (!uploadedFile?.file) {
@@ -4471,7 +5222,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
       setViewingContract(newContract as any)
       setShowContractViewerDialog(true)
 
-      console.log("âœ… Contract uploaded:", newContract)
+      console.log("Ã¢Å“â€¦ Contract uploaded:", newContract)
 
     } else {
       const cleanupPath = deriveContractStoragePath(publicUrlData.publicUrl)
@@ -4481,7 +5232,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
           console.error("Failed to clean up uploaded contract after database error:", cleanupError)
         }
       }
-      console.error("âŒ Failed to upload contract:", result.error)
+      console.error("Ã¢ÂÅ’ Failed to upload contract:", result.error)
       alert(`Failed to save contract: ${result.error || "Please try again."}`)
     }
   }
@@ -4491,6 +5242,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     totalAmount: 0,
     depositPaid: 0,
     balance: 0,
+    refundFeesCharged: 0,
     depositDate: "",
     finalPaymentDue: "",
     paymentStatus: "pending"
@@ -4570,6 +5322,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
   const financialReport = {
     grossIncome: paidPaymentRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
     refunds: refundPaymentRecords.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+    refundFees: refundPaymentRecords.reduce((sum, payment) => sum + Number(payment.refundFee || payment.refund_fee_amount || 0), 0),
     netIncome: 0,
     monthIncome: paidPaymentRecords
       .filter(payment => {
@@ -4584,7 +5337,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     paymentsReceived: paidPaymentRecords.length,
     refundsIssued: refundPaymentRecords.length,
   }
-  financialReport.netIncome = financialReport.grossIncome - financialReport.refunds
+  financialReport.netIncome = financialReport.grossIncome - financialReport.refunds - financialReport.refundFees
   const financialRows = allPaymentRecords.map(payment => {
     const couple = allCouples.find((item: any) => item.id === payment.coupleId)
     return {
@@ -4614,7 +5367,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
   const refundRows = financialRows.filter(isRefundPayment)
 
   const exportFinancialCsv = () => {
-    const headers = ["Date", "Couple", "Wedding Date", "Description", "Type", "Status", "Amount"]
+    const headers = ["Date", "Couple", "Wedding Date", "Description", "Type", "Status", "Amount", "Refund Fee", "Total Officiant Charge"]
     const rows = financialRows.map(row => [
       row.dueDate || row.paidDate || row.createdAt || "",
       row.coupleName,
@@ -4623,6 +5376,8 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
       row.type || "",
       row.status || "",
       Number(row.amount || 0).toFixed(2),
+      Number(row.refundFee || 0).toFixed(2),
+      Number(row.totalOfficiantCharge || 0).toFixed(2),
     ])
     const csv = [headers, ...rows]
       .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(","))
@@ -5109,6 +5864,8 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     setAllCouples(updatedCouples)
 
     if (!nextIsActive) {
+      launchArchiveConfettiOnce(currentCouple.id)
+
       const archivedIndex = allCouples.findIndex(couple => String(couple.id) === String(currentCouple.id))
       const nextActiveIndex = updatedCouples.findIndex((couple, index) => index !== archivedIndex && couple.isActive)
 
@@ -5173,11 +5930,11 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
 
   const handleAddTask = async (newTaskData: Omit<Task, 'id' | 'createdDate'>) => {
     if (!currentUser?.id || !editCoupleInfo?.id) {
-      console.error("âŒ Cannot add task: No user or couple selected")
+      console.error("Ã¢ÂÅ’ Cannot add task: No user or couple selected")
       return
     }
 
-    console.log("[SCRIPT]‹ Adding task for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]â€¹ Adding task for couple:", editCoupleInfo.id)
 
     // Save to database
     const result = await addTaskToDB(currentUser.id, editCoupleInfo.id, {
@@ -5205,9 +5962,9 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
         scheduleEmailNotification(newTask)
       }
 
-      console.log("âœ… Task added:", newTask)
+      console.log("Ã¢Å“â€¦ Task added:", newTask)
     } else {
-      console.error("âŒ Failed to add task:", result.error)
+      console.error("Ã¢ÂÅ’ Failed to add task:", result.error)
       alert("Failed to add task. Please try again.")
     }
   }
@@ -5217,17 +5974,12 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     const reminderDate = new Date(task.dueDate)
     reminderDate.setDate(reminderDate.getDate() - task.reminderDays)
 
-    console.log(`[SCRIPT]§ Scheduling email notification:`)
+    console.log(`[SCRIPT]Â§ Scheduling email notification:`)
     console.log(`Task: ${task.task}`)
     console.log(`Reminder Date: ${reminderDate.toDateString()}`)
     console.log(`Due: ${task.dueDate} at ${task.dueTime}`)
 
-    // Get recipients - both couple and officiant
-    const recipients = [
-      editCoupleInfo?.brideEmail,
-      editCoupleInfo?.groomEmail,
-      officiantProfile?.email || currentUser?.email
-    ].filter(Boolean)
+    const recipients = [officiantProfile?.email || currentUser?.email].filter(Boolean)
 
     const coupleName = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
     const taskOfficiantName = officiantName
@@ -5235,8 +5987,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     // Send immediate confirmation email about the task
     for (const email of recipients) {
       try {
-        const isOfficiant = email === officiantProfile?.email || email === currentUser?.email
-        const emailContent = generateTaskReminderEmail(task, isOfficiant, coupleName, taskOfficiantName)
+        const emailContent = generateTaskReminderEmail(task, coupleName, taskOfficiantName)
 
         const response = await fetch("/api/send-email", {
           method: "POST",
@@ -5250,26 +6001,24 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
         })
 
         if (response.ok) {
-          console.log(`âœ… Task notification sent to ${email}`)
+          console.log(`Ã¢Å“â€¦ Task notification sent to ${email}`)
         } else {
-          console.error(`âŒ Failed to send task notification to ${email}`)
+          console.error(`Ã¢ÂÅ’ Failed to send task notification to ${email}`)
         }
       } catch (err) {
-        console.error(`âŒ Error sending task notification to ${email}:`, err)
+        console.error(`Ã¢ÂÅ’ Error sending task notification to ${email}:`, err)
       }
     }
 
-    console.log(`[SCRIPT]… Reminder scheduled for ${reminderDate.toDateString()} - Recipients: ${recipients.join(', ')}`)
+    console.log(`[SCRIPT]â€¦ Reminder scheduled for ${reminderDate.toDateString()} - Recipients: ${recipients.join(', ')}`)
   }
 
-  const generateTaskReminderEmail = (task: Task, isOfficiant: boolean, coupleName: string, officiantName: string) => {
+  const generateTaskReminderEmail = (task: Task, coupleName: string, officiantName: string) => {
     const cleanOfficiantName = officiantName === "Officiant" ? "Your Officiant" : officiantName
     const cleanOfficiantFirstName =
       cleanOfficiantName === "Your Officiant" ? cleanOfficiantName : cleanOfficiantName.split(/\s+/)[0]
-    const cleanGreeting = isOfficiant ? `Dear ${cleanOfficiantName}` : `Dear ${coupleName}`
-    const cleanClosingNote = isOfficiant
-      ? "Please ensure this task is completed before the wedding date."
-      : `${cleanOfficiantName} has created this task for your wedding planning. Please review and complete it as needed.`
+    const cleanGreeting = `Dear ${cleanOfficiantName}`
+    const cleanClosingNote = "Please ensure this private task is completed before the ceremony date."
     const cleanPriorityLabel: Record<string, string> = {
       low: "Low",
       medium: "Medium",
@@ -5283,7 +6032,6 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
       day: "numeric",
     })
     const cleanDetailsSection = task.details ? `Details:\n${task.details}\n\n` : ""
-    const cleanContactLine = isOfficiant ? "" : "If you have any questions, please contact your officiant.\n\n"
 
     return {
       subject: `Wedding Task: ${task.task}`,
@@ -5299,48 +6047,11 @@ Category: ${task.category}
 
 ${cleanDetailsSection}${cleanClosingNote}
 
-${cleanContactLine}Thank you,
+This reminder was sent only to the officiant and was not sent to the couple or client.
+
+Thank you,
 ${cleanOfficiantFirstName}
 `,
-    }
-
-    const priorityEmoji: Record<string, string> = {
-      low: 'Ÿ¢',
-      medium: 'Ÿ¡',
-      high: 'Ÿ ',
-      urgent: '[DOC]´'
-    }
-
-    const greeting = isOfficiant ? `Dear ${officiantName}` : `Dear ${coupleName}`
-    const closingNote = isOfficiant
-      ? `Please ensure this task is completed before the wedding date.`
-      : `Your officiant ${officiantName} has created this task for your wedding planning. Please review and complete as needed.`
-
-    return {
-      subject: `[SCRIPT]‹ Wedding Task: ${task.task}`,
-      body: `${greeting},
-
-A new task has been created for your wedding ceremony:
-
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-
-[SCRIPT]‹ Task: ${task.task}
-[SCRIPT]… Due Date: ${new Date(task.dueDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-â° Due Time: ${task.dueTime}
-${priorityEmoji[task.priority] || '[SCRIPT]Œ'} Priority: ${task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-[SCRIPT] Category: ${task.category}
-
-${task.details ? `[SCRIPT] Details:\n${task.details}` : ''}
-
-â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-
-${closingNote}
-
-${isOfficiant ? '' : `If you have any questions, please contact your officiant.`}
-
-Best regards,
-OrdainedPro Wedding Portal
-`
     }
   }
 
@@ -5360,12 +6071,12 @@ OrdainedPro Wedding Portal
 
     if (!result.ok) {
       // Revert on error
-      console.error("âŒ Failed to update task:", result.error)
+      console.error("Ã¢ÂÅ’ Failed to update task:", result.error)
       setTasks(prev => prev.map(t =>
         t.id === taskId ? { ...t, completed: !newCompletedState } : t
       ))
     } else {
-      console.log("âœ… Task completion toggled:", taskId, newCompletedState)
+      console.log("Ã¢Å“â€¦ Task completion toggled:", taskId, newCompletedState)
     }
   }
 
@@ -5422,7 +6133,7 @@ OrdainedPro Wedding Portal
     // 2. Send email notification
     // 3. Set up response tracking
 
-    console.log(`[SCRIPT]§ MEETING INVITATION SENT:`)
+    console.log(`[SCRIPT]Â§ MEETING INVITATION SENT:`)
     console.log(`Meeting: ${meeting.subject}`)
     console.log(`Date: ${meeting.date} at ${meeting.time}`)
     console.log(`Attendees: ${meeting.attendees.join(', ')}`)
@@ -5442,7 +6153,7 @@ OrdainedPro Wedding Portal
 
       updateMeetingStatus(meeting.id, randomResponse)
 
-      console.log(`[SCRIPT]¬ EMAIL RESPONSE RECEIVED:`)
+      console.log(`[SCRIPT]Â¬ EMAIL RESPONSE RECEIVED:`)
       console.log(`Meeting: ${meeting.subject}`)
       console.log(`Response: ${randomResponse.toUpperCase()}`)
       console.log(`Updated meeting status in portal calendar`)
@@ -5539,7 +6250,7 @@ OrdainedPro Wedding Portal
       } else if (fileType.includes('pdf')) {
         return (
           <div className="text-center space-y-4">
-            <div className="text-6xl">[SCRIPT]„</div>
+            <div className="text-6xl">[SCRIPT]â€ž</div>
             <p className="text-gray-600">PDF Contract</p>
             <p className="font-medium">{contract.name}</p>
             <p className="text-sm text-gray-500">File type: {contract.file.type}</p>
@@ -5555,7 +6266,7 @@ OrdainedPro Wedding Portal
       } else {
         return (
           <div className="text-center space-y-4">
-            <div className="text-6xl">[SCRIPT]</div>
+            <div className="text-6xl">[SCRIPT]Â</div>
             <p className="text-gray-600">Contract Document</p>
             <p className="font-medium">{contract.name}</p>
             <p className="text-sm text-gray-500">File type: {contract.file.type}</p>
@@ -5573,7 +6284,7 @@ OrdainedPro Wedding Portal
       // If no file, show contract details
       return (
         <div className="text-center space-y-6">
-          <div className="text-6xl">[SCRIPT]‹</div>
+          <div className="text-6xl">[SCRIPT]â€¹</div>
           <div>
             <p className="text-gray-600 mb-2">Contract Information</p>
             <p className="font-medium text-xl">{contract.name}</p>
@@ -5648,7 +6359,7 @@ OrdainedPro Wedding Portal
     } else if (fileType.includes('pdf')) {
       return (
         <div className="text-center space-y-4">
-          <div className="text-6xl">[SCRIPT]„</div>
+          <div className="text-6xl">[SCRIPT]â€ž</div>
           <p className="text-gray-600">PDF Preview</p>
           <p className="font-medium">{file.name}</p>
           <p className="text-sm text-gray-500">Size: {file.size}</p>
@@ -5664,7 +6375,7 @@ OrdainedPro Wedding Portal
     } else if (fileType.includes('text/') || fileType.includes('txt')) {
       return (
         <div className="text-center space-y-4">
-          <div className="text-6xl">[SCRIPT]</div>
+          <div className="text-6xl">[SCRIPT]Â</div>
           <p className="text-gray-600">Text Document</p>
           <p className="font-medium">{file.name}</p>
           <p className="text-sm text-gray-500">Size: {file.size}</p>
@@ -5676,7 +6387,7 @@ OrdainedPro Wedding Portal
     } else if (fileType.includes('document') || fileType.includes('word') || fileType.includes('doc')) {
       return (
         <div className="text-center space-y-4">
-          <div className="text-6xl">[SCRIPT]</div>
+          <div className="text-6xl">[SCRIPT]Â</div>
           <p className="text-gray-600">Word Document</p>
           <p className="font-medium">{file.name}</p>
           <p className="text-sm text-gray-500">Size: {file.size}</p>
@@ -5711,11 +6422,11 @@ OrdainedPro Wedding Portal
   // File management handlers
   const handleFilesUploaded = async (uploadedFiles: UploadedFile[]) => {
     if (!currentUser?.id || !editCoupleInfo?.id) {
-      console.error("âŒ Cannot upload files: No user or couple selected")
+      console.error("Ã¢ÂÅ’ Cannot upload files: No user or couple selected")
       return
     }
 
-    console.log("[SCRIPT] Uploading", uploadedFiles.length, "files for couple:", editCoupleInfo.id)
+    console.log("[SCRIPT]Â Uploading", uploadedFiles.length, "files for couple:", editCoupleInfo.id)
 
     for (const file of uploadedFiles) {
       // Check if file already exists
@@ -5725,7 +6436,7 @@ OrdainedPro Wedding Portal
       )
 
       if (exists) {
-        console.log("â­ï¸ Skipping duplicate file:", file.name)
+        console.log("Ã¢ÂÂ­Ã¯Â¸Â Skipping duplicate file:", file.name)
         continue
       }
 
@@ -5739,7 +6450,7 @@ OrdainedPro Wedding Portal
           .upload(filePath, file.file, { upsert: true })
 
         if (uploadError) {
-          console.error("âŒ Storage upload error:", uploadError)
+          console.error("Ã¢ÂÅ’ Storage upload error:", uploadError)
           alert(`Failed to upload ${file.name}: ${uploadError.message}`)
           continue
         }
@@ -5772,12 +6483,12 @@ OrdainedPro Wedding Portal
             url: publicUrl
           }
           setFiles(prev => [...prev, newFile])
-          console.log("âœ… File uploaded and saved:", file.name, publicUrl)
+          console.log("Ã¢Å“â€¦ File uploaded and saved:", file.name, publicUrl)
         } else {
-          console.error("âŒ Failed to save file to database:", file.name, result.error)
+          console.error("Ã¢ÂÅ’ Failed to save file to database:", file.name, result.error)
         }
       } catch (err: any) {
-        console.error("âŒ Exception uploading file:", file.name, err)
+        console.error("Ã¢ÂÅ’ Exception uploading file:", file.name, err)
         alert(`Failed to upload ${file.name}: ${err.message}`)
       }
     }
@@ -5795,12 +6506,12 @@ OrdainedPro Wedding Portal
 
     if (!result.ok) {
       // Revert on error
-      console.error("âŒ Failed to delete file:", result.error)
+      console.error("Ã¢ÂÅ’ Failed to delete file:", result.error)
       if (removedFile) {
         setFiles(prev => [...prev, removedFile])
       }
     } else {
-      console.log("âœ… File deleted:", fileId)
+      console.log("Ã¢Å“â€¦ File deleted:", fileId)
     }
   }
 
@@ -5854,7 +6565,7 @@ OrdainedPro Wedding Portal
       // Determine recipient emails
       const recipientEmails = [brideEmail, groomEmail].filter(Boolean)
 
-      console.log("[SCRIPT]§ Sending message to:", { coupleId, coupleName, recipientEmails, message: newMessage })
+      console.log("[SCRIPT]Â§ Sending message to:", { coupleId, coupleName, recipientEmails, message: newMessage })
 
       // 1. Save message to Supabase
       if (currentUser) {
@@ -5874,9 +6585,9 @@ OrdainedPro Wedding Portal
           .select()
 
         if (saveError) {
-          console.error("âŒ Error saving message to Supabase:", saveError)
+          console.error("Ã¢ÂÅ’ Error saving message to Supabase:", saveError)
         } else {
-          console.log("âœ… Message saved to Supabase:", savedMessage)
+          console.log("Ã¢Å“â€¦ Message saved to Supabase:", savedMessage)
 
           // Add to local messages state, unless the realtime listener already added it.
           setMessages(prev => {
@@ -5903,7 +6614,7 @@ OrdainedPro Wedding Portal
         if (!email) continue
 
         try {
-          console.log(`[SCRIPT]§ Attempting to send email to: ${email}`)
+          console.log(`[SCRIPT]Â§ Attempting to send email to: ${email}`)
 
           // Build attachments array - include both scripts (textContent) and files (base64Content)
           const emailAttachments = messageAttachments
@@ -5945,18 +6656,18 @@ OrdainedPro Wedding Portal
           })
 
           const result = await response.json()
-          console.log(`[SCRIPT]§ API Response for ${email}:`, result)
+          console.log(`[SCRIPT]Â§ API Response for ${email}:`, result)
 
           if (response.ok && result.success) {
-            console.log(`âœ… Email sent to ${email}:`, result)
+            console.log(`Ã¢Å“â€¦ Email sent to ${email}:`, result)
             emailsSent++
           } else {
             const errorMsg = result.error || result.details || "Unknown error"
-            console.error(`âŒ Failed to send email to ${email}:`, result)
+            console.error(`Ã¢ÂÅ’ Failed to send email to ${email}:`, result)
             emailErrors.push(`${email}: ${errorMsg}`)
           }
         } catch (emailError) {
-          console.error(`âŒ Error sending email to ${email}:`, emailError)
+          console.error(`Ã¢ÂÅ’ Error sending email to ${email}:`, emailError)
           emailErrors.push(`${email}: Network error`)
         }
       }
@@ -5968,14 +6679,14 @@ OrdainedPro Wedding Portal
 
       // Log results (no popup - the message appears in the conversation)
       if (emailsSent > 0) {
-        console.log(`âœ… Emails sent to: ${recipientEmails.join(", ")}`)
+        console.log(`Ã¢Å“â€¦ Emails sent to: ${recipientEmails.join(", ")}`)
       }
       if (emailErrors.length > 0) {
-        console.warn(`[WARNING] ï¸ Some emails failed:`, emailErrors)
+        console.warn(`[WARNING]Â Ã¯Â¸Â Some emails failed:`, emailErrors)
       }
 
     } catch (error) {
-      console.error("âŒ Error in handleSendMessage:", error)
+      console.error("Ã¢ÂÅ’ Error in handleSendMessage:", error)
       alert("Failed to send message. Please try again.")
     } finally {
       setIsSendingMessage(false)
@@ -6085,9 +6796,9 @@ OrdainedPro Wedding Portal
 
 Congratulations on your upcoming wedding! Please find your ceremony services invoice attached.
 
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-ŽŠ WEDDING CEREMONY INVOICE ŽŠ
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+Å½Å  WEDDING CEREMONY INVOICE Å½Å 
+Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 
 COUPLE: ${invoiceForm.coupleName}
 WEDDING DATE: ${new Date(invoiceForm.weddingDate).toLocaleDateString('en-US', {
@@ -6132,9 +6843,9 @@ ${invoiceForm.notes}
 We're honored to be part of your special day and look forward to creating a beautiful ceremony that reflects your love story!
 
 Blessings,
-${officiantLabel}${officiantPhone ? `\n[SCRIPT]ž ${officiantPhone}` : ''}${officiantEmail ? `\n[SCRIPT]§ ${officiantEmail}` : ''}${officiantProfile?.website ? `\nŒ ${officiantProfile.website}` : ''}
+${officiantLabel}${officiantPhone ? `\n[SCRIPT]Å¾ ${officiantPhone}` : ''}${officiantEmail ? `\n[SCRIPT]Â§ ${officiantEmail}` : ''}${officiantProfile?.website ? `\nÅ’Â ${officiantProfile.website}` : ''}
 
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•`
+Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â`
   }
 
   const generateInvoiceContent = (paymentUrl?: string) => {
@@ -6332,24 +7043,24 @@ ${officiantLabel}${officiantPhone ? `\nPhone: ${officiantPhone}` : ''}${offician
     } finally {
       setIsSendingInvoice(false)
     }
-    setNewMessage(`[SCRIPT]§ Wedding Invoice Sent
+    setNewMessage(`[SCRIPT]Â§ Wedding Invoice Sent
 
 Couple: ${invoiceForm.coupleName}
 Sent to: ${recipients}
-§¾ Invoice #: ${invoiceForm.invoiceNumber}
-’’ Wedding Date: ${new Date(invoiceForm.weddingDate).toLocaleDateString()}
-›ï¸ Venue: ${invoiceForm.venue}
+Â§Â¾ Invoice #: ${invoiceForm.invoiceNumber}
+â€™â€™ Wedding Date: ${new Date(invoiceForm.weddingDate).toLocaleDateString()}
+Ââ€ºÃ¯Â¸Â Venue: ${invoiceForm.venue}
 
-’° FINANCIAL SUMMARY:
+â€™Â° FINANCIAL SUMMARY:
 * Total Services: ${invoiceForm.total}
 * Deposit Paid: ${invoiceForm.depositPaid}
 * Balance Due: ${invoiceForm.balanceDue}
-[SCRIPT]… Payment Due: ${new Date(invoiceForm.dueDate).toLocaleDateString()}
+[SCRIPT]â€¦ Payment Due: ${new Date(invoiceForm.dueDate).toLocaleDateString()}
 
-[SCRIPT]‹ SERVICES INCLUDED:
+[SCRIPT]â€¹ SERVICES INCLUDED:
 ${invoiceForm.items.map(item => `* ${item.service} - ${item.quantity * item.rate}`).join('\n')}
 
-’³ Payment Methods: ${invoiceForm.paymentMethods}
+â€™Â³ Payment Methods: ${invoiceForm.paymentMethods}
 
 ${invoiceContent}`)
     setShowAttachments(true)
@@ -6567,22 +7278,22 @@ ${officiantProfile?.name || "Your officiant"}`)
 
       // Apply common modifications
       if (lowerRequest.includes('shorter') || lowerRequest.includes('brief')) {
-        modificationResponse += "âœ… Made the ceremony more concise and streamlined\n"
+        modificationResponse += "Ã¢Å“â€¦ Made the ceremony more concise and streamlined\n"
         updatedScript = updatedScript.replace(/\[.*?\]/g, '') // Remove bracketed instructions
       } else if (lowerRequest.includes('longer') || lowerRequest.includes('more detail')) {
-        modificationResponse += "âœ… Added more detailed elements and explanations\n"
+        modificationResponse += "Ã¢Å“â€¦ Added more detailed elements and explanations\n"
         updatedScript += `\n\nADDITIONAL ELEMENTS\n[Additional ceremonial elements and personal touches as requested]\n`
       } else if (lowerRequest.includes('personal') || lowerRequest.includes('customize')) {
-        modificationResponse += "âœ… Added more personalized elements\n"
+        modificationResponse += "Ã¢Å“â€¦ Added more personalized elements\n"
         updatedScript = updatedScript.replace('EXCHANGE OF VOWS', 'PERSONALIZED EXCHANGE OF VOWS\n[Customized vows reflecting the couple\'s unique relationship]')
       } else if (lowerRequest.includes('music') || lowerRequest.includes('song')) {
-        modificationResponse += "âœ… Added music cues and recommendations\n"
+        modificationResponse += "Ã¢Å“â€¦ Added music cues and recommendations\n"
         updatedScript = updatedScript.replace('PROCESSIONAL', 'PROCESSIONAL\n[Suggested music: "Canon in D" or couple\'s chosen processional song]')
       } else if (lowerRequest.includes('reading') || lowerRequest.includes('poem')) {
-        modificationResponse += "âœ… Added reading section\n"
+        modificationResponse += "Ã¢Å“â€¦ Added reading section\n"
         updatedScript = updatedScript.replace('EXCHANGE OF VOWS', 'SPECIAL READING\n[Insert chosen reading, poem, or scripture here]\n\nEXCHANGE OF VOWS')
       } else {
-        modificationResponse += "âœ… Applied your requested changes to the script\n"
+        modificationResponse += "Ã¢Å“â€¦ Applied your requested changes to the script\n"
         updatedScript += `\n\nCUSTOM MODIFICATION\n[Modified based on request: ${request}]\n`
       }
 
@@ -6760,6 +7471,9 @@ ${officiantProfile?.name || "Your officiant"}`)
     setHasGeneratedScript,
     generatedScriptContent,
     setGeneratedScriptContent,
+    premiumScriptUses,
+    premiumScriptUsesRemaining,
+    premiumScriptLimit: PREMIUM_SCRIPT_LIMIT,
     scriptVersionHistory,
     setScriptVersionHistory,
     chatMessagesRef,
@@ -6866,6 +7580,7 @@ ${officiantProfile?.name || "Your officiant"}`)
     setShowRecordPaymentDialog,
     newPayment,
     setNewPayment,
+    REFUND_FEE_RATE,
     uploadingScript,
     setUploadingScript,
     coupleScripts,
@@ -6954,7 +7669,7 @@ ${officiantProfile?.name || "Your officiant"}`)
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-8">
-          <div className="text-6xl mb-4">’’</div>
+          <div className="text-6xl mb-4">â€™â€™</div>
           <h2 className="text-2xl font-bold text-blue-900 mb-2">No Ceremonies Yet</h2>
           <p className="text-gray-600 mb-6">
             You haven't added any couples/ceremonies yet. Add your first ceremony to get started!

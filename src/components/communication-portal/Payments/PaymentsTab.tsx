@@ -22,6 +22,8 @@ export function PaymentsTab() {
     setShowInvoiceDialog,
     setShowRecordPaymentDialog,
     setNewPayment,
+    setDashboardInitialView,
+    setShowDashboardDialog,
     handleOpenInvoiceDialog,
   } = useCommunicationPortal()
 
@@ -42,56 +44,6 @@ export function PaymentsTab() {
                               Paid in Full
                             </Badge>
                           )}
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowInvoiceDialog(true)}
-                            className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                          >
-                            <FileText className="w-4 h-4 mr-2" />
-                            View Invoice
-                          </Button>
-                          {paymentInfo.balance > 0 && (
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setNewPayment((current: any) => ({
-                                  ...current,
-                                  amount: "",
-                                  date: new Date().toISOString().split("T")[0],
-                                  method: "Credit Card",
-                                  notes: "",
-                                  kind: "payment",
-                                }))
-                                setShowRecordPaymentDialog(true)
-                              }}
-                              className="bg-green-500 hover:bg-green-600"
-                            >
-                              <Plus className="w-4 h-4 mr-2" />
-                              Record Payment
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setNewPayment((current: any) => ({
-                                ...current,
-                                amount: "",
-                                date: new Date().toISOString().split("T")[0],
-                                method: "Original payment method",
-                                notes: "",
-                                kind: "refund",
-                              }))
-                              setShowRecordPaymentDialog(true)
-                            }}
-                            className="border-red-200 text-red-700 hover:bg-red-50"
-                          >
-                            <RotateCcw className="w-4 h-4 mr-2" />
-                            Record Refund
-                          </Button>
                         </div>
                       </div>
                       <CardDescription>Track ceremony payments and outstanding balances</CardDescription>
@@ -144,15 +96,6 @@ export function PaymentsTab() {
                           <p className="font-semibold text-blue-900">Final Payment Due</p>
                           <p className="text-sm text-blue-700">{paymentInfo.finalPaymentDue}</p>
                         </div>
-                        {paymentInfo.balance > 0 && (
-                          <Button
-                            className="bg-blue-500 hover:bg-blue-600"
-                            onClick={handleOpenPaymentReminderDialog}
-                          >
-                            <Mail className="w-4 h-4 mr-2" />
-                            Send Payment Reminder
-                          </Button>
-                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -188,6 +131,7 @@ export function PaymentsTab() {
                         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
                           <p className="text-sm font-medium text-red-800">Refunds</p>
                           <p className="text-2xl font-bold text-red-950">${financialReport.refunds.toFixed(2)}</p>
+                          <p className="mt-1 text-xs text-red-700">Fees: ${financialReport.refundFees.toFixed(2)}</p>
                         </div>
                         <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                           <p className="text-sm font-medium text-blue-800">Net Income</p>
@@ -254,7 +198,10 @@ export function PaymentsTab() {
                                     <p className="text-xs text-gray-500">{row.dueDate || row.createdAt} • {row.description}</p>
                                   </div>
                                 </div>
-                                <p className="font-bold text-red-700">-${Number(row.amount || 0).toFixed(2)}</p>
+                                <div className="text-right">
+                                  <p className="font-bold text-red-700">-${Number(row.amount || 0).toFixed(2)}</p>
+                                  <p className="text-xs text-red-600">Fee: ${Number(row.refundFee || 0).toFixed(2)}</p>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -298,6 +245,9 @@ export function PaymentsTab() {
                                      className={payment.status === 'paid' ? 'bg-green-100 text-green-800' : payment.status === 'refunded' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'}>
                                 {payment.status === 'paid' ? 'Completed' : payment.status === 'refunded' ? 'Refunded' : 'Pending'}
                               </Badge>
+                              {payment.status === 'refunded' && (
+                                <p className="text-xs text-red-600 mt-1">Fee: ${Number(payment.refundFee || 0).toFixed(2)}</p>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -314,14 +264,65 @@ export function PaymentsTab() {
                   </CardHeader>
                   <CardContent className="space-y-3 p-6">
                     <Button
-                      className="w-full justify-start bg-white border border-blue-200 text-blue-700 hover:bg-blue-50"
+                      className="h-9 w-full justify-start border border-blue-400 bg-blue-500/15 text-blue-800 hover:bg-blue-500/25"
                       onClick={handleOpenInvoiceDialog}
                     >
                       <Receipt className="w-4 h-4 mr-2" />
                       Generate Invoice
                     </Button>
                     <Button
-                      className="w-full justify-start bg-white border border-blue-200 text-blue-700 hover:bg-blue-50"
+                      className="h-9 w-full justify-start border border-sky-400 bg-sky-500/15 text-sky-800 hover:bg-sky-500/25"
+                      onClick={() => setShowInvoiceDialog(true)}
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      View Invoice
+                    </Button>
+                    <Button
+                      className="h-9 w-full justify-start border border-emerald-400 bg-emerald-500/15 text-emerald-800 hover:bg-emerald-500/25"
+                      onClick={() => {
+                        setNewPayment((current: any) => ({
+                          ...current,
+                          amount: "",
+                          date: new Date().toISOString().split("T")[0],
+                          method: "Credit Card",
+                          notes: "",
+                          kind: "payment",
+                        }))
+                        setShowRecordPaymentDialog(true)
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Record Payment
+                    </Button>
+                    <Button
+                      className="h-9 w-full justify-start border border-rose-400 bg-rose-500/15 text-rose-800 hover:bg-rose-500/25"
+                      onClick={() => {
+                        setNewPayment((current: any) => ({
+                          ...current,
+                          amount: "",
+                          date: new Date().toISOString().split("T")[0],
+                          method: "Original payment method",
+                          notes: "",
+                          kind: "refund",
+                        }))
+                        setShowRecordPaymentDialog(true)
+                      }}
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Record Refund
+                    </Button>
+                    <Button
+                      className="h-9 w-full justify-start border border-red-400 bg-red-500/15 text-red-800 hover:bg-red-500/25"
+                      onClick={() => {
+                        setDashboardInitialView("refunds")
+                        setShowDashboardDialog(true)
+                      }}
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Refunds
+                    </Button>
+                    <Button
+                      className="h-9 w-full justify-start border border-amber-400 bg-amber-500/20 text-amber-900 hover:bg-amber-500/30"
                       onClick={handleOpenPaymentReminderDialog}
                     >
                       <Mail className="w-4 h-4 mr-2" />

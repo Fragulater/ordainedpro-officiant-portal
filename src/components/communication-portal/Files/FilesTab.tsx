@@ -143,24 +143,6 @@ export function FilesTab() {
                 </CardContent>
               </Card>
 
-              {/* File Upload Section */}
-              <Card className="border-blue-100 shadow-md">
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
-                  <CardTitle className="text-blue-900">Upload Documents</CardTitle>
-                  <CardDescription>Share ceremony scripts, photos, music lists, and other important documents</CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <FileUpload
-                    mode="full"
-                    onFilesUploaded={handleFilesUploaded}
-                    onFileRemoved={handleFileRemoved}
-                    maxFiles={10}
-                    maxFileSize={25}
-                    acceptedFileTypes={['.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png', '.gif', '.mp3', '.mp4', '.mov', '.zip', '.ppt', '.pptx', '.xls', '.xlsx']}
-                  />
-                </CardContent>
-              </Card>
-
               {/* Existing Files */}
               <Card className="border-blue-100 shadow-md">
                 <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -272,6 +254,25 @@ export function FilesTab() {
                       )})}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* File Upload Section */}
+              <Card className="border-blue-100 shadow-md">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <CardTitle className="text-blue-900">Upload Documents</CardTitle>
+                  <CardDescription>Share ceremony scripts, photos, music lists, and other important documents</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <FileUpload
+                    mode="full"
+                    density="slim"
+                    onFilesUploaded={handleFilesUploaded}
+                    onFileRemoved={handleFileRemoved}
+                    maxFiles={10}
+                    maxFileSize={25}
+                    acceptedFileTypes={['.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png', '.gif', '.mp3', '.mp4', '.mov', '.zip', '.ppt', '.pptx', '.xls', '.xlsx']}
+                  />
                 </CardContent>
               </Card>
 

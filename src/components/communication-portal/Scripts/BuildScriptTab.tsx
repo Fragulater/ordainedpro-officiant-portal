@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Select } from "@/components/ui/select"
-import { MessageCircle, FileText, Users, Send, Download, Plus, Check, MapPin, Heart, Edit, FileEdit, Eye, Save, Upload, ChevronRight, Printer, Mail, BookOpen } from "lucide-react"
+import { MessageCircle, FileText, Users, Send, Download, Plus, Check, MapPin, Heart, Edit, FileEdit, Eye, Save, Upload, ChevronRight, Printer, Mail, BookOpen, Sparkles } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 export function BuildScriptTab() {
@@ -43,6 +43,8 @@ export function BuildScriptTab() {
     selectedMrScriptService,
     storyPromptSuggestions,
     hasGeneratedScript,
+    premiumScriptUsesRemaining = 3,
+    premiumScriptLimit = 3,
     chatMessagesRef,
     editingScript,
     setEditingScript,
@@ -396,7 +398,7 @@ export function BuildScriptTab() {
 
                           {/* Script Generation Action Buttons */}
                           <div className="mt-4 pt-4 border-t-2 border-gray-200">
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                               {/* Generate Initial Script - Green */}
                               <div className="relative">
                                 <Button
@@ -407,7 +409,7 @@ export function BuildScriptTab() {
                                   <FileText className="w-5 h-5 mb-1" />
                                   <span className="text-xs">Generate Initial Script</span>
                                 </Button>
-                                <ChevronRight className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-900 z-10" />
+                                <ChevronRight className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-900 z-10 hidden lg:block" />
                               </div>
 
                               {/* Refine Script - Blue (enabled after questions answered) */}
@@ -421,7 +423,21 @@ export function BuildScriptTab() {
                                   <Edit className="w-5 h-5 mb-1" />
                                   <span className="text-xs">Refine Script</span>
                                 </Button>
-                                <ChevronRight className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-900 z-10" />
+                                <ChevronRight className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-900 z-10 hidden lg:block" />
+                              </div>
+
+                              <div className="relative">
+                                <Button
+                                  onClick={() => generateAndSaveScript(true)}
+                                  disabled={!selectedCeremonyStyle || !selectedCeremonyLength || premiumScriptUsesRemaining <= 0 || isTyping}
+                                  className="bg-violet-600 hover:bg-violet-700 text-white font-medium py-3 disabled:bg-gray-300 disabled:cursor-not-allowed flex-col h-auto w-full"
+                                  title={premiumScriptUsesRemaining <= 0 ? "Premium Polish limit reached for this profile" : "Use the premium model to polish this script"}
+                                >
+                                  <Sparkles className="w-5 h-5 mb-1" />
+                                  <span className="text-xs">Premium Polish</span>
+                                  <span className="text-[10px] opacity-90">{premiumScriptUsesRemaining}/{premiumScriptLimit} left</span>
+                                </Button>
+                                <ChevronRight className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-900 z-10 hidden lg:block" />
                               </div>
 
                               {/* Generate Final Script - Pink */}

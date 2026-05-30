@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { CalendarDays, DollarSign, FileText, Users, Clock, MapPin, Phone, Mail, User, Star, Edit, Save, LayoutDashboard, Plus, WalletCards } from "lucide-react"
+import { Archive, CalendarDays, DollarSign, FileText, Users, Clock, MapPin, Phone, Mail, User, Star, Edit, Save, LayoutDashboard, Plus, WalletCards } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 // Helper to safely get initials from a name
@@ -37,6 +37,7 @@ export function PortalOverview() {
     setShowAddCeremonyDialog,
     financialReport,
     getCeremonyTypeConfig,
+    toggleCeremonyStatus,
   } = useCommunicationPortal()
 
   // Guard against null/undefined editCoupleInfo
@@ -107,6 +108,11 @@ export function PortalOverview() {
   const weddingCountdownDays = getWeddingCountdownDays()
   const hasWeddingDate = Boolean(editWeddingDetails?.weddingDate)
   const isWeddingCountdownUrgent = hasWeddingDate && weddingCountdownDays <= 3
+  const handleArchiveProfile = () => {
+    const confirmed = window.confirm("Are you sure you want to Archive this profile?")
+    if (!confirmed) return
+    toggleCeremonyStatus?.()
+  }
 
   return (
     <>
@@ -403,12 +409,23 @@ export function PortalOverview() {
 
           <Card className="border-blue-100 shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="pb-4 bg-gradient-to-r from-blue-50 to-indigo-50">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg flex items-center text-blue-900">
+              <div className="flex items-center justify-between gap-5">
+                <CardTitle className="text-lg flex items-center text-blue-900 whitespace-nowrap">
                   <MapPin className="w-5 h-5 mr-2 text-blue-600" />
                   Ceremony Details
                 </CardTitle>
-                <div className="flex items-center space-x-2">
+                <div className="flex shrink-0 items-center space-x-2">
+                  {editCoupleInfo?.isActive !== false && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleArchiveProfile}
+                      className="border-red-200 text-red-700 hover:bg-red-50 text-[11px] px-2.5 py-1 h-7"
+                    >
+                      <Archive className="w-3 h-3 mr-1" />
+                      Archive
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -486,7 +503,7 @@ export function PortalOverview() {
                         handleOpenEditWeddingDialog()
                       }
                     }}
-                    className={`w-full justify-start h-10 ${
+                    className={`mt-5 w-full justify-start h-10 ${
                       hasPrivateNotes
                         ? "border-green-300 bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800"
                         : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-600"

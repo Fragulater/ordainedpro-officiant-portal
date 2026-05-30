@@ -465,18 +465,6 @@ export function OfficiantPublicProfile() {
                 )}
               </div>
 
-              {/* Video */}
-              {selectedOfficiant.videoUrl && (
-                <div>
-                  <h3 className="font-semibold text-lg mb-3">Introduction Video</h3>
-                  <video
-                    src={selectedOfficiant.videoUrl}
-                    controls
-                    className="w-full rounded-lg"
-                  />
-                </div>
-              )}
-
               {/* Photo Gallery */}
               {selectedOfficiant.photoGallery.length > 0 && (
                 <div>
@@ -492,6 +480,18 @@ export function OfficiantPublicProfile() {
                       />
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Video */}
+              {selectedOfficiant.videoUrl && (
+                <div>
+                  <h3 className="font-semibold text-lg mb-3">Video</h3>
+                  <video
+                    src={selectedOfficiant.videoUrl}
+                    controls
+                    className="w-full rounded-lg"
+                  />
                 </div>
               )}
 

@@ -52,12 +52,18 @@ export interface Meeting {
   responseDeadline: string
 }
 
+export interface MeetingAttendee {
+  name: string
+  email: string
+}
+
 export interface ScheduleMeetingDialogProps {
   onScheduleMeeting: (meeting: Omit<Meeting, 'id' | 'createdDate' | 'status' | 'reminderSent' | 'calendarInviteSent'>) => void
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   coupleId?: number
   coupleEmails?: string[]
+  coupleAttendees?: MeetingAttendee[]
   coupleName?: string
   officiantName?: string
   officiantEmail?: string
@@ -70,6 +76,7 @@ export function ScheduleMeetingDialog({
   onOpenChange,
   coupleId,
   coupleEmails = ["ganuactivate@gmail.com", "ganuactivate@gmail.com"],
+  coupleAttendees = [],
   coupleName = "Sarah & David",
   officiantName = "Officiant",
   officiantEmail = "",
@@ -81,6 +88,27 @@ export function ScheduleMeetingDialog({
     cleanOfficiantName === "Officiant" ? "Officiant" : cleanOfficiantName.split(/\s+/)[0]
   const officiantLabel =
     cleanOfficiantName === "Officiant" ? "Officiant" : `Officiant ${officiantFirstName}`
+  const attendeePreview = coupleEmails
+    .filter(Boolean)
+    .map((email, index) => {
+      const matchedAttendee =
+        coupleAttendees.find((attendee) => attendee.email === email) ||
+        coupleAttendees[index]
+      const fallbackName = coupleName.split("&")[index]?.trim() || `Attendee ${index + 1}`
+
+      return {
+        email,
+        name: matchedAttendee?.name?.trim() || fallbackName,
+      }
+    })
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean)
+    if (parts.length === 0) return "?"
+    return parts
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("")
+  }
 
   const [formData, setFormData] = useState({
     subject: "",
@@ -1050,17 +1078,24 @@ ${officiantLabel}${officiantEmail ? `\n📧 ${officiantEmail}` : ''}${officiantP
                     {officiantEmail && <p className="text-xs text-gray-600">{officiantEmail}</p>}
                   </div>
                 </div>
-                {formData.attendees.map((email, index) => (
+                {formData.attendees.map((email, index) => {
+                  const attendee =
+                    attendeePreview.find((preview) => preview.email === email) ||
+                    attendeePreview[index] ||
+                    { email, name: `Attendee ${index + 1}` }
+
+                  return (
                   <div key={index} className="flex items-center text-sm">
                     <div className="w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center mr-2">
-                      <span className="text-white text-xs">{index === 0 ? 'SJ' : 'DC'}</span>
+                      <span className="text-white text-xs">{getInitials(attendee.name)}</span>
                     </div>
                     <div>
-                      <p className="font-medium">{index === 0 ? 'Sarah Johnson' : 'David Chen'}</p>
+                      <p className="font-medium">{attendee.name}</p>
                       <p className="text-xs text-gray-600">{email}</p>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 

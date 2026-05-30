@@ -29,6 +29,9 @@ export function TasksTab() {
                   <div>
                     <CardTitle className="text-blue-900">Ceremony Checklist</CardTitle>
                     <CardDescription>Track progress and stay organized for the ceremony</CardDescription>
+                    <p className="mt-2 text-xs font-medium text-blue-700">
+                      Ceremony checklist tasks are visible to all parties in this profile.
+                    </p>
                   </div>
                   <div className="flex space-x-2">
                     <Select value={taskFilter} onValueChange={(value: string) => setTaskFilter(value)}>

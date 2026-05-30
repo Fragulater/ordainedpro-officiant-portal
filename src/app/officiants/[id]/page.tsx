@@ -308,24 +308,24 @@ export default async function PublicOfficiantPage({ params }: { params: Promise<
               </div>
             </div>
 
+            {profile.photo_gallery && profile.photo_gallery.length > 0 ? (
+              <div>
+                <h2 className="mb-3 text-lg font-bold text-gray-950">Photo Gallery</h2>
+                <PublicOfficiantGallery photos={profile.photo_gallery} name={name} />
+              </div>
+            ) : null}
+
             {profile.video_url ? (
               <div>
                 <div className="mb-3 flex items-center gap-2">
                   <Play className="h-5 w-5 text-blue-700" />
-                  <h2 className="text-lg font-bold text-gray-950">Introduction Video</h2>
+                  <h2 className="text-lg font-bold text-gray-950">Video</h2>
                 </div>
                 <video className="aspect-video max-h-[320px] w-full rounded-lg border bg-black object-contain shadow-sm" controls preload="metadata" playsInline>
                   <source src={profile.video_url} type="video/mp4" />
                   <source src={profile.video_url} />
                   Your browser does not support the video tag.
                 </video>
-              </div>
-            ) : null}
-
-            {profile.photo_gallery && profile.photo_gallery.length > 0 ? (
-              <div>
-                <h2 className="mb-3 text-lg font-bold text-gray-950">Photo Gallery</h2>
-                <PublicOfficiantGallery photos={profile.photo_gallery} name={name} />
               </div>
             ) : null}
 

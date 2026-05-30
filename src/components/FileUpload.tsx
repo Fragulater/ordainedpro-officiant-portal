@@ -39,6 +39,7 @@ interface FileUploadProps {
   maxFileSize?: number // in MB
   maxFiles?: number
   mode?: 'compact' | 'full' // compact for message attachments, full for files tab
+  density?: 'default' | 'slim'
   existingFiles?: UploadedFile[]
   className?: string
 }
@@ -50,6 +51,7 @@ export function FileUpload({
   maxFileSize = 10, // 10MB
   maxFiles = 5,
   mode = 'full',
+  density = 'default',
   existingFiles = [],
   className = ""
 }: FileUploadProps) {
@@ -346,29 +348,29 @@ export function FileUpload({
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
-        <CardContent className="p-8 text-center">
-          <div className="flex flex-col items-center space-y-4">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+        <CardContent className={`${density === 'slim' ? 'p-5' : 'p-8'} text-center`}>
+          <div className={`flex flex-col items-center ${density === 'slim' ? 'space-y-2' : 'space-y-4'}`}>
+            <div className={`${density === 'slim' ? 'w-11 h-11' : 'w-16 h-16'} rounded-full flex items-center justify-center ${
               dragActive ? 'bg-blue-100' : 'bg-gray-100'
             }`}>
-              <Upload className={`w-8 h-8 ${dragActive ? 'text-blue-500' : 'text-gray-400'}`} />
+              <Upload className={`${density === 'slim' ? 'w-5 h-5' : 'w-8 h-8'} ${dragActive ? 'text-blue-500' : 'text-gray-400'}`} />
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className={`${density === 'slim' ? 'text-base mb-1' : 'text-lg mb-2'} font-semibold text-gray-900`}>
                 Drop files here to upload
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className={`${density === 'slim' ? 'text-sm mb-2' : 'mb-4'} text-gray-500`}>
                 or click to browse from your device
               </p>
 
-              <Button onClick={onButtonClick} className="bg-blue-500 hover:bg-blue-600">
+              <Button onClick={onButtonClick} className="bg-blue-500 hover:bg-blue-600" size={density === 'slim' ? 'sm' : 'default'}>
                 <Upload className="w-4 h-4 mr-2" />
                 Choose Files
               </Button>
             </div>
 
-            <div className="text-xs text-gray-400 space-y-1">
+            <div className={`${density === 'slim' ? 'leading-5' : 'space-y-1'} text-xs text-gray-400`}>
               <p>Supported formats: {acceptedFileTypes.join(', ')}</p>
               <p>Maximum file size: {maxFileSize}MB</p>
               <p>Maximum {maxFiles} files</p>

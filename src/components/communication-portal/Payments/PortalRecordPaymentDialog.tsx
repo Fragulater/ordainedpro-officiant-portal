@@ -18,7 +18,12 @@ export function PortalRecordPaymentDialog() {
     setShowRecordPaymentDialog,
     newPayment,
     setNewPayment,
+    REFUND_FEE_RATE,
   } = useCommunicationPortal()
+
+  const enteredAmount = parseFloat(newPayment.amount) || 0
+  const refundFeeAmount = newPayment.kind === "refund" ? Math.round(enteredAmount * REFUND_FEE_RATE * 100) / 100 : 0
+  const totalOfficiantCharge = newPayment.kind === "refund" ? Math.round((enteredAmount + refundFeeAmount) * 100) / 100 : 0
 
   // Don't render if editCoupleInfo is not available
   if (!editCoupleInfo?.brideName) {
@@ -146,6 +151,18 @@ export function PortalRecordPaymentDialog() {
                         : (paymentInfo.balance - parseFloat(newPayment.amount)).toFixed(2)}
                     </span>
                   </div>
+                  {newPayment.kind === "refund" && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-green-800">Officiant Refund Fee (5%):</span>
+                        <span className="font-bold text-green-900">${refundFeeAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-green-200 pt-2">
+                        <span className="text-green-900 font-medium">Total Officiant Charge:</span>
+                        <span className="font-bold text-green-900">${totalOfficiantCharge.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
                   {newPayment.kind !== "refund" && (paymentInfo.balance - parseFloat(newPayment.amount)) === 0 && (
                     <div className="mt-3 p-2 bg-green-100 rounded-lg border border-green-300">
                       <p className="text-center font-bold text-green-800">

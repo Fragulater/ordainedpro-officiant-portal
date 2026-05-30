@@ -69,6 +69,15 @@ export function PortalOfficiantDashboardDialog() {
     loadUserFiles()
   }, [loadUserFiles])
 
+  useEffect(() => {
+    const handleUserFilesUpdated = () => {
+      loadUserFiles()
+    }
+
+    window.addEventListener("ordainedpro:user-files-updated", handleUserFilesUpdated)
+    return () => window.removeEventListener("ordainedpro:user-files-updated", handleUserFilesUpdated)
+  }, [loadUserFiles])
+
   const getUserFileType = (file: any) => {
     const fileName = (file.name || "").toLowerCase()
     const fileType = (file.type || "").toLowerCase()
@@ -178,6 +187,26 @@ export function PortalOfficiantDashboardDialog() {
     }
   }
 
+  const handleUploadSavedDocument = async (file: File) => {
+    const formData = new FormData()
+
+    formData.append("file", file, file.name)
+    formData.append("name", file.name)
+    formData.append("folder", "dashboard")
+
+    const response = await fetch("/api/user-files", {
+      method: "POST",
+      body: formData,
+    })
+    const result = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(result.error || "Unable to upload this document.")
+    }
+
+    await loadUserFiles()
+  }
+
   return (
     <>
       {/* Officiant Dashboard Dialog */}
@@ -206,6 +235,7 @@ export function PortalOfficiantDashboardDialog() {
           handleContractAction(Number(documentId), "delete")
         }}
         onDocumentAssignToCouple={handleAssignSavedFileToCouple}
+        onDocumentUpload={handleUploadSavedDocument}
         onSelectCouple={(ceremonyId) => {
           // Find the couple by ID and set as active
           const coupleIndex = allCouples.findIndex((c) => c.id.toString() === ceremonyId)
