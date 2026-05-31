@@ -509,6 +509,39 @@ const calculateInvoiceValues = (form: any) => {
 const marketplaceBaseUrl = process.env.NEXT_PUBLIC_MARKETPLACE_URL || "https://scripts.ordainedpro.com"
 const MAIN_MARKETPLACE_SCRIPT_LIMIT = 10
 
+const transformScriptRecord = (s: any) => ({
+  id: s.id,
+  title: s.title,
+  type: s.type,
+  status: s.status,
+  content: s.content,
+  description: s.description || '',
+  lastModified: s.updated_at ? new Date(s.updated_at).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  }) : '',
+  createdDate: s.created_at ? new Date(s.created_at).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  }) : '',
+  coupleId: s.couple_id ?? s.coupleId ?? null,
+  isPublished: s.is_published || s.isPublished || false,
+  price: Number(s.price) || 0,
+  sales: s.sales_count || s.sales || 0,
+  earnings: Number(s.earnings_total ?? s.earnings) || 0,
+  rating: Number(s.rating) || 0,
+  marketplaceLanguages: Array.isArray(s.marketplace_languages) ? s.marketplace_languages : (s.marketplaceLanguages || []),
+  marketplaceCategories: Array.isArray(s.marketplace_categories) ? s.marketplace_categories : (s.marketplaceCategories || []),
+  marketplaceCeremonyTypes: Array.isArray(s.marketplace_ceremony_types) ? s.marketplace_ceremony_types : (s.marketplaceCeremonyTypes || []),
+  marketplaceVisibility: s.marketplace_visibility || s.marketplaceVisibility || "main_marketplace",
+  marketplacePublishedAt: s.marketplace_published_at || s.marketplacePublishedAt,
+  marketplaceUrl: s.marketplace_url || s.marketplaceUrl || `${marketplaceBaseUrl}/scripts/${s.id}`,
+  stripeProductId: s.stripe_product_id || s.stripeProductId,
+  stripePriceId: s.stripe_price_id || s.stripePriceId
+})
+
 const userHasActiveSellerSubscription = async (userId: string) => {
   const { data, error } = await supabase
     .from("subscriptions")
@@ -2077,38 +2110,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
     if (result.ok && result.data) {
       // Transform database format to component format
-      const transformedScripts = result.data.map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        type: s.type,
-        status: s.status,
-        content: s.content,
-        description: s.description || '',
-        lastModified: s.updated_at ? new Date(s.updated_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }) : '',
-        createdDate: s.created_at ? new Date(s.created_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }) : '',
-        coupleId: s.couple_id,
-        isPublished: s.is_published || false,
-        price: Number(s.price) || 0,
-        sales: s.sales_count || 0,
-        earnings: Number(s.earnings_total) || 0,
-        rating: Number(s.rating) || 0,
-        marketplaceLanguages: Array.isArray(s.marketplace_languages) ? s.marketplace_languages : [],
-        marketplaceCategories: Array.isArray(s.marketplace_categories) ? s.marketplace_categories : [],
-        marketplaceCeremonyTypes: Array.isArray(s.marketplace_ceremony_types) ? s.marketplace_ceremony_types : [],
-        marketplaceVisibility: s.marketplace_visibility || "main_marketplace",
-        marketplacePublishedAt: s.marketplace_published_at,
-        marketplaceUrl: s.marketplace_url || `${marketplaceBaseUrl}/scripts/${s.id}`,
-        stripeProductId: s.stripe_product_id,
-        stripePriceId: s.stripe_price_id
-      }))
+      const transformedScripts = result.data.map(transformScriptRecord)
       setCoupleScripts(transformedScripts)
       console.log("Ã¢Å“â€¦ Loaded", transformedScripts.length, "scripts from database")
     } else {
@@ -2122,6 +2124,38 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   useEffect(() => {
     loadScriptsForUser()
   }, [loadScriptsForUser])
+
+  const saveGeneratedScriptDraft = useCallback(async (script: {
+    title: string
+    type: string
+    status?: string
+    content: string
+    description?: string
+    coupleId?: number | null
+  }) => {
+    if (!currentUser?.id) return null
+
+    const result = await addScriptToDB(currentUser.id, {
+      title: script.title,
+      type: script.type || "Custom",
+      status: script.status || "Latest Draft",
+      content: script.content,
+      description: script.description || "Created by Mr. Script",
+      coupleId: script.coupleId ?? editCoupleInfo?.id ?? null
+    })
+
+    if (!result.ok || !result.data) {
+      console.error("Failed to save Mr. Script draft:", result.error)
+      return null
+    }
+
+    const savedScript = transformScriptRecord(result.data)
+    setCoupleScripts(prevScripts => [
+      savedScript,
+      ...prevScripts.filter(existing => String(existing.id) !== String(savedScript.id))
+    ])
+    return savedScript
+  }, [currentUser?.id, editCoupleInfo?.id])
 
   const loadSalesForUser = useCallback(async () => {
     if (!currentUser?.id) return
@@ -2361,12 +2395,12 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const handleGenerateScript = (scriptType: string) => {
     setIsGeneratingScript(true)
 
-    setTimeout(() => {
+    setTimeout(async () => {
       const subjectName = [editCoupleInfo?.brideName, editCoupleInfo?.groomName]
         .filter(Boolean)
         .join(" & ") || currentCeremonyConfig.label
       const newScript = {
-        id: generatedScripts.length + 1,
+        id: Date.now(),
         coupleId: editCoupleInfo?.id,
         title: `${scriptType} Ceremony Script - ${subjectName}`,
         content: generateScriptContent(scriptType),
@@ -2375,35 +2409,26 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         status: "completed"
       }
 
-      setGeneratedScripts(prev => [...prev, newScript])
-
-      // Add to files as well
-      const scriptFile: UploadedFile = {
-        id: `script_${newScript.id}_${Date.now()}`,
-        file: new File([newScript.content], `${newScript.title}.txt`, { type: 'text/plain' }),
-        name: `${newScript.title}.txt`,
-        size: newScript.content.length,
-        type: 'text/plain',
-        url: '#',
-        uploadProgress: 100,
-        status: 'completed'
-      }
-
-      setUploadedFiles(prev => [...prev, scriptFile])
+      const savedScript = await saveGeneratedScriptDraft(newScript)
+      const scriptForEditor = savedScript || newScript
+      setGeneratedScripts(prev => [
+        scriptForEditor,
+        ...prev.filter(script => String(script.id) !== String(scriptForEditor.id))
+      ])
       setIsGeneratingScript(false)
 
       const confirmationMessage = {
         id: aiChatMessages.length + 1,
         role: "assistant",
-        content: `Perfect! I've generated a ${scriptType.toLowerCase()} ceremony script for ${subjectName}. The script is now open in the Script Editor tab where you can customize it. - Mr. Script`,
+        content: `Perfect! I've generated a ${scriptType.toLowerCase()} ceremony script for ${subjectName}. The script is saved to this profile and is now open in the Script Editor tab where you can customize it. - Mr. Script`,
         timestamp: new Date().toLocaleTimeString()
       }
 
       setAiChatMessages(prev => [...prev, confirmationMessage])
 
       // Auto-switch to Script Editor tab and load the script
-      setEditingScript(newScript)
-      const htmlContent = newScript.content.replace(/\n/g, '<br>')
+      setEditingScript(scriptForEditor)
+      const htmlContent = scriptForEditor.content.replace(/\n/g, '<br>')
       setScriptContent(htmlContent)
       setEditorFontSize(16)
       setScriptBuilderTab('editor')
@@ -3835,7 +3860,7 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
 
       // Create a new script from the uploaded document
       const newScript = {
-        id: generatedScripts.length + 1,
+        id: Date.now(),
         coupleId: editCoupleInfo?.id,
         title: `Imported Script - ${getFirstName(editCoupleInfo?.brideName)} & ${getFirstName(editCoupleInfo?.groomName)}`,
         type: 'Custom',
@@ -3844,7 +3869,15 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
         status: 'completed'
       }
 
-      setGeneratedScripts(prev => [...prev, newScript])
+      const savedScript = await saveGeneratedScriptDraft({
+        ...newScript,
+        description: "Imported and personalized by Mr. Script"
+      })
+      const scriptForEditor = savedScript || newScript
+      setGeneratedScripts(prev => [
+        scriptForEditor,
+        ...prev.filter(script => String(script.id) !== String(scriptForEditor.id))
+      ])
 
       // Add AI message confirming the upload
       const confirmMessage = {
@@ -3870,7 +3903,7 @@ What would you like me to help you with in this script?`,
       e.target.value = ''
 
       // Auto-switch to Script Editor tab and load the script
-      setEditingScript(newScript)
+      setEditingScript(scriptForEditor)
       const htmlContent = personalizedScript.replace(/\n/g, '<br>')
       setScriptContent(htmlContent)
       setEditorFontSize(16)
@@ -3942,7 +3975,7 @@ ${officiantLabel}`,
     if (!editingScript || !currentUser?.id) return
 
     // Check if this is a new script or existing script (before any updates)
-    const existingDbScript = coupleScripts.find(script => script.id === editingScript.id)
+    const existingDbScript = coupleScripts.find(script => String(script.id) === String(editingScript.id))
     const isNewScript = !existingDbScript
 
     // Get the current content from the editor element to ensure we have the latest formatted content
@@ -4021,10 +4054,14 @@ ${officiantLabel}`,
         if (result.ok && result.data) {
           // Add to local state with database ID
           const newScript = {
-            ...result.data,
+            ...transformScriptRecord(result.data),
             lastModified: currentDate
           }
-          setCoupleScripts(prevScripts => [newScript, ...prevScripts])
+          setCoupleScripts(prevScripts => [
+            newScript,
+            ...prevScripts.filter(script => String(script.id) !== String(newScript.id))
+          ])
+          setGeneratedScripts(prevScripts => prevScripts.filter(script => String(script.id) !== String(editingScript.id)))
           console.log('Ã¢Å“â€¦ New script created in database:', result.data.id)
           alert(`Ã¢Å“â€¦ Script "${editingScript.title}" created successfully!\n\nSaved to server on: ${currentDate}\nContent: ${plainTextContent.length} characters`)
         } else {
@@ -4041,7 +4078,7 @@ ${officiantLabel}`,
           // Update local state
           setCoupleScripts(prevScripts =>
             prevScripts.map(script =>
-              script.id === editingScript.id
+              String(script.id) === String(editingScript.id)
                 ? {
                     ...script,
                     content: currentContent,
@@ -7148,7 +7185,7 @@ ${invoiceContent}`)
   }, [scriptContent, showScriptEditorDialog])
 
   // Handle sending generated script to editor
-  const handleSendToEditor = () => {
+  const handleSendToEditor = async () => {
     if (!hasGeneratedScript || !generatedScriptContent) {
       alert('No script has been generated yet. Please complete the ceremony planning process first.')
       return
@@ -7186,15 +7223,28 @@ ${invoiceContent}`)
     // Create a new script object similar to existing scripts
     const newScript = {
       id: Date.now(),
+      coupleId: editCoupleInfo?.id,
       title: `Generated Ceremony Script - ${selectedCeremonyStyle || 'Custom'}`,
       content: generatedScriptContent,
       createdDate: new Date().toLocaleDateString(),
       type: selectedCeremonyStyle || 'Custom',
       status: 'draft'
     }
+    const savedScript = await saveGeneratedScriptDraft({
+      ...newScript,
+      description: "Generated by Mr. Script"
+    })
+    const scriptForEditor = savedScript || newScript
+
+    if (savedScript) {
+      setGeneratedScripts(prev => [
+        savedScript,
+        ...prev.filter(script => String(script.id) !== String(savedScript.id))
+      ])
+    }
 
     // Set up the editor with the generated content
-    setEditingScript(newScript)
+    setEditingScript(scriptForEditor)
     setScriptContent(generatedScriptContent)
     setShowScriptEditorDialog(true)
   }
