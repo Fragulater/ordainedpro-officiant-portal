@@ -2664,14 +2664,16 @@ Mr. Script - Your Personal Wedding Script Creator`
   }
 
   const buildQuickSetupResponses = (baseResponses: Record<string, string> = {}) => {
+    const profileContext = buildMrScriptProfileContext()
+    const scriptTypeSelection = selectedCeremonyStyle || profileContext.serviceOption || baseResponses['ceremony-type']
     const quickSetupResponses: Record<string, string> = {
       ...baseResponses,
     }
-    const quickSetupService = getMrScriptServiceByResponse(selectedCeremonyStyle)
+    const quickSetupService = getMrScriptServiceByResponse(scriptTypeSelection)
     const shouldUseWeddingDetails = ["wedding", "vow_renewal"].includes(quickSetupService.id)
 
-    if (selectedCeremonyStyle) {
-      quickSetupResponses['ceremony-type'] = selectedCeremonyStyle
+    if (scriptTypeSelection) {
+      quickSetupResponses['ceremony-type'] = scriptTypeSelection
     }
 
     if (selectedCeremonyLength) {
@@ -2711,7 +2713,7 @@ Mr. Script - Your Personal Wedding Script Creator`
     }
 
     const quickSetupFacts = [
-      selectedCeremonyStyle ? `Script type: ${quickSetupService.displayName}` : "",
+      scriptTypeSelection ? `Script type: ${quickSetupService.displayName}` : "",
       selectedCeremonyLength ? `Ceremony length: ${selectedCeremonyLength}` : "",
       selectedOfficiantStyle ? `Officiant style: ${selectedOfficiantStyle}` : "",
       shouldUseWeddingDetails && selectedUnityCeremony ? `Unity ceremony: ${selectedUnityCeremony}` : "",
@@ -2731,6 +2733,10 @@ Mr. Script - Your Personal Wedding Script Creator`
 
     return quickSetupResponses
   }
+
+  useEffect(() => {
+    setSelectedCeremonyStyle(getMrScriptProfileService())
+  }, [editCoupleInfo?.id, currentCeremonyType])
 
   const getFirstUnansweredGuidedQuestionIndex = (responses: Record<string, string>) => {
     const activeQuestions = getActiveGuidedQuestions(responses)
@@ -3179,11 +3185,11 @@ Mr. Script - Your Personal Wedding Script Creator`
     setIsTyping(true)
 
     const profileContext = buildMrScriptProfileContext()
-    const service = getMrScriptServiceByResponse(userResponses['ceremony-type'] || selectedCeremonyStyle || profileContext.serviceOption)
+    const scriptTypeSelection = selectedCeremonyStyle || profileContext.serviceOption || userResponses['ceremony-type']
     const responseMap: Record<string, string> = buildQuickSetupResponses({
       ...profileContext.responsePrefill,
       ...userResponses,
-      'ceremony-type': userResponses['ceremony-type'] || selectedCeremonyStyle || profileContext.serviceOption,
+      'ceremony-type': scriptTypeSelection,
       'ceremony-duration': userResponses['ceremony-duration'] || selectedCeremonyLength,
       'ceremony-tone': userResponses['ceremony-tone'] || selectedOfficiantStyle,
       'officiant-style': userResponses['officiant-style'] || selectedOfficiantStyle,
@@ -3191,6 +3197,7 @@ Mr. Script - Your Personal Wedding Script Creator`
       'special-elements': userResponses['special-elements'] || selectedUnityCeremony,
       'vows-type': userResponses['vows-type'] || selectedVowsType,
     })
+    const service = getMrScriptServiceByResponse(responseMap['ceremony-type'])
     const fallbackScript = generateCompleteScript(responseMap, editCoupleInfo, editWeddingDetails)
 
     try {
