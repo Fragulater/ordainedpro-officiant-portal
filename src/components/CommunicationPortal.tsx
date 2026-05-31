@@ -874,6 +874,11 @@ const buildClarificationAnswer = (value: string) => {
 const getSpecialInclusionsPrompt = () =>
   "Would you like readings, prayers, remembrance, cultural traditions, family involvement, music, stories, or any special ceremony moments included? You can name any that apply, say none, or ask me what any of those mean."
 
+const getToneQuickChoices = (service: ReturnType<typeof getMrScriptServiceByResponse>) =>
+  service.sensitivity === "grief"
+    ? ["Gentle", "Compassionate", "Reflective", "Hopeful", "Spiritual", "Respectful", "Warm", "Solemn"]
+    : ["Romantic", "Lighthearted", "Fun", "Energetic", "Warm", "Formal", "Modern", "Spiritual", "Religious", "Very religious"]
+
 // AI Assistant Functions
 const generateAIResponse = (question: Question, previousResponses: Record<string, string>): string => {
   if (question.id === "ceremony-type") {
@@ -7444,6 +7449,52 @@ ${officiantProfile?.name || "Your officiant"}`)
   })
   const selectedMrScriptService = getMrScriptServiceByResponse(mrScriptServiceSelection)
   const storyPromptSuggestions = getMrScriptStoryPrompts(mrScriptServiceSelection)
+  const getGuidedQuickResponseOptions = () => {
+    const mergedResponses = buildQuickSetupResponses(userResponses)
+    const activeQuestions = getActiveGuidedQuestions(mergedResponses)
+    const currentQuestion = activeQuestions[currentQuestionIndex]
+    const service = getMrScriptServiceByResponse(mergedResponses["ceremony-type"])
+
+    if (mergedResponses[PENDING_LOVED_ONE_HONOR_KEY] === "true") {
+      return ["Keep it general", "Mention by name", "Skip"]
+    }
+
+    if (!currentQuestion) return []
+
+    if (currentQuestion.type === "multiple-choice") {
+      return currentQuestion.options || []
+    }
+
+    if (currentQuestion.id === "core-details") {
+      const detailQuestions = getGuidedDetailQuestions(currentQuestion, mergedResponses)
+      const detailIndex = getFirstUnansweredGuidedDetailIndex(currentQuestion, mergedResponses)
+      const detailPrompt = detailQuestions[detailIndex]?.toLowerCase() || ""
+
+      if (/\btone\b|\bfeel\b/.test(detailPrompt)) {
+        return getToneQuickChoices(service)
+      }
+
+      if (/\bwhat kind of piece\b|\bpiece should be written\b/.test(detailPrompt)) {
+        return ["Eulogy", "Vows", "Toast", "Speech", "Reading", "Ceremony outline"]
+      }
+    }
+
+    if (currentQuestion.id === "story-notes") {
+      return service.sensitivity === "grief"
+        ? ["Warm tribute", "Funny memory", "Family story", "Legacy", "Faith", "Skip"]
+        : ["Romantic", "Funny story", "How they met", "Proposal", "Family", "Future hopes", "Skip"]
+    }
+
+    if (currentQuestion.id === "special-inclusions") {
+      return ["Reading", "Prayer", "Remembrance", "Family involvement", "Music", "None"]
+    }
+
+    if (currentQuestion.id === "avoidances") {
+      return ["None", "Keep it secular", "Avoid humor", "Avoid long readings", "Keep it general"]
+    }
+
+    return []
+  }
 
   const portalContextValue = {
     getCoupleColors,
@@ -7451,6 +7502,7 @@ ${officiantProfile?.name || "Your officiant"}`)
     activeGuidedQuestions,
     selectedMrScriptService,
     storyPromptSuggestions,
+    getGuidedQuickResponseOptions,
     generateAIResponse,
     generateRecommendation,
     generateCompleteScript,

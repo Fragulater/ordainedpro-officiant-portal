@@ -74,9 +74,11 @@ export function BuildScriptTab() {
     handleSaveScript,
     uploadingScript,
     handleSendToEditor,
+    getGuidedQuickResponseOptions,
   } = useCommunicationPortal()
 
   const guidedQuestions = activeGuidedQuestions?.length ? activeGuidedQuestions : GUIDED_QUESTIONS
+  const guidedQuickResponseOptions = getGuidedQuickResponseOptions?.() || []
   const showWeddingQuickDetails = ["Wedding", "Vow Renewal"].includes(selectedCeremonyStyle)
   const outlinePreviewSections =
     selectedCeremonyStyle === "Eulogy, Vows, or Speech"
@@ -366,12 +368,10 @@ export function BuildScriptTab() {
                         </div>
 
                         {/* Quick Response Options */}
-                        {currentQuestionIndex < guidedQuestions.length &&
-                         guidedQuestions[currentQuestionIndex]?.type === 'multiple-choice' &&
-                         !isTyping && (
+                        {guidedQuickResponseOptions.length > 0 && !isTyping && (
                           <div className="border-t border-gray-200 p-3">
                             <div className="flex flex-wrap gap-2">
-                              {guidedQuestions[currentQuestionIndex].options?.map((option) => (
+                              {guidedQuickResponseOptions.map((option: string) => (
                                 <Button
                                   key={option}
                                   variant="outline"
