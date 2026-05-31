@@ -437,7 +437,7 @@ async function callOpenAI(prompt: string, service: MrScriptService, usePremiumMo
         },
         { role: "user", content: prompt },
       ],
-      max_tokens: 1800,
+      max_completion_tokens: 1800,
       temperature: service.sensitivity === "grief" ? 0.55 : 0.72,
     }),
   });
