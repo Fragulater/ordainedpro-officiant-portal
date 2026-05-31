@@ -150,6 +150,46 @@ const getSensitivityInstructions = (service: MrScriptService) => {
   ];
 };
 
+const getFaithStyleInstructions = (body: ScriptGenerationBody) => {
+  const responses = body.userResponses || {};
+  const styleText = [
+    body.officiantStyle,
+    body.ceremonyTone,
+    responses["officiant-style"],
+    responses["ceremony-tone"],
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (/\bvery\s+religious\b/.test(styleText)) {
+    return [
+      "The selected officiant style is Very religious.",
+      "Use clearly faith-forward language throughout the ceremony, including prayerful cadence, blessings, sacred commitment language, and reverent references to God or faith when appropriate.",
+      "Still avoid naming a specific denomination, scripture passage, ritual rule, or closed-tradition practice unless the submitted details provide it.",
+      "If the faith tradition is not specified, use broadly inclusive religious language and bracket any tradition-specific details for confirmation.",
+    ];
+  }
+
+  if (/\breligious\b/.test(styleText) && !/\bnot overly religious\b|\bnon[-\s]?religious\b/.test(styleText)) {
+    return [
+      "The selected officiant style is Religious.",
+      "Include meaningful faith language, blessings, and references to sacred commitment, but keep the ceremony accessible and not sermon-like unless the submitted details ask for that.",
+      "Do not invent a denomination, scripture passage, or tradition-specific ritual details unless provided.",
+    ];
+  }
+
+  if (/\bspiritual but not overly religious\b/.test(styleText)) {
+    return [
+      "The selected officiant style is Spiritual but not overly religious.",
+      "Use gentle spiritual language, gratitude, blessing, and meaning-focused wording without making the ceremony strongly faith-forward.",
+      "Avoid denomination-specific wording, scripture, or heavy religious claims unless provided.",
+    ];
+  }
+
+  return [];
+};
+
 const getServiceBoundaries = (service: MrScriptService) => {
   const sharedBoundaries = [
     service.legalStatus === "possibly" || service.legalStatus === "yes"
@@ -290,6 +330,7 @@ const buildSegmentPrompt = (
   const context = buildContextBlock(body, service);
   const sensitivity = safeList(getSensitivityInstructions(service));
   const boundaries = safeList(getServiceBoundaries(service));
+  const faithStyle = safeList(getFaithStyleInstructions(body));
 
   return `You are Mr. Script, an expert life-ceremony writing assistant for professional officiants.
 
@@ -312,6 +353,9 @@ ${sensitivity}
 
 SERVICE BOUNDARIES:
 ${boundaries}
+
+FAITH STYLE GUIDANCE:
+${faithStyle}
 
 THIS SEGMENT MUST INCLUDE:
 ${sections}

@@ -198,6 +198,8 @@ export function BuildScriptTab() {
                               <option value="Formal and polished">Formal and polished</option>
                               <option value="Light, joyful, and conversational">Light, joyful, and conversational</option>
                               <option value="Spiritual but not overly religious">Spiritual but not overly religious</option>
+                              <option value="Religious">Religious</option>
+                              <option value="Very religious">Very religious</option>
                               <option value="Gentle, quiet, and comforting">Gentle, quiet, and comforting</option>
                             </select>
                           </div>
