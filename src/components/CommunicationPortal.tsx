@@ -2727,6 +2727,59 @@ Mr. Script - Your Personal Wedding Script Creator`
     return quickSetupResponses
   }
 
+  const getFirstUnansweredGuidedQuestionIndex = (responses: Record<string, string>) => {
+    const activeQuestions = getActiveGuidedQuestions(responses)
+    const firstUnansweredIndex = activeQuestions.findIndex((question) =>
+      !responses[question.id] || hasUnansweredGuidedDetails(question, responses)
+    )
+
+    return firstUnansweredIndex === -1 ? activeQuestions.length : firstUnansweredIndex
+  }
+
+  useEffect(() => {
+    const syncedResponses = buildQuickSetupResponses(userResponses)
+    const quickSetupKeys = [
+      "ceremony-type",
+      "ceremony-duration",
+      "ceremony-tone",
+      "officiant-style",
+      "story-notes",
+      "special-elements",
+      "vows-type",
+      "quick-setup-summary",
+    ]
+    const hasQuickSetupChanges = quickSetupKeys.some(
+      (key) => (userResponses[key] || "") !== (syncedResponses[key] || "")
+    )
+
+    if (hasQuickSetupChanges) {
+      setUserResponses(syncedResponses)
+    }
+
+    if (scriptMode === "guided") {
+      const activeQuestions = getActiveGuidedQuestions(syncedResponses)
+      const currentQuestion = activeQuestions[currentQuestionIndex]
+      const currentQuestionAnswered = currentQuestion
+        ? Boolean(syncedResponses[currentQuestion.id]) && !hasUnansweredGuidedDetails(currentQuestion, syncedResponses)
+        : true
+      const nextQuestionIndex = getFirstUnansweredGuidedQuestionIndex(syncedResponses)
+
+      if (currentQuestionAnswered && nextQuestionIndex !== currentQuestionIndex) {
+        setCurrentQuestionIndex(nextQuestionIndex)
+      }
+    }
+  }, [
+    selectedCeremonyStyle,
+    selectedCeremonyLength,
+    selectedOfficiantStyle,
+    selectedUnityCeremony,
+    selectedVowsType,
+    storyNotes,
+    scriptMode,
+    currentQuestionIndex,
+    userResponses,
+  ])
+
   const handleModeSelect = (mode: "guided" | "expert") => {
     setScriptMode(mode)
 
