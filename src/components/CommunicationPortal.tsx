@@ -322,6 +322,21 @@ const getCeremonyAgeFromNotes = (notes: string | null | undefined, role?: string
   return match?.[1]?.trim() || ""
 }
 
+const formatProfileTime = (time?: string | null) => {
+  if (!time) return ""
+
+  const [hourText, minuteText] = time.split(":")
+  const hour = Number(hourText)
+  const minute = Number(minuteText || "0")
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return time
+
+  return new Date(2024, 0, 1, hour, minute).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
 const getMeetingStart = (meeting: { date?: string; time?: string | null }) => {
   const date = meeting.date || ""
   const time = meeting.time || "00:00"
@@ -944,7 +959,7 @@ const generateAIResponse = (question: Question, previousResponses: Record<string
 
     `${question.question}`,
 
-    question.aiRecommendation ? `â€™Â¡ ${question.aiRecommendation}` : ''
+    question.aiRecommendation ? `Tip: ${question.aiRecommendation}` : ''
   ].filter(Boolean)
 
   return responses.join('\n\n')
@@ -976,7 +991,7 @@ const generateRecommendation = (responses: Record<string, string>): string => {
   }
 
   if (duration) {
-    recommendation += `Ã¢ÂÂ° **Timing**: For a ${duration.toLowerCase()} ceremony, I'll structure the script with appropriate pacing and content.\n\n`
+    recommendation += `**Timing**: For a ${duration.toLowerCase()} ceremony, I'll structure the script with appropriate pacing and content.\n\n`
   }
 
   if (tone) {
@@ -991,7 +1006,7 @@ const generateRecommendation = (responses: Record<string, string>): string => {
     recommendation += `**Details already pulled from this profile**:\n${responses["profile-context-summary"]}\n\n`
   }
 
-  recommendation += "Would you like me to start generating your personalized script now? I can always adjust it based on any additional preferences you have."
+  recommendation += "I have enough to create the first draft, and I can still adjust it based on any additional preferences you provide."
 
   return recommendation
 }
@@ -2579,7 +2594,7 @@ Mr. Script - Your Personal Wedding Script Creator`
         ? coupleNames
         : deceasedName || childName || honoreeName || coupleNames || ceremonyLabel
     const ceremonyDate = editWeddingDetails?.weddingDate || ""
-    const ceremonyTime = editWeddingDetails?.startTime || ""
+    const ceremonyTime = formatProfileTime(editWeddingDetails?.startTime)
     const venueName = editWeddingDetails?.venueName || ""
     const venueAddress = editWeddingDetails?.venueAddress || editCoupleInfo?.address || ""
     const expectedGuests = editWeddingDetails?.expectedGuests || ""
@@ -2674,6 +2689,15 @@ Mr. Script - Your Personal Wedding Script Creator`
 
     if (scriptTypeSelection) {
       quickSetupResponses['ceremony-type'] = scriptTypeSelection
+    }
+
+    if (quickSetupResponses['profile-context-summary']) {
+      const normalizedProfileFacts = quickSetupResponses['profile-context-summary']
+        .split("\n")
+        .map((fact) => fact.replace(/^- Ceremony type:.+$/i, `- Ceremony type: ${quickSetupService.displayName}`))
+        .filter((fact) => shouldUseWeddingDetails || !/^- Couple:/i.test(fact))
+
+      quickSetupResponses['profile-context-summary'] = normalizedProfileFacts.join("\n")
     }
 
     if (selectedCeremonyLength) {
@@ -3155,17 +3179,6 @@ Mr. Script - Your Personal Wedding Script Creator`
 
       setChatMessages(prev => [...prev, recommendationMessage])
       setIsTyping(false)
-
-      // After showing recommendation, offer to generate the script
-      setTimeout(() => {
-        const scriptOfferMessage: ChatMessage = {
-          id: `ai-script-offer-${Date.now()}`,
-          type: 'ai',
-          content: "Perfect! I have enough to create a first draft. Would you like me to generate the complete script now? Just say 'yes' or 'generate script' and I'll build it out in sections.",
-          timestamp: new Date()
-        }
-        setChatMessages(prev => [...prev, scriptOfferMessage])
-      }, 2000)
     }, 1500)
   }
 
