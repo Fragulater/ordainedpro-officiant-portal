@@ -78,6 +78,14 @@ export function BuildScriptTab() {
 
   const guidedQuestions = activeGuidedQuestions?.length ? activeGuidedQuestions : GUIDED_QUESTIONS
   const showWeddingQuickDetails = ["Wedding", "Vow Renewal"].includes(selectedCeremonyStyle)
+  const outlinePreviewSections =
+    selectedCeremonyStyle === "Eulogy, Vows, or Speech"
+      ? ["Opening Acknowledgment", "Words of Sympathy", "Life Tribute", "Personal Stories", "Reading or Reflection", "Closing Tribute"]
+      : selectedMrScriptService?.scriptSections || []
+  const outlinePreviewLabel =
+    selectedCeremonyStyle === "Eulogy, Vows, or Speech"
+      ? "Eulogy"
+      : selectedMrScriptService?.shortName || selectedCeremonyStyle
 
   return (
 <TabsContent value="buildscript">
@@ -275,11 +283,11 @@ export function BuildScriptTab() {
                             <div className="flex items-center justify-between gap-3 mb-2">
                               <h5 className="text-sm font-semibold text-indigo-950">Outline Preview</h5>
                               <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-white">
-                                {selectedMrScriptService?.shortName || selectedCeremonyStyle}
+                                {outlinePreviewLabel}
                               </Badge>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                              {selectedMrScriptService?.scriptSections?.map((section: string) => (
+                              {outlinePreviewSections.map((section: string) => (
                                 <span key={section} className="text-xs px-2 py-1 rounded bg-white border border-indigo-100 text-indigo-800">
                                   {section}
                                 </span>

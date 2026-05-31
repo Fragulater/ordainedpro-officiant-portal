@@ -19,6 +19,15 @@ type ScriptSegment = {
   wordTarget: number;
 };
 
+const EULOGY_SCRIPT_SECTIONS = [
+  "Opening Acknowledgment",
+  "Words of Sympathy",
+  "Life Tribute",
+  "Personal Stories",
+  "Reading or Reflection",
+  "Closing Tribute",
+];
+
 type ScriptGenerationBody = {
   ceremonyType?: string;
   ceremonyStyle?: string;
@@ -83,17 +92,36 @@ const chunkSections = (sections: string[], chunkCount: number) => {
   return chunks.map((chunk, index) => (chunk.length ? chunk : [sections[index] || "Ceremony Section"]));
 };
 
-const getSegmentCount = (service: MrScriptService, duration?: string) => {
-  const minutes = parseDurationMinutes(duration);
-  if (service.id === "writing_service") return Math.min(4, service.scriptSections.length);
-  if (minutes <= 10) return Math.min(3, service.scriptSections.length);
-  if (minutes <= 20) return Math.min(4, service.scriptSections.length);
-  return Math.min(6, service.scriptSections.length);
+const getScriptSectionsForBody = (service: MrScriptService, body?: ScriptGenerationBody) => {
+  const selectedType = [
+    body?.ceremonyType,
+    body?.ceremonyStyle,
+    body?.userResponses?.["ceremony-type"],
+    body?.coreDetails,
+    body?.storyNotes,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (service.id === "writing_service" && /\beulogy\b|\bcelebration of life\b|\bmemorial\b|\btribute\b/.test(selectedType)) {
+    return EULOGY_SCRIPT_SECTIONS;
+  }
+
+  return service.scriptSections.length ? service.scriptSections : ["Opening", "Main Message", "Closing"];
 };
 
-const buildSegments = (service: MrScriptService, duration?: string): ScriptSegment[] => {
-  const sections = service.scriptSections.length ? service.scriptSections : ["Opening", "Main Message", "Closing"];
-  const segmentCount = getSegmentCount(service, duration);
+const getSegmentCount = (service: MrScriptService, sectionCount: number, duration?: string) => {
+  const minutes = parseDurationMinutes(duration);
+  if (service.id === "writing_service") return Math.min(4, sectionCount);
+  if (minutes <= 10) return Math.min(3, sectionCount);
+  if (minutes <= 20) return Math.min(4, sectionCount);
+  return Math.min(6, sectionCount);
+};
+
+const buildSegments = (service: MrScriptService, duration?: string, body?: ScriptGenerationBody): ScriptSegment[] => {
+  const sections = getScriptSectionsForBody(service, body);
+  const segmentCount = getSegmentCount(service, sections.length, duration);
   const totalWords = getTargetWordCount(duration);
   const chunks = chunkSections(sections, segmentCount);
 
@@ -508,7 +536,7 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as ScriptGenerationBody;
     const service = getMrScriptServiceByResponse(body.ceremonyType || body.ceremonyStyle);
-    const segments = buildSegments(service, body.ceremonyLength || body.userResponses?.["ceremony-duration"]);
+    const segments = buildSegments(service, body.ceremonyLength || body.userResponses?.["ceremony-duration"], body);
     const isRefinement = Boolean(body.refinementInstructions);
     const isSingleSegment = typeof body.regenerateSegmentIndex === "number";
 

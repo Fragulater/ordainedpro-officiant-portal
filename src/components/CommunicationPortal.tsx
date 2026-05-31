@@ -7384,12 +7384,13 @@ ${officiantProfile?.name || "Your officiant"}`)
       setIsTyping(false)
     }, 1500)
   }
+  const mrScriptServiceSelection = selectedCeremonyStyle || userResponses['ceremony-type']
   const activeGuidedQuestions = getActiveGuidedQuestions({
     ...userResponses,
-    'ceremony-type': userResponses['ceremony-type'] || selectedCeremonyStyle
+    'ceremony-type': mrScriptServiceSelection
   })
-  const selectedMrScriptService = getMrScriptServiceByResponse(userResponses['ceremony-type'] || selectedCeremonyStyle)
-  const storyPromptSuggestions = getMrScriptStoryPrompts(userResponses['ceremony-type'] || selectedCeremonyStyle)
+  const selectedMrScriptService = getMrScriptServiceByResponse(mrScriptServiceSelection)
+  const storyPromptSuggestions = getMrScriptStoryPrompts(mrScriptServiceSelection)
 
   const portalContextValue = {
     getCoupleColors,
