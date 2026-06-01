@@ -1759,7 +1759,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
         .select("*")
         .eq("user_id", currentUser.id)
         .eq("couple_id", editCoupleInfo.id)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
 
       if (error) {
         console.error("Ã¢ÂÅ’ Error loading messages:", error)
@@ -1776,6 +1776,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
           role: msg.sender,
           message: msg.content,
           timestamp: formatMessageTime(msg.created_at),
+          createdAt: msg.created_at,
           avatar: "/api/placeholder/40/40"
         }))
 
@@ -1837,8 +1838,9 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
 
             if (messageExists) return previousMessages
 
+            const createdAt = newMessageRecord.created_at || newMessageRecord.timestamp || new Date().toISOString()
+
             return [
-              ...previousMessages,
               {
                 id: newMessageRecord.id,
                 sender:
@@ -1846,9 +1848,11 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
                   (newMessageRecord.sender === "officiant" ? officiantLabel : "Couple"),
                 role: newMessageRecord.sender,
                 message: newMessageRecord.content || newMessageRecord.body || "",
-                timestamp: formatMessageTime(newMessageRecord.created_at || newMessageRecord.timestamp),
+                timestamp: formatMessageTime(createdAt),
+                createdAt,
                 avatar: "/api/placeholder/40/40",
               },
+              ...previousMessages,
             ]
           })
         }
@@ -2239,8 +2243,12 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     files: []
   })
 
-  // Display messages from Supabase (or empty state)
-  const displayMessages = messages
+  // Display messages from Supabase with the newest conversation items first.
+  const displayMessages = [...messages].sort((a, b) => {
+    const bTime = new Date(b.createdAt || b.created_at || b.timestamp || 0).getTime()
+    const aTime = new Date(a.createdAt || a.created_at || a.timestamp || 0).getTime()
+    return bTime - aTime
+  })
 
   // Tasks are now loaded per couple from the database
   const [tasks, setTasks] = useState<Task[]>([])
@@ -6730,14 +6738,17 @@ ${cleanOfficiantFirstName}
             const messageExists = prev.some((message) => String(message.id) === String(savedMessage[0].id))
             if (messageExists) return prev
 
-            return [...prev, {
+            const createdAt = savedMessage[0].created_at || new Date().toISOString()
+
+            return [{
               id: savedMessage[0].id,
               sender: officiantLabel,
               role: "officiant",
               message: newMessage,
               timestamp: "Just now",
+              createdAt,
               avatar: "/api/placeholder/40/40"
-            }]
+            }, ...prev]
           })
         }
       }

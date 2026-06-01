@@ -16,6 +16,7 @@ import { useCommunicationPortal } from "../CommunicationPortalContext"
 export function MessagesTab() {
   const {
     messages,
+    displayMessages,
     newMessage,
     setNewMessage,
     setShowAddTaskDialog,
@@ -39,6 +40,8 @@ export function MessagesTab() {
     officiantProfile,
     currentUser,
   } = useCommunicationPortal()
+
+  const conversationMessages = displayMessages || messages
 
   const upcomingMeetings = meetings
     .filter((meeting) => {
@@ -71,14 +74,14 @@ export function MessagesTab() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-4 max-h-96 overflow-y-auto mb-6">
-                      {messages.length === 0 ? (
+                      {conversationMessages.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
                           <MessageCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                           <p className="font-medium">No messages yet</p>
                           <p className="text-sm mt-1">Send a message to start the conversation with {editCoupleInfo?.brideName} & {editCoupleInfo?.groomName}</p>
                         </div>
                       ) : (
-                        messages.map((message) => (
+                        conversationMessages.map((message) => (
                           <div key={message.id} className={`flex space-x-3 ${message.role === 'officiant' ? 'justify-end' : ''}`}>
                             {message.role !== 'officiant' && (
                               <Avatar className="ring-2 ring-blue-100">
@@ -96,7 +99,7 @@ export function MessagesTab() {
                               </div>
                               <p className="text-xs text-gray-500 mt-2 flex items-center">
                                 <span className="font-medium">{message.sender}</span>
-                                <span className="mx-1">•</span>
+                                <span className="mx-1">-</span>
                                 <span>{message.timestamp}</span>
                               </p>
                             </div>
