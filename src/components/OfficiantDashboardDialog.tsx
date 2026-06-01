@@ -3689,7 +3689,7 @@ ${officiantFullName}`;
                         </div>
                         {isAspirant && (
                           <Button asChild className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white">
-                            <NextLink href="/subscription/checkout?plan=professional&source=dashboard">
+                            <NextLink href="/subscription/checkout?plan=professional&source=dashboard&returnTo=%2F">
                               <Sparkles className="w-4 h-4 mr-2" />
                               Upgrade Now
                             </NextLink>
@@ -4129,7 +4129,7 @@ ${officiantFullName}`;
                               If you switch from Aspirant to Professional, the Professional subscription starts right away. Transitional subscription changes are not prorated, credited, or refunded.
                             </div>
                             <Button asChild className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white">
-                              <NextLink href="/subscription/checkout?plan=professional&source=dashboard-pricing">
+                              <NextLink href="/subscription/checkout?plan=professional&source=dashboard-pricing&returnTo=%2F">
                                 <Crown className="w-4 h-4 mr-2" />
                                 Upgrade to Professional
                               </NextLink>

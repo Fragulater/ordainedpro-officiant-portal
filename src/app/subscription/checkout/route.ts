@@ -17,6 +17,10 @@ function getPriceId(plan: SubscriptionPlan) {
     : process.env.STRIPE_ASPIRANT_PRICE_ID;
 }
 
+function isStripePriceId(value: string | undefined): value is string {
+  return /^price_[A-Za-z0-9]+$/.test(value || "");
+}
+
 function setupResponse(missing: string, plan: SubscriptionPlan) {
   return new NextResponse(
     `<!doctype html>
@@ -33,9 +37,9 @@ function setupResponse(missing: string, plan: SubscriptionPlan) {
         <body>
           <main>
             <h1>Subscription checkout needs setup</h1>
-            <p>The ${plan} checkout route is wired, but Stripe cannot create the session yet because this value is missing:</p>
+            <p>The ${plan} checkout route is wired, but Stripe cannot create the session yet because this required value needs attention:</p>
             <p><code>${missing}</code></p>
-            <p>Add the correct Stripe recurring Price ID in <code>.env.local</code>, then restart the dev server.</p>
+            <p>Set the correct Stripe recurring Price ID in <code>.env.local</code> or Netlify environment variables, then retry checkout.</p>
             <p><a href="/ordination/offer">Return to Ordination Offer</a></p>
           </main>
         </body>
@@ -69,6 +73,13 @@ export async function GET(request: NextRequest) {
   if (!priceId) {
     return setupResponse(
       plan === "professional" ? "STRIPE_PROFESSIONAL_PRICE_ID" : "STRIPE_ASPIRANT_PRICE_ID",
+      plan
+    );
+  }
+
+  if (!isStripePriceId(priceId)) {
+    return setupResponse(
+      `${plan === "professional" ? "STRIPE_PROFESSIONAL_PRICE_ID" : "STRIPE_ASPIRANT_PRICE_ID"} must be a Stripe Price ID that starts with price_`,
       plan
     );
   }
