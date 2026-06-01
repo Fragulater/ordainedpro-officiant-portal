@@ -18,6 +18,7 @@ import { PortalShareScriptDialog } from "./Scripts/PortalShareScriptDialog"
 import { PortalOfficiantDashboardDialog } from "./CeremoniesCouples/PortalOfficiantDashboardDialog"
 import { PortalViewInvoiceDialog } from "./Payments/PortalViewInvoiceDialog"
 import { PortalRecordPaymentDialog } from "./Payments/PortalRecordPaymentDialog"
+import { PortalRefundsDialog } from "./Payments/PortalRefundsDialog"
 
 export function PortalDialogs() {
   const { editCoupleInfo } = useCommunicationPortal()
@@ -46,6 +47,7 @@ export function PortalDialogs() {
       <PortalOfficiantDashboardDialog />
       <PortalViewInvoiceDialog />
       <PortalRecordPaymentDialog />
+      <PortalRefundsDialog />
     </>
   )
 }

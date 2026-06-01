@@ -27,7 +27,6 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { supabase } from "@/supabase/utils/client";
 import { MyVendorsView } from "@/components/officiant-dashboard/MyVendorsView";
-import { RefundsView } from "@/components/officiant-dashboard/RefundsView";
 import {
   LayoutDashboard,
   Heart,
@@ -66,7 +65,6 @@ import {
   ExternalLink,
   Check,
   BriefcaseBusiness,
-  RotateCcw,
   Loader2,
   RefreshCw,
 } from "lucide-react";
@@ -182,7 +180,6 @@ interface OfficiantDashboardDialogProps {
     | "calendar"
     | "documents"
     | "vendors"
-    | "refunds"
     | "settings";
 }
 
@@ -295,7 +292,6 @@ export function OfficiantDashboardDialog({
     | "documents"
     | "vendors"
     | "profile"
-    | "refunds"
     | "settings"
   >(initialView);
   const [ceremonyFilter, setCeremonyFilter] = useState<
@@ -1951,14 +1947,6 @@ ${officiantFullName}`;
                 My Vendors
               </Button>
               <Button
-                variant={activeView === "refunds" ? "secondary" : "ghost"}
-                className="w-full justify-start"
-                onClick={() => setActiveView("refunds")}
-              >
-                <RotateCcw className="w-4 h-4 mr-3" />
-                Refunds
-              </Button>
-              <Button
                 variant={activeView === "settings" ? "secondary" : "ghost"}
                 className="w-full justify-start"
                 onClick={() => setActiveView("settings")}
@@ -3446,11 +3434,6 @@ ${officiantFullName}`;
             {/* My Vendors View */}
             {activeView === "vendors" && (
               <MyVendorsView userId={user?.id} />
-            )}
-
-            {/* Refunds View */}
-            {activeView === "refunds" && (
-              <RefundsView userId={user?.id} />
             )}
 
             {/* Documents View */}

@@ -1485,7 +1485,8 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const [showSwitchCeremonyDialog, setShowSwitchCeremonyDialog] = useState(false)
   const [showArchivedCeremoniesDialog, setShowArchivedCeremoniesDialog] = useState(false)
   const [showDashboardDialog, setShowDashboardDialog] = useState(false)
-  const [dashboardInitialView, setDashboardInitialView] = useState<"dashboard" | "ceremonies" | "profile" | "calendar" | "documents" | "vendors" | "refunds" | "settings">("dashboard")
+  const [dashboardInitialView, setDashboardInitialView] = useState<"dashboard" | "ceremonies" | "profile" | "calendar" | "documents" | "vendors" | "settings">("dashboard")
+  const [showRefundsDialog, setShowRefundsDialog] = useState(false)
 
   // Form states for Add New Ceremony
   const [newCeremony, setNewCeremony] = useState({
@@ -7626,6 +7627,8 @@ ${officiantProfile?.name || "Your officiant"}`)
     setShowDashboardDialog,
     dashboardInitialView,
     setDashboardInitialView,
+    showRefundsDialog,
+    setShowRefundsDialog,
     newCeremony,
     setNewCeremony,
     ceremonyTypeOptions: CEREMONY_TYPE_OPTIONS,

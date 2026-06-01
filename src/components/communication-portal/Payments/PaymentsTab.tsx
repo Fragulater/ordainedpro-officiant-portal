@@ -22,8 +22,7 @@ export function PaymentsTab() {
     setShowInvoiceDialog,
     setShowRecordPaymentDialog,
     setNewPayment,
-    setDashboardInitialView,
-    setShowDashboardDialog,
+    setShowRefundsDialog,
     handleOpenInvoiceDialog,
   } = useCommunicationPortal()
 
@@ -313,10 +312,7 @@ export function PaymentsTab() {
                     </Button>
                     <Button
                       className="h-9 w-full justify-start border border-red-400 bg-red-500/15 text-red-800 hover:bg-red-500/25"
-                      onClick={() => {
-                        setDashboardInitialView("refunds")
-                        setShowDashboardDialog(true)
-                      }}
+                      onClick={() => setShowRefundsDialog(true)}
                     >
                       <RotateCcw className="w-4 h-4 mr-2" />
                       Refunds
