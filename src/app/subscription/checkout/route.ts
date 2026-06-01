@@ -6,15 +6,35 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type SubscriptionPlan = "aspirant" | "professional";
+type CheckoutOffer = "ordination-1995" | null;
 
 function getPlan(value: string | null): SubscriptionPlan {
   return value === "aspirant" ? "aspirant" : "professional";
 }
 
-function getPriceId(plan: SubscriptionPlan) {
-  return plan === "professional"
-    ? process.env.STRIPE_PROFESSIONAL_PRICE_ID
-    : process.env.STRIPE_ASPIRANT_PRICE_ID;
+function getOffer(value: string | null): CheckoutOffer {
+  return value === "ordination-1995" ? "ordination-1995" : null;
+}
+
+function getPriceConfig(plan: SubscriptionPlan, offer: CheckoutOffer) {
+  if (plan === "professional") {
+    return {
+      envKey: "STRIPE_PROFESSIONAL_PRICE_ID",
+      priceId: process.env.STRIPE_PROFESSIONAL_PRICE_ID,
+    };
+  }
+
+  if (offer === "ordination-1995") {
+    return {
+      envKey: "STRIPE_ASPIRANT_ORDINATION_PRICE_ID",
+      priceId: process.env.STRIPE_ASPIRANT_ORDINATION_PRICE_ID,
+    };
+  }
+
+  return {
+    envKey: "STRIPE_ASPIRANT_PRICE_ID",
+    priceId: process.env.STRIPE_ASPIRANT_PRICE_ID,
+  };
 }
 
 function isStripePriceId(value: string | undefined): value is string {
@@ -63,7 +83,8 @@ function getSafeReturnTo(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const plan = getPlan(request.nextUrl.searchParams.get("plan"));
-  const priceId = getPriceId(plan);
+  const offer = getOffer(request.nextUrl.searchParams.get("offer"));
+  const { envKey, priceId } = getPriceConfig(plan, offer);
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
   if (!stripeSecretKey) {
@@ -71,17 +92,11 @@ export async function GET(request: NextRequest) {
   }
 
   if (!priceId) {
-    return setupResponse(
-      plan === "professional" ? "STRIPE_PROFESSIONAL_PRICE_ID" : "STRIPE_ASPIRANT_PRICE_ID",
-      plan
-    );
+    return setupResponse(envKey, plan);
   }
 
   if (!isStripePriceId(priceId)) {
-    return setupResponse(
-      `${plan === "professional" ? "STRIPE_PROFESSIONAL_PRICE_ID" : "STRIPE_ASPIRANT_PRICE_ID"} must be a Stripe Price ID that starts with price_`,
-      plan
-    );
+    return setupResponse(`${envKey} must be a Stripe Price ID that starts with price_`, plan);
   }
 
   const supabase = await createClient();
