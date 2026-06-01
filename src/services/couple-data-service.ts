@@ -349,6 +349,29 @@ export async function loadTasks(userId: string, coupleId: number): Promise<{ ok:
   }
 }
 
+export async function loadAllTasks(userId: string): Promise<{ ok: boolean; data?: Task[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", userId)
+      .order("completed", { ascending: true })
+      .order("due_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("[ERROR] Error loading all tasks:", error)
+      return { ok: false, error: error.message }
+    }
+
+    console.log("[OK] Loaded", data?.length || 0, "tasks across ceremonies")
+    return { ok: true, data: data || [] }
+  } catch (err: any) {
+    console.error("[ERROR] Exception loading all tasks:", err)
+    return { ok: false, error: err.message }
+  }
+}
+
 export async function addTask(userId: string, coupleId: number, taskData: {
   task: string
   dueDate?: string

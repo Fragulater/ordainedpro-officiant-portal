@@ -15,7 +15,7 @@ import {
   addCeremony as addCeremonyToDB,
   updateCouple as updateCoupleInDB,
   upsertCeremonyDetails as upsertCeremonyDetailsInDB,
-  loadTasks as loadTasksFromDB,
+  loadAllTasks as loadAllTasksFromDB,
   addTask as addTaskToDB,
   updateTask as updateTaskInDB,
   loadFiles as loadFilesFromDB,
@@ -1867,43 +1867,55 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     }
   }, [currentUser?.id, editCoupleInfo?.id, officiantLabel])
 
-  // Load tasks when couple changes
-  const loadTasksForCouple = useCallback(async () => {
-    if (!currentUser?.id || !editCoupleInfo?.id) return
+  // Load the officiant-wide task list across all ceremonies.
+  const loadTasksForOfficiant = useCallback(async () => {
+    if (!currentUser?.id) return
 
     setIsLoadingTasks(true)
-    console.log("[SCRIPT]â€¹ Loading tasks for couple:", editCoupleInfo.id)
+    console.log("Loading tasks across all ceremonies for officiant:", currentUser.id)
 
-    const result = await loadTasksFromDB(currentUser.id, editCoupleInfo.id)
+    const result = await loadAllTasksFromDB(currentUser.id)
+    const couplesById = new Map(allCouples.map((couple: any) => [Number(couple.id), couple]))
 
     if (result.ok && result.data) {
       // Transform database format to component format
-      const transformedTasks: Task[] = result.data.map((t: any) => ({
-        id: t.id,
-        task: t.task,
-        completed: t.completed || false,
-        dueDate: t.due_date || "",
-        dueTime: t.due_time || "",
-        priority: t.priority || "medium",
-        category: t.category || "General",
-        details: t.details || "",
-        emailReminder: t.email_reminder || false,
-        reminderDays: t.reminder_days || 1,
-        createdDate: t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : ""
-      }))
+      const transformedTasks: Task[] = result.data.map((t: any) => {
+        const couple = couplesById.get(Number(t.couple_id))
+        const coupleName = couple
+          ? [couple.brideName, couple.groomName].filter(Boolean).join(" & ") || "Unnamed ceremony"
+          : "Ceremony profile"
+
+        return {
+          id: t.id,
+          coupleId: t.couple_id,
+          coupleName,
+          ceremonyDate: couple?.weddingDetails?.weddingDate || "",
+          venueName: couple?.weddingDetails?.venueName || "",
+          task: t.task,
+          completed: t.completed || false,
+          dueDate: t.due_date || "",
+          dueTime: t.due_time || "",
+          priority: t.priority || "medium",
+          category: t.category || "General",
+          details: t.details || "",
+          emailReminder: t.email_reminder || false,
+          reminderDays: t.reminder_days || 1,
+          createdDate: t.created_at ? new Date(t.created_at).toISOString().split('T')[0] : ""
+        }
+      })
       setTasks(transformedTasks)
-      console.log("Ã¢Å“â€¦ Loaded", transformedTasks.length, "tasks for couple", editCoupleInfo.id)
+      console.log("Loaded", transformedTasks.length, "tasks across all ceremonies")
     } else {
-      console.log("[SCRIPT]Â­ No tasks found or error for couple", editCoupleInfo.id)
+      console.log("No tasks found or error loading officiant-wide tasks")
       setTasks([])
     }
 
     setIsLoadingTasks(false)
-  }, [currentUser?.id, editCoupleInfo?.id])
+  }, [allCouples, currentUser?.id])
 
   useEffect(() => {
-    loadTasksForCouple()
-  }, [loadTasksForCouple])
+    loadTasksForOfficiant()
+  }, [loadTasksForOfficiant])
 
   // Load files when couple changes
   const loadFilesForCouple = useCallback(async () => {
@@ -6098,6 +6110,10 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
       const newTask: Task = {
         ...newTaskData,
         id: result.data.id,
+        coupleId: editCoupleInfo.id,
+        coupleName: [editCoupleInfo?.brideName, editCoupleInfo?.groomName].filter(Boolean).join(" & ") || "Unnamed ceremony",
+        ceremonyDate: editWeddingDetails?.weddingDate || "",
+        venueName: editWeddingDetails?.venueName || "",
         createdDate: new Date().toISOString().split('T')[0]
       }
       setTasks(prev => [...prev, newTask])
@@ -6226,15 +6242,25 @@ ${cleanOfficiantFirstName}
   }
 
   const getFilteredTasks = () => {
+    const sortedTasks = [...tasks].sort((firstTask, secondTask) => {
+      if (firstTask.completed !== secondTask.completed) return firstTask.completed ? 1 : -1
+
+      const firstDue = firstTask.dueDate ? new Date(firstTask.dueDate).getTime() : Number.MAX_SAFE_INTEGER
+      const secondDue = secondTask.dueDate ? new Date(secondTask.dueDate).getTime() : Number.MAX_SAFE_INTEGER
+
+      if (firstDue !== secondDue) return firstDue - secondDue
+      return String(firstTask.task).localeCompare(String(secondTask.task))
+    })
+
     switch (taskFilter) {
       case 'pending':
-        return tasks.filter(task => !task.completed)
+        return sortedTasks.filter(task => !task.completed)
       case 'completed':
-        return tasks.filter(task => task.completed)
+        return sortedTasks.filter(task => task.completed)
       case 'high-priority':
-        return tasks.filter(task => (task.priority === 'high' || task.priority === 'urgent') && !task.completed)
+        return sortedTasks.filter(task => (task.priority === 'high' || task.priority === 'urgent') && !task.completed)
       default:
-        return tasks
+        return sortedTasks
     }
   }
 

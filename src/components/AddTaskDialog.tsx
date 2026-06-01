@@ -26,6 +26,10 @@ import {
 } from "lucide-react"
 export interface Task {
   id: number
+  coupleId?: number
+  coupleName?: string
+  ceremonyDate?: string
+  venueName?: string
   task: string
   completed: boolean
   dueDate: string

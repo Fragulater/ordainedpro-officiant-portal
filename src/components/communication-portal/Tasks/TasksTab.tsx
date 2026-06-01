@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FileText, CheckSquare, Plus, Check, Clock, Bell } from "lucide-react"
+import { CalendarDays, FileText, CheckSquare, Plus, Check, Clock, Bell, MapPin } from "lucide-react"
 import { Task } from "@/components/AddTaskDialog"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
@@ -20,6 +20,21 @@ export function TasksTab() {
     getPriorityColor,
     getPriorityIcon,
   } = useCommunicationPortal()
+  const filteredTasks = getFilteredTasks()
+
+  const formatDate = (dateValue: string) => {
+    if (!dateValue) return "No date set"
+
+    const date = new Date(dateValue)
+    if (Number.isNaN(date.getTime())) return "No date set"
+
+    return date.toLocaleDateString()
+  }
+
+  const formatDueLabel = (task: Task) => {
+    const dueDate = formatDate(task.dueDate)
+    return task.dueTime ? `Due: ${dueDate} at ${task.dueTime}` : `Due: ${dueDate}`
+  }
 
   return (
 <TabsContent value="tasks">
@@ -27,10 +42,10 @@ export function TasksTab() {
               <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-blue-900">Ceremony Checklist</CardTitle>
-                    <CardDescription>Track progress and stay organized for the ceremony</CardDescription>
+                    <CardTitle className="text-blue-900">Officiant Task List</CardTitle>
+                    <CardDescription>View, add, and update your tasks across all ceremonies</CardDescription>
                     <p className="mt-2 text-xs font-medium text-blue-700">
-                      Ceremony checklist tasks are visible to all parties in this profile.
+                      This section reflects tasks across all couples and ceremonies so you can quickly reference your upcoming to-do list.
                     </p>
                   </div>
                   <div className="flex space-x-2">
@@ -57,7 +72,7 @@ export function TasksTab() {
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-3">
-                  {getFilteredTasks().map((task) => (
+                  {filteredTasks.map((task) => (
                     <div key={task.id} className={`p-4 border rounded-xl transition-all ${
                       task.completed ? 'bg-green-50 border-green-200 shadow-sm' : 'bg-white border-blue-100 hover:border-blue-200'
                     }`}>
@@ -74,9 +89,14 @@ export function TasksTab() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-2">
-                            <p className={`font-medium ${task.completed ? 'text-green-800 line-through' : 'text-gray-900'}`}>
-                              {task.task}
-                            </p>
+                            <div>
+                              <p className={`font-medium ${task.completed ? 'text-green-800 line-through' : 'text-gray-900'}`}>
+                                {task.task}
+                              </p>
+                              <p className="text-xs font-medium text-blue-700">
+                                {task.coupleName || "Ceremony profile"}
+                              </p>
+                            </div>
                             <Badge className={getPriorityColor(task.priority)}>
                               {getPriorityIcon(task.priority)} {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                             </Badge>
@@ -85,12 +105,24 @@ export function TasksTab() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
                             <div className="flex items-center">
                               <Clock className="w-3 h-3 mr-1" />
-                              Due: {new Date(task.dueDate).toLocaleDateString()} at {task.dueTime}
+                              {formatDueLabel(task)}
                             </div>
                             <div className="flex items-center">
                               <FileText className="w-3 h-3 mr-1" />
                               {task.category}
                             </div>
+                            {task.ceremonyDate && (
+                              <div className="flex items-center">
+                                <CalendarDays className="w-3 h-3 mr-1" />
+                                Ceremony: {formatDate(task.ceremonyDate)}
+                              </div>
+                            )}
+                            {task.venueName && (
+                              <div className="flex items-center">
+                                <MapPin className="w-3 h-3 mr-1" />
+                                {task.venueName}
+                              </div>
+                            )}
                           </div>
 
                           {task.details && (
@@ -116,10 +148,10 @@ export function TasksTab() {
                       </div>
                     </div>
                   ))}
-                  {getFilteredTasks().length === 0 && (
+                  {filteredTasks.length === 0 && (
                     <div className="text-center py-8 text-gray-500">
                       <CheckSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>No tasks found for the selected filter.</p>
+                      <p>No tasks found across your ceremonies for the selected filter.</p>
                     </div>
                   )}
                 </div>
