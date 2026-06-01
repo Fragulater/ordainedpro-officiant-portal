@@ -85,7 +85,7 @@ export function PortalOverview() {
     const date = getWeddingDate(couple)
     return couple?.isActive !== false && Boolean(date && date >= today)
   }).length
-  const monthlyIncome = Number(financialReport?.monthIncome || 0)
+  const netIncome = Number(financialReport?.netIncome || 0)
   const outstandingBalance = Number(financialReport?.outstanding || 0)
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(amount)
@@ -391,9 +391,9 @@ export function PortalOverview() {
                   <div className="flex items-center justify-between rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2">
                     <div className="flex items-center text-emerald-800">
                       <DollarSign className="w-4 h-4 mr-2" />
-                      Income This Month
+                      Net Income
                     </div>
-                    <span className="font-semibold text-emerald-900">{formatCurrency(monthlyIncome)}</span>
+                    <span className="font-semibold text-emerald-900">{formatCurrency(netIncome)}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50 px-3 py-2">
                     <div className="flex items-center text-amber-800">
