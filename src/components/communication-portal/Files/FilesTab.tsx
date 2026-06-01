@@ -44,7 +44,7 @@ export function FilesTab() {
 
   return (
 <TabsContent value="files">
-            <div className="space-y-4">
+            <div className="mx-auto w-full max-w-5xl space-y-4">
               {/* AI Generated Scripts Section */}
               <Card className="border-green-100 shadow-md bg-gradient-to-r from-green-50 to-emerald-50">
                 <CardHeader className="p-4">
