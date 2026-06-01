@@ -13,7 +13,7 @@ import { useRef, useState } from "react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 const MARKETPLACE_LANGUAGES = ["English", "Spanish", "Punjabi", "Hindi", "French", "Chinese", "Other"]
-const MARKETPLACE_CATEGORIES = ["Christian", "Catholic", "Jewish", "Muslim", "Hindu", "Other"]
+const MARKETPLACE_CATEGORIES = ["Christian", "Catholic", "Jewish", "Muslim", "Hindu", "Spiritual", "Non-religious", "Other"]
 const MARKETPLACE_CEREMONY_TYPES = [
   "Weddings",
   "LGBTQ Weddings",
