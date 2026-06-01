@@ -44,13 +44,13 @@ export function FilesTab() {
 
   return (
 <TabsContent value="files">
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* AI Generated Scripts Section */}
               <Card className="border-green-100 shadow-md bg-gradient-to-r from-green-50 to-emerald-50">
-                <CardHeader>
+                <CardHeader className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <MessageCircle className="w-5 h-5 text-green-600" />
+                      <MessageCircle className="w-4 h-4 text-green-600" />
                       <CardTitle className="text-green-900">Mr. Script Generated Scripts</CardTitle>
                     </div>
                     <Badge className="bg-green-100 text-green-800 border-green-200">
@@ -63,20 +63,20 @@ export function FilesTab() {
                       : "Custom ceremony scripts created by Mr. Script for this profile"}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   {visibleMrScriptDrafts.length === 0 ? (
-                    <div className="text-center py-8">
-                      <MessageCircle className="w-12 h-12 mx-auto mb-4 text-green-300" />
-                      <p className="text-green-700 mb-2">No Mr. Script scripts generated yet</p>
+                    <div className="text-center py-5">
+                      <MessageCircle className="w-9 h-9 mx-auto mb-3 text-green-300" />
+                      <p className="text-green-700 mb-1">No Mr. Script scripts generated yet</p>
                       <p className="text-sm text-green-600">Visit the Build Script tab to create your first ceremony script with Mr. Script</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {visibleMrScriptDrafts.map((script: any) => (
-                        <div key={script.id} className="border border-green-200 rounded-xl p-4 bg-white hover:bg-green-50 transition-colors group">
+                        <div key={script.id} className="border border-green-200 rounded-lg p-3 bg-white hover:bg-green-50 transition-colors group">
                           <div className="flex items-start space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-xl flex items-center justify-center flex-shrink-0">
-                              <FileText className="w-6 h-6 text-green-600" />
+                            <div className="w-9 h-9 bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <FileText className="w-5 h-5 text-green-600" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between">
@@ -155,7 +155,7 @@ export function FilesTab() {
 
               {/* Existing Files */}
               <Card className="border-blue-100 shadow-md">
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-blue-900">Uploaded Documents</CardTitle>
@@ -192,10 +192,10 @@ export function FilesTab() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-4">
                   {files.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <div className="text-center py-5 text-gray-500">
+                      <FileText className="w-9 h-9 mx-auto mb-3 opacity-50" />
                       <p className="text-gray-500">No files uploaded yet</p>
                       <p className="text-sm">Upload your first document using the section above</p>
                     </div>
@@ -207,10 +207,10 @@ export function FilesTab() {
                         const isTextFile = fileType.includes("text/") || fileName.endsWith(".txt")
 
                         return (
-                        <div key={file.id} className="flex items-center space-x-3 p-4 border border-blue-100 rounded-xl bg-white hover:bg-blue-50 transition-colors group">
+                        <div key={file.id} className="flex items-center space-x-3 p-3 border border-blue-100 rounded-lg bg-white hover:bg-blue-50 transition-colors group">
                           <div className="flex-shrink-0">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center">
-                              <span className="text-2xl">{getFileIcon(file.type)}</span>
+                            <div className="w-9 h-9 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
+                              <span className="text-xl">{getFileIcon(file.type)}</span>
                             </div>
                           </div>
                           <div className="flex-1 min-w-0">
@@ -269,11 +269,11 @@ export function FilesTab() {
 
               {/* File Upload Section */}
               <Card className="border-blue-100 shadow-md">
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
                   <CardTitle className="text-blue-900">Upload Documents</CardTitle>
                   <CardDescription>Share ceremony scripts, photos, music lists, and other important documents</CardDescription>
                 </CardHeader>
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <FileUpload
                     mode="full"
                     density="slim"

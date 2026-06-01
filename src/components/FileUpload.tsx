@@ -348,19 +348,19 @@ export function FileUpload({
         onDragOver={handleDrag}
         onDrop={handleDrop}
       >
-        <CardContent className={`${density === 'slim' ? 'p-5' : 'p-8'} text-center`}>
+        <CardContent className={`${density === 'slim' ? 'p-3' : 'p-8'} text-center`}>
           <div className={`flex flex-col items-center ${density === 'slim' ? 'space-y-2' : 'space-y-4'}`}>
-            <div className={`${density === 'slim' ? 'w-11 h-11' : 'w-16 h-16'} rounded-full flex items-center justify-center ${
+            <div className={`${density === 'slim' ? 'w-9 h-9' : 'w-16 h-16'} rounded-full flex items-center justify-center ${
               dragActive ? 'bg-blue-100' : 'bg-gray-100'
             }`}>
-              <Upload className={`${density === 'slim' ? 'w-5 h-5' : 'w-8 h-8'} ${dragActive ? 'text-blue-500' : 'text-gray-400'}`} />
+              <Upload className={`${density === 'slim' ? 'w-4 h-4' : 'w-8 h-8'} ${dragActive ? 'text-blue-500' : 'text-gray-400'}`} />
             </div>
 
             <div>
-              <h3 className={`${density === 'slim' ? 'text-base mb-1' : 'text-lg mb-2'} font-semibold text-gray-900`}>
+              <h3 className={`${density === 'slim' ? 'text-sm mb-1' : 'text-lg mb-2'} font-semibold text-gray-900`}>
                 Drop files here to upload
               </h3>
-              <p className={`${density === 'slim' ? 'text-sm mb-2' : 'mb-4'} text-gray-500`}>
+              <p className={`${density === 'slim' ? 'text-xs mb-2' : 'mb-4'} text-gray-500`}>
                 or click to browse from your device
               </p>
 
