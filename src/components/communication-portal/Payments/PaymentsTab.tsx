@@ -217,7 +217,11 @@ export function PaymentsTab() {
                     </CardHeader>
                     <CardContent className="p-6">
                       <div className="space-y-3">
-                        {paymentHistory.map((payment) => (
+                        {paymentHistory.length === 0 ? (
+                          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+                            No payment transactions recorded for this ceremony yet.
+                          </div>
+                        ) : paymentHistory.map((payment) => (
                           <div key={payment.id} className="flex items-center justify-between p-4 border border-blue-100 rounded-xl bg-white">
                             <div className="flex items-center space-x-3">
                               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
