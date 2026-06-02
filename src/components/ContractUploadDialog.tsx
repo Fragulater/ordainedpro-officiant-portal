@@ -303,6 +303,8 @@ interface ContractUploadDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   onContractUploaded: (contract: Omit<Contract, "id" | "createdDate">) => void
+  onContractUpdated?: (contractId: number, contract: Omit<Contract, "id" | "createdDate"> & { templateContent?: string }) => Promise<{ ok: boolean; error?: string } | void>
+  editingContract?: Contract | null
   onUseDefaultContract?: () => Promise<{ ok: boolean; error?: string; alreadyExists?: boolean } | void>
   contractPrefillDefaults?: Record<string, string>
   setContractPrefillDefaults?: (defaults: Record<string, string>) => void
@@ -317,6 +319,8 @@ export function ContractUploadDialog({
   isOpen,
   onOpenChange,
   onContractUploaded,
+  onContractUpdated,
+  editingContract = null,
   onUseDefaultContract,
   contractPrefillDefaults = {},
   setContractPrefillDefaults,
@@ -433,6 +437,51 @@ export function ContractUploadDialog({
     setAttorneyReviewChecked(false)
     setUploadedAttorneyReviewChecked(false)
   }
+
+  useEffect(() => {
+    if (!isOpen || !editingContract) return
+
+    setFormData({
+      name: editingContract.name || "",
+      description: editingContract.description || "",
+      type: editingContract.type || "Custom Contract",
+      expiryDate: editingContract.expiryDate || "",
+      status: editingContract.status || "draft",
+    })
+    setUploadedFiles(editingContract.file ? [editingContract.file] : [])
+    setErrors({})
+    setSavedTemplateMessage("")
+    setContractMode("custom")
+    setUploadedAttorneyReviewChecked(true)
+    setSmartFieldWorkspace("")
+
+    const fileUrl = editingContract.fileUrl || editingContract.file?.url
+    const fileType = (editingContract.fileType || editingContract.file?.type || "").toLowerCase()
+    const fileName = (editingContract.name || editingContract.file?.name || "").toLowerCase()
+    const canLoadAsText = Boolean(fileUrl) && (fileType.includes("text") || fileName.endsWith(".txt"))
+
+    if (!canLoadAsText || !fileUrl) return
+
+    let isCancelled = false
+    fetch(fileUrl)
+      .then((response) => {
+        if (!response.ok) throw new Error("Unable to load the saved contract text.")
+        return response.text()
+      })
+      .then((text) => {
+        if (!isCancelled) setSmartFieldWorkspace(text)
+      })
+      .catch((error) => {
+        console.error("Failed to load saved contract text for editing:", error)
+        if (!isCancelled) {
+          setSavedTemplateMessage("Contract details loaded. The saved file could not be loaded into the text editor.")
+        }
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [editingContract, isOpen])
 
   useEffect(() => {
     if (!allowDefaultContract && contractMode === "default") {
@@ -637,6 +686,30 @@ export function ContractUploadDialog({
   }
 
   const handleSave = async () => {
+    if (editingContract) {
+      const updatedContract = {
+        name: formData.name,
+        description: formData.description,
+        type: formData.type,
+        expiryDate: formData.expiryDate,
+        status: formData.status,
+        file: uploadedFiles[0],
+        fileUrl: uploadedFiles[0]?.url || editingContract.fileUrl,
+        fileType: uploadedFiles[0]?.type || editingContract.fileType,
+        fileSize: uploadedFiles[0]?.size || editingContract.fileSize,
+        templateContent: smartFieldWorkspace,
+      }
+
+      const result = await onContractUpdated?.(editingContract.id, updatedContract)
+      if (result && !result.ok) {
+        setErrors((prev) => ({ ...prev, editContract: result.error || "Unable to update this contract." }))
+        return
+      }
+
+      handleCancel()
+      return
+    }
+
     if (contractMode === "default") {
       if (!hasAcceptedDefaultContractLegal) {
         if (!attorneyReviewChecked) {
@@ -720,10 +793,12 @@ export function ContractUploadDialog({
         <DialogHeader>
           <DialogTitle className="text-blue-900 flex items-center">
             <FileSignature className="w-5 h-5 mr-2" />
-            Upload New Contract
+            {editingContract ? "Edit Contract" : "Upload New Contract"}
           </DialogTitle>
           <DialogDescription>
-            Upload a contract document from your device and add details for tracking and management
+            {editingContract
+              ? "Update this saved contract before sending it for signature."
+              : "Upload a contract document from your device and add details for tracking and management"}
           </DialogDescription>
         </DialogHeader>
 
@@ -1284,14 +1359,20 @@ export function ContractUploadDialog({
               isAddingDefaultContract ||
               isSavingUploadedContractAcknowledgment ||
               (contractMode === "default" && !hasAcceptedDefaultContractLegal && !attorneyReviewChecked) ||
-              (contractMode === "custom" && (!formData.name || !formData.type || uploadedFiles.length === 0 || !uploadedAttorneyReviewChecked))
+              (contractMode === "custom" && !editingContract && (!formData.name || !formData.type || uploadedFiles.length === 0 || !uploadedAttorneyReviewChecked)) ||
+              (contractMode === "custom" && Boolean(editingContract) && (!formData.name || !formData.type))
             }
           >
             <Save className="w-4 h-4 mr-2" />
-            {contractMode === "default"
-              ? isAddingDefaultContract ? "Adding..." : "Use Default Contract"
-              : isSavingUploadedContractAcknowledgment ? "Saving..." : "Upload Contract"}
+          {contractMode === "default"
+            ? isAddingDefaultContract ? "Adding..." : "Use Default Contract"
+              : editingContract
+                ? "Save Contract"
+                : isSavingUploadedContractAcknowledgment ? "Saving..." : "Upload Contract"}
           </Button>
+          {errors.editContract && (
+            <p className="text-sm text-red-600">{errors.editContract}</p>
+          )}
         </div>
       </DialogContent>
     </Dialog>

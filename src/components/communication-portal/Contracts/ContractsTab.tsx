@@ -4,8 +4,7 @@ import { TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Send, FileSignature, Eye, Upload, Trash2 } from "lucide-react"
-import { Contract } from "@/components/ContractUploadDialog"
+import { Edit, Send, FileSignature, Eye, Upload, Trash2 } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 export function ContractsTab() {
@@ -14,6 +13,19 @@ export function ContractsTab() {
     contracts,
     handleContractAction,
   } = useCommunicationPortal()
+
+  const isEditablePendingContract = (status?: string) => {
+    const normalizedStatus = String(status || "draft").toLowerCase()
+    return ["draft", "pending"].includes(normalizedStatus)
+  }
+
+  const getContractStatusLabel = (status?: string) => {
+    const normalizedStatus = String(status || "draft").toLowerCase()
+    if (normalizedStatus === "signed") return "Signed"
+    if (normalizedStatus === "sent") return "Sent"
+    if (normalizedStatus === "pending") return "Pending"
+    return "Draft"
+  }
 
   return (
 <TabsContent value="contracts">
@@ -42,11 +54,11 @@ export function ContractsTab() {
                             <div className="flex items-center space-x-3">
                               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                                 contract.status === 'signed' ? 'bg-green-100' :
-                                ['pending', 'sent'].includes(contract.status) ? 'bg-yellow-100' : 'bg-gray-100'
+                                contract.status === 'sent' ? 'bg-yellow-100' : 'bg-gray-100'
                               }`}>
                                 <FileSignature className={`w-6 h-6 ${
                                   contract.status === 'signed' ? 'text-green-600' :
-                                  ['pending', 'sent'].includes(contract.status) ? 'text-yellow-600' : 'text-gray-600'
+                                  contract.status === 'sent' ? 'text-yellow-600' : 'text-gray-600'
                                 }`} />
                               </div>
                               <div>
@@ -54,13 +66,12 @@ export function ContractsTab() {
                                 <div className="flex items-center space-x-4 mt-1">
                                   <Badge variant={
                                     contract.status === 'signed' ? 'default' :
-                                    ['pending', 'sent'].includes(contract.status) ? 'secondary' : 'outline'
+                                    contract.status === 'sent' ? 'secondary' : 'outline'
                                   } className={
                                     contract.status === 'signed' ? 'bg-green-100 text-green-800' :
-                                    ['pending', 'sent'].includes(contract.status) ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                                    contract.status === 'sent' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
                                   }>
-                                    {contract.status === 'signed' ? 'Signed' :
-                                     ['pending', 'sent'].includes(contract.status) ? 'Sent' : 'Draft'}
+                                    {getContractStatusLabel(contract.status)}
                                   </Badge>
                                   <p className="text-sm text-gray-500">
                                     {contract.status === 'signed' && `Signed by ${contract.signedBy} on ${contract.signedDate}`}
@@ -91,15 +102,27 @@ export function ContractsTab() {
                                 <Trash2 className="w-4 h-4 mr-1" />
                                 Delete
                               </Button>
-                              <Button
-                                size="sm"
-                                className="bg-green-500 hover:bg-green-600"
-                                onClick={() => handleContractAction(contract.id, 'send')}
-                                title="Send contract via messaging"
-                              >
-                                <Send className="w-4 h-4 mr-1" />
-                                Send
-                              </Button>
+                              {isEditablePendingContract(contract.status) ? (
+                                <Button
+                                  size="sm"
+                                  className="bg-purple-500 hover:bg-purple-600"
+                                  onClick={() => handleContractAction(contract.id, 'edit')}
+                                  title="Edit this draft contract"
+                                >
+                                  <Edit className="w-4 h-4 mr-1" />
+                                  Edit
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  className="bg-green-500 hover:bg-green-600"
+                                  onClick={() => handleContractAction(contract.id, 'send')}
+                                  title="Send contract via messaging"
+                                >
+                                  <Send className="w-4 h-4 mr-1" />
+                                  Send
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>

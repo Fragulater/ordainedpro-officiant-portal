@@ -7,7 +7,10 @@ export function PortalContractUploadDialog() {
   const {
     showContractUploadDialog,
     setShowContractUploadDialog,
+    editingContractForUpload,
+    setEditingContractForUpload,
     handleContractUploaded,
+    handleContractUpdated,
     addDefaultContractForCurrentCouple,
     contractPrefillDefaults,
     setContractPrefillDefaults,
@@ -18,13 +21,22 @@ export function PortalContractUploadDialog() {
     editCoupleInfo,
   } = useCommunicationPortal()
 
+  const handleOpenChange = (open: boolean) => {
+    setShowContractUploadDialog(open)
+    if (!open) {
+      setEditingContractForUpload(null)
+    }
+  }
+
   return (
     <>
       {/* Contract Upload Dialog */}
       <ContractUploadDialog
         isOpen={showContractUploadDialog}
-        onOpenChange={setShowContractUploadDialog}
+        onOpenChange={handleOpenChange}
         onContractUploaded={handleContractUploaded}
+        onContractUpdated={handleContractUpdated}
+        editingContract={editingContractForUpload}
         onUseDefaultContract={addDefaultContractForCurrentCouple}
         contractPrefillDefaults={contractPrefillDefaults}
         setContractPrefillDefaults={setContractPrefillDefaults}

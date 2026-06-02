@@ -13,6 +13,15 @@ import { Meeting } from "@/components/ScheduleMeetingDialog"
 import { FileUpload } from "@/components/FileUpload"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
+type ConversationMessage = {
+  id: string | number
+  role?: string
+  avatar?: string
+  sender?: string
+  message?: string
+  timestamp?: string
+}
+
 export function MessagesTab() {
   const {
     messages,
@@ -42,7 +51,7 @@ export function MessagesTab() {
     currentUser,
   } = useCommunicationPortal()
 
-  const conversationMessages = displayMessages || messages
+  const conversationMessages: ConversationMessage[] = displayMessages || messages
   const canSendMessage = newMessage.trim().length > 0 || messageAttachments.length > 0
 
   const submitMessage = () => {

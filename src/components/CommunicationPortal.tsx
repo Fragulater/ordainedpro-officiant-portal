@@ -2314,6 +2314,7 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   // Contracts are now loaded per couple from the database
   const [contracts, setContracts] = useState<any[]>([])
   const [isLoadingContracts, setIsLoadingContracts] = useState(false)
+  const [editingContractForUpload, setEditingContractForUpload] = useState<any | null>(null)
 
   const transformContractRecord = (c: any) => ({
     id: c.id,
@@ -4405,8 +4406,11 @@ ${shareScriptForm.body}`
 
     switch (action) {
       case 'edit':
+        setEditingContractForUpload(contract)
+        setShowContractUploadDialog(true)
+        break
       case 'view':
-        console.log(`${action === 'edit' ? 'Editing' : 'Viewing'} contract:`, contract.name)
+        console.log(`Viewing contract:`, contract.name)
         setViewingContract(contract)
         setShowContractViewerDialog(true)
         break
@@ -4442,6 +4446,97 @@ ${shareScriptForm.body}`
         setShowSendContractDialog(true)
         console.log('Opening send dialog for contract:', contract.name)
         break
+    }
+  }
+
+  const handleContractUpdated = async (
+    contractId: number,
+    contractData: Omit<Contract, "id" | "createdDate"> & { templateContent?: string }
+  ) => {
+    const existingContract = contracts.find(c => c.id === contractId)
+    if (!existingContract) {
+      return { ok: false, error: "Contract not found." }
+    }
+
+    let nextFileUrl = contractData.fileUrl || existingContract.fileUrl || existingContract.file?.url || ""
+    let nextFileType = contractData.fileType || existingContract.fileType || existingContract.file?.type || "application/octet-stream"
+    let nextFileSize = contractData.fileSize || existingContract.fileSize || existingContract.file?.size || 0
+    const templateContent = contractData.templateContent?.trim()
+
+    try {
+      if (templateContent && currentUser?.id && editCoupleInfo?.id) {
+        const safeName = (contractData.name || existingContract.name || "contract")
+          .replace(/[^a-z0-9]+/gi, "-")
+          .replace(/^-+|-+$/g, "")
+          .toLowerCase() || "contract"
+        const textBlob = new Blob([contractData.templateContent || ""], { type: "text/plain;charset=utf-8" })
+        const filePath = `${currentUser.id}/${editCoupleInfo.id}/${safeName}-draft-${Date.now()}.txt`
+
+        const { error: uploadError } = await supabase.storage
+          .from("contracts")
+          .upload(filePath, textBlob, {
+            contentType: "text/plain;charset=utf-8",
+            upsert: true,
+          })
+
+        if (uploadError) throw uploadError
+
+        const { data: publicUrlData } = supabase.storage
+          .from("contracts")
+          .getPublicUrl(filePath)
+
+        nextFileUrl = publicUrlData.publicUrl
+        nextFileType = "text/plain"
+        nextFileSize = textBlob.size
+      }
+
+      const updateResult = await updateContractInDB(contractId, {
+        name: contractData.name,
+        description: contractData.description || null,
+        type: contractData.type || "Custom Contract",
+        expiry_date: contractData.expiryDate || null,
+        status: contractData.status || "draft",
+        file_url: nextFileUrl || null,
+        file_type: nextFileType || null,
+        file_size: nextFileSize || null,
+      } as any)
+
+      if (!updateResult.ok) {
+        return { ok: false, error: updateResult.error || "Unable to update this contract." }
+      }
+
+      setContracts(prev => prev.map(contract => {
+        if (contract.id !== contractId) return contract
+
+        return {
+          ...contract,
+          name: contractData.name,
+          description: contractData.description || "",
+          type: contractData.type || "Custom Contract",
+          expiryDate: contractData.expiryDate || "",
+          status: contractData.status || "draft",
+          fileUrl: nextFileUrl,
+          fileType: nextFileType,
+          fileSize: nextFileSize,
+          file: {
+            ...(contract.file || {}),
+            id: contract.file?.id || `contract-file-${contractId}`,
+            file: contract.file?.file || new File([], contractData.name, { type: nextFileType }),
+            name: contractData.name,
+            size: nextFileSize,
+            type: nextFileType,
+            url: nextFileUrl,
+            uploadProgress: 100,
+            status: "completed" as const,
+          },
+        }
+      }))
+      setEditingContractForUpload(null)
+      setShowContractUploadDialog(false)
+      return { ok: true }
+    } catch (error) {
+      console.error("Failed to update contract:", error)
+      return { ok: false, error: error instanceof Error ? error.message : "Unable to update this contract." }
     }
   }
 
@@ -5147,6 +5242,18 @@ ${shareScriptForm.body}`
           ? { ...c, status: contractWasSent ? 'sent' : 'pending', sentDate: sentAt.toLocaleDateString(), boldsignDocumentId: boldSignResult?.documentId } as any
           : c
       ))
+
+      const portalMessage = [
+        emailForm.body.trim(),
+        "",
+        `Contract sent for signature: ${sendingContract.name}`,
+        boldSignResult?.documentId ? `BoldSign document ID: ${boldSignResult.documentId}` : "",
+      ].filter(Boolean).join("\n")
+
+      await handleSendMessage(portalMessage, [], {
+        recipientEmails: recipients,
+        subject: emailForm.subject.trim(),
+      })
 
       setShowSendContractDialog(false)
       setSendingContract(null)
@@ -6767,7 +6874,11 @@ ${cleanOfficiantFirstName}
     return 'FILE'
   }
 
-  const handleSendMessage = async (messageOverride?: string, attachmentsOverride?: UploadedFile[]) => {
+  const handleSendMessage = async (
+    messageOverride?: string,
+    attachmentsOverride?: UploadedFile[],
+    options?: { recipientEmails?: string[]; subject?: string }
+  ) => {
     const outgoingMessage = typeof messageOverride === "string" ? messageOverride : newMessage
     const outgoingAttachments = attachmentsOverride || messageAttachments
 
@@ -6784,7 +6895,9 @@ ${cleanOfficiantFirstName}
       const coupleName = `${editCoupleInfo?.brideName || allCouples[activeCoupleIndex]?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || allCouples[activeCoupleIndex]?.groomName || 'Partner 2'}`
 
       // Determine recipient emails
-      const recipientEmails = getCurrentCoupleRecipientEmails()
+      const recipientEmails = options?.recipientEmails?.length
+        ? options.recipientEmails
+        : getCurrentCoupleRecipientEmails()
 
       if (recipientEmails.length === 0) {
         alert("No recipient email is saved for this ceremony. Add a primary or secondary contact email before sending a message.")
@@ -6873,7 +6986,7 @@ ${cleanOfficiantFirstName}
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               to: email,
-              subject: `Message from ${officiantLabel} - Wedding Planning`,
+              subject: options?.subject || `Message from ${officiantLabel} - Wedding Planning`,
               message: outgoingMessage || "(File attachments)",
               fromName: officiantLabel,
               coupleName: coupleName,
@@ -7646,6 +7759,8 @@ ${officiantProfile?.name || "Your officiant"}`)
     setShowScheduleMeetingDialog,
     showContractUploadDialog,
     setShowContractUploadDialog,
+    editingContractForUpload,
+    setEditingContractForUpload,
     showEditWeddingDialog,
     setShowEditWeddingDialog,
     showAddEventDialog,
@@ -7850,6 +7965,7 @@ ${officiantProfile?.name || "Your officiant"}`)
     handleSaveScript,
     handleSendScript,
     handleContractAction,
+    handleContractUpdated,
     handleSendContractEmail: handleSendContractRealEmail,
     addDefaultContractForCurrentCouple,
     handleOpenPaymentReminderDialog,
