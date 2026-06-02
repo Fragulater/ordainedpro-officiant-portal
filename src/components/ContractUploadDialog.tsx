@@ -255,11 +255,6 @@ const getSmartFieldWarnings = (content: string) => {
   return warnings
 }
 
-const getSmartFieldTags = (content: string) => {
-  const tags = content.match(/{{[^}\n]+}}?/g) || []
-  return Array.from(new Set(tags))
-}
-
 const formatSavedContractSize = (size?: number | null) => {
   if (!size) return "0 KB"
   if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
@@ -358,14 +353,11 @@ export function ContractUploadDialog({
   const [smartFieldGroup, setSmartFieldGroup] = useState("Recommended Fields")
   const [smartFieldSearch, setSmartFieldSearch] = useState("")
   const [smartFieldWorkspace, setSmartFieldWorkspace] = useState("")
+  const [smartFieldEditorScroll, setSmartFieldEditorScroll] = useState({ top: 0, left: 0 })
   const smartFieldWorkspaceRef = useRef<HTMLTextAreaElement | null>(null)
   const smartFieldContext = getSmartFieldContext(ceremonyType)
   const smartFieldWarnings = useMemo(
     () => getSmartFieldWarnings(smartFieldWorkspace),
-    [smartFieldWorkspace]
-  )
-  const smartFieldTagMatches = useMemo(
-    () => getSmartFieldTags(smartFieldWorkspace),
     [smartFieldWorkspace]
   )
   const filteredSmartFields = useMemo(() => {
@@ -383,6 +375,34 @@ export function ContractUploadDialog({
     })
   }, [smartFieldContext, smartFieldGroup, smartFieldSearch])
   const smartFieldCategories = SMART_FIELD_GROUPS.filter((group) => group !== "All Fields")
+
+  const renderSmartFieldWorkspaceHighlight = (content: string) => {
+    if (!content) return null
+
+    const tagPattern = /{{(?:text|sign|date|editdate)\|[123]\|\*\|[^{}\n|]+\|[a-z0-9_]+}}/g
+    const nodes: Array<string | JSX.Element> = []
+    let lastIndex = 0
+
+    content.replace(tagPattern, (tag, index) => {
+      if (index > lastIndex) {
+        nodes.push(content.slice(lastIndex, index))
+      }
+
+      nodes.push(
+        <span key={`${tag}-${index}`} className="rounded bg-blue-50 px-0.5 font-semibold text-blue-700">
+          {tag}
+        </span>
+      )
+      lastIndex = index + tag.length
+      return tag
+    })
+
+    if (lastIndex < content.length) {
+      nodes.push(content.slice(lastIndex))
+    }
+
+    return nodes
+  }
 
   const updateContractDefault = (field: string, value: string) => {
     setContractPrefillDefaults?.({
@@ -1092,32 +1112,36 @@ export function ContractUploadDialog({
                   </div>
                 </div>
                 <div className="relative min-h-[520px] overflow-hidden rounded-md border border-blue-200 bg-white">
+                  <pre
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 min-h-[520px] overflow-hidden whitespace-pre-wrap break-words p-3 font-mono text-sm leading-6 text-slate-950"
+                  >
+                    <span
+                      style={{
+                        display: "block",
+                        transform: `translate(${-smartFieldEditorScroll.left}px, ${-smartFieldEditorScroll.top}px)`,
+                      }}
+                    >
+                      {renderSmartFieldWorkspaceHighlight(smartFieldWorkspace)}
+                    </span>
+                  </pre>
                   <Textarea
                     ref={smartFieldWorkspaceRef}
                     id="smartFieldWorkspace"
                     value={smartFieldWorkspace}
                     onChange={(event) => setSmartFieldWorkspace(event.target.value)}
+                    onScroll={(event) => {
+                      setSmartFieldEditorScroll({
+                        top: event.currentTarget.scrollTop,
+                        left: event.currentTarget.scrollLeft,
+                      })
+                    }}
                     placeholder="Paste your contract here, then click where a smart field belongs..."
                     rows={22}
                     spellCheck={false}
-                    className="relative min-h-[520px] resize-y border-0 bg-white p-3 font-mono text-sm leading-6 text-slate-950 caret-blue-700 shadow-none selection:bg-blue-200 focus-visible:ring-2 focus-visible:ring-blue-300"
+                    className="relative min-h-[520px] resize-y border-0 bg-transparent p-3 font-mono text-sm leading-6 text-transparent caret-blue-700 shadow-none selection:bg-blue-200 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-blue-300"
                   />
                 </div>
-                {smartFieldTagMatches.length > 0 && (
-                  <div className="mt-3 rounded-md border border-blue-100 bg-blue-50 p-3">
-                    <p className="text-xs font-semibold text-blue-950">Smart fields detected</p>
-                    <div className="mt-2 flex max-h-28 flex-wrap gap-2 overflow-y-auto">
-                      {smartFieldTagMatches.map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded bg-white px-2 py-1 font-mono text-xs font-semibold text-blue-700 shadow-sm"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 {savedTemplateMessage && (
                   <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
                     {savedTemplateMessage}
