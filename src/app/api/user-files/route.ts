@@ -43,6 +43,39 @@ async function ensureUserDocumentsBucket(supabaseAdmin: ReturnType<typeof getSup
   }
 }
 
+export async function GET() {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Please log in before viewing saved documents." }, { status: 401 })
+    }
+
+    const supabaseAdmin = getSupabaseAdmin()
+    const { data, error } = await supabaseAdmin
+      .from("user_files")
+      .select("id, name, type, size, url, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      throw new Error(`Unable to load saved documents: ${error.message}`)
+    }
+
+    return NextResponse.json({ ok: true, files: data || [] })
+  } catch (error) {
+    console.error("User files load error:", error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to load saved documents." },
+      { status: 500 }
+    )
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()

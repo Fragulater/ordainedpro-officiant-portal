@@ -12,9 +12,13 @@ import {
   AlertCircle,
   CalendarDays,
   Clipboard,
+  Download,
+  Eye,
   FileBadge,
   FileSignature,
   FileText,
+  FolderOpen,
+  Loader2,
   NotebookPen,
   Save,
   Upload,
@@ -36,6 +40,15 @@ type SmartField = {
   group: string
   keywords?: string
   contexts?: SmartFieldContext[]
+}
+
+type SavedContractFile = {
+  id: string | number
+  name: string
+  type?: string | null
+  size?: number | null
+  url?: string | null
+  created_at?: string | null
 }
 
 const SMART_FIELD_GROUPS = [
@@ -241,6 +254,29 @@ const getSmartFieldWarnings = (content: string) => {
   return warnings
 }
 
+const formatSavedContractSize = (size?: number | null) => {
+  if (!size) return "0 KB"
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  return `${Math.max(1, Math.round(size / 1024))} KB`
+}
+
+const getSavedContractType = (file: SavedContractFile) => {
+  const fileName = (file.name || "").toLowerCase()
+  const fileType = (file.type || "").toLowerCase()
+
+  if (fileType.includes("pdf") || fileName.endsWith(".pdf")) return "PDF"
+  if (fileName.endsWith(".docx")) return "DOCX"
+  if (fileType.includes("word") || fileName.endsWith(".doc")) return "DOC"
+  if (fileType.startsWith("text/") || fileName.endsWith(".txt")) return "TXT"
+  if (fileType.includes("html") || fileName.endsWith(".html")) return "HTML"
+  return "FILE"
+}
+
+const formatSavedContractDate = (date?: string | null) => {
+  if (!date) return "Recently added"
+  return new Date(date).toLocaleDateString()
+}
+
 export interface Contract {
   id: number
   name: string
@@ -301,6 +337,10 @@ export function ContractUploadDialog({
   const [isAddingDefaultContract, setIsAddingDefaultContract] = useState(false)
   const [isSavingUploadedContractAcknowledgment, setIsSavingUploadedContractAcknowledgment] = useState(false)
   const [isSavingTemplateToFiles, setIsSavingTemplateToFiles] = useState(false)
+  const [showSavedContractsDialog, setShowSavedContractsDialog] = useState(false)
+  const [savedContracts, setSavedContracts] = useState<SavedContractFile[]>([])
+  const [isLoadingSavedContracts, setIsLoadingSavedContracts] = useState(false)
+  const [savedContractsError, setSavedContractsError] = useState("")
   const [attorneyReviewChecked, setAttorneyReviewChecked] = useState(false)
   const [uploadedAttorneyReviewChecked, setUploadedAttorneyReviewChecked] = useState(false)
   const [smartFieldGroup, setSmartFieldGroup] = useState("Recommended Fields")
@@ -432,6 +472,41 @@ export function ContractUploadDialog({
     } catch (error) {
       console.error("Failed to copy contract tag:", error)
     }
+  }
+
+  const loadSavedContracts = async () => {
+    setIsLoadingSavedContracts(true)
+    setSavedContractsError("")
+
+    try {
+      const response = await fetch("/api/user-files", {
+        method: "GET",
+        cache: "no-store",
+      })
+      const result = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to load saved contracts.")
+      }
+
+      setSavedContracts(Array.isArray(result.files) ? result.files : [])
+    } catch (error) {
+      console.error("Failed to load saved contracts:", error)
+      setSavedContracts([])
+      setSavedContractsError(error instanceof Error ? error.message : "Unable to load saved contracts.")
+    } finally {
+      setIsLoadingSavedContracts(false)
+    }
+  }
+
+  const openSavedContractsDialog = () => {
+    setShowSavedContractsDialog(true)
+    loadSavedContracts()
+  }
+
+  const openSavedContract = (file: SavedContractFile) => {
+    if (!file.url) return
+    window.open(file.url, "_blank", "noopener,noreferrer")
   }
 
   const saveTaggedTemplateToFiles = async () => {
@@ -593,6 +668,7 @@ export function ContractUploadDialog({
   }
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl max-h-[94vh] overflow-y-auto">
         <DialogHeader>
@@ -813,6 +889,15 @@ export function ContractUploadDialog({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-8 border-blue-200 text-blue-700 hover:bg-blue-50"
+                      onClick={openSavedContractsDialog}
+                    >
+                      <FolderOpen className="mr-1 h-3.5 w-3.5" />
+                      Saved Contracts
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"
@@ -1144,5 +1229,88 @@ export function ContractUploadDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={showSavedContractsDialog} onOpenChange={setShowSavedContractsDialog}>
+      <DialogContent className="max-w-3xl border-blue-200 bg-white">
+        <DialogHeader>
+          <DialogTitle className="flex items-center text-blue-950">
+            <FolderOpen className="mr-2 h-5 w-5 text-blue-600" />
+            Saved Contracts
+          </DialogTitle>
+          <DialogDescription className="text-blue-800">
+            View contracts and documents saved in your Officiant Dashboard Documents section.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
+          {isLoadingSavedContracts ? (
+            <div className="flex min-h-40 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-800">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading saved contracts...
+            </div>
+          ) : savedContractsError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {savedContractsError}
+            </div>
+          ) : savedContracts.length === 0 ? (
+            <div className="flex min-h-44 flex-col items-center justify-center rounded-lg border border-dashed border-blue-200 bg-blue-50 p-6 text-center">
+              <FileText className="mb-3 h-9 w-9 text-blue-300" />
+              <p className="font-medium text-blue-950">No saved contracts yet</p>
+              <p className="mt-1 max-w-md text-sm text-blue-700">
+                Contracts saved from this editor or uploaded in Dashboard Documents will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {savedContracts.map((file) => (
+                <div
+                  key={file.id}
+                  className="rounded-lg border border-blue-100 bg-blue-50/60 p-4 shadow-sm"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-100 text-blue-700">
+                          <FileText className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-blue-950">{file.name}</p>
+                          <p className="text-xs text-blue-700">
+                            {getSavedContractType(file)} - {formatSavedContractSize(file.size)} - Updated {formatSavedContractDate(file.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
+                        onClick={() => openSavedContract(file)}
+                        disabled={!file.url}
+                      >
+                        <Eye className="mr-1 h-3.5 w-3.5" />
+                        View
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 border-green-200 bg-white text-green-700 hover:bg-green-50"
+                        onClick={() => openSavedContract(file)}
+                        disabled={!file.url}
+                      >
+                        <Download className="mr-1 h-3.5 w-3.5" />
+                        Download
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
