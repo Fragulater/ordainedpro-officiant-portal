@@ -241,30 +241,6 @@ const getSmartFieldWarnings = (content: string) => {
   return warnings
 }
 
-const renderHighlightedContractText = (content: string) => {
-  if (!content) {
-    return (
-      <span className="text-slate-400">
-        Paste your contract here, then click where a smart field belongs...
-      </span>
-    )
-  }
-
-  return content.split(/(\{\{+[^}\n]+}}+)/g).map((part, index) => {
-    const key = `${index}-${part.slice(0, 12)}`
-
-    if (/^\{\{+[^}\n]+}}+$/.test(part)) {
-      return (
-        <span key={key} className="rounded bg-blue-50 font-semibold text-blue-700">
-          {part}
-        </span>
-      )
-    }
-
-    return <span key={key}>{part}</span>
-  })
-}
-
 export interface Contract {
   id: number
   name: string
@@ -331,7 +307,6 @@ export function ContractUploadDialog({
   const [smartFieldSearch, setSmartFieldSearch] = useState("")
   const [smartFieldWorkspace, setSmartFieldWorkspace] = useState("")
   const smartFieldWorkspaceRef = useRef<HTMLTextAreaElement | null>(null)
-  const smartFieldHighlightRef = useRef<HTMLDivElement | null>(null)
   const smartFieldContext = getSmartFieldContext(ceremonyType)
   const smartFieldWarnings = useMemo(
     () => getSmartFieldWarnings(smartFieldWorkspace),
@@ -530,10 +505,6 @@ export function ContractUploadDialog({
       if (currentTextArea) {
         currentTextArea.scrollTop = previousScrollTop
         currentTextArea.scrollLeft = previousScrollLeft
-      }
-      if (smartFieldHighlightRef.current) {
-        smartFieldHighlightRef.current.scrollTop = previousScrollTop
-        smartFieldHighlightRef.current.scrollLeft = previousScrollLeft
       }
     }, 0)
   }
@@ -873,28 +844,15 @@ export function ContractUploadDialog({
                   </div>
                 </div>
                 <div className="relative min-h-[520px] overflow-hidden rounded-md border border-blue-200 bg-white">
-                  <div
-                    ref={smartFieldHighlightRef}
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-sm leading-6 text-slate-950"
-                  >
-                    {renderHighlightedContractText(smartFieldWorkspace)}
-                  </div>
                   <Textarea
                     ref={smartFieldWorkspaceRef}
                     id="smartFieldWorkspace"
                     value={smartFieldWorkspace}
                     onChange={(event) => setSmartFieldWorkspace(event.target.value)}
-                    onScroll={(event) => {
-                      if (smartFieldHighlightRef.current) {
-                        smartFieldHighlightRef.current.scrollTop = event.currentTarget.scrollTop
-                        smartFieldHighlightRef.current.scrollLeft = event.currentTarget.scrollLeft
-                      }
-                    }}
-                    placeholder=""
+                    placeholder="Paste your contract here, then click where a smart field belongs..."
                     rows={22}
                     spellCheck={false}
-                    className="relative min-h-[520px] resize-y border-0 bg-transparent p-3 font-mono text-sm leading-6 text-slate-950 caret-slate-950 opacity-[0.01] shadow-none selection:bg-blue-200 focus-visible:ring-0"
+                    className="relative min-h-[520px] resize-y border-0 bg-white p-3 font-mono text-sm leading-6 text-slate-950 caret-blue-700 shadow-none selection:bg-blue-200 focus-visible:ring-2 focus-visible:ring-blue-300"
                   />
                 </div>
                 <p className="mt-3 text-xs leading-5 text-blue-800">
@@ -904,7 +862,7 @@ export function ContractUploadDialog({
                   <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
                     <p className="flex items-start text-sm font-semibold text-amber-900">
                       <AlertCircle className="mr-2 mt-0.5 h-4 w-4 shrink-0" />
-                      We found one or more missing or unrecognized smart fields in this custom contract. Please review the highlighted fields before sending.
+                      We found one or more missing or unrecognized smart fields in this custom contract. Please review the fields below before sending.
                     </p>
                     <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-amber-900">
                       {smartFieldWarnings.map((warning) => (
