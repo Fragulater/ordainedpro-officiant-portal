@@ -5217,16 +5217,21 @@ ${shareScriptForm.body}`
       }
 
       const boldSignResult = await response.json().catch(() => null)
+      const boldSignDocumentId = boldSignResult?.documentId ? String(boldSignResult.documentId) : ""
       const normalizedBoldSignStatus = String(boldSignResult?.boldSignStatus || "").toLowerCase()
       const contractWasSent = ["accepted", "sent", "waiting for me", "waiting for others", "completed", "signed"].some((status) =>
         normalizedBoldSignStatus.includes(status)
       )
       console.log("BoldSign send result:", {
-        documentId: boldSignResult?.documentId,
+        documentId: boldSignDocumentId,
         status: boldSignResult?.boldSignStatus,
         details: boldSignResult?.statusCheck,
         prefillSkipped: boldSignResult?.prefillSkipped,
       })
+
+      if (!boldSignDocumentId) {
+        throw new Error("BoldSign did not return a document ID. The contract notification was not sent.")
+      }
 
       const sentAt = new Date()
       const updateResult = await updateContractInDB(sendingContract.id, {
@@ -5239,15 +5244,17 @@ ${shareScriptForm.body}`
 
       setContracts(prev => prev.map(c =>
         c.id === sendingContract.id
-          ? { ...c, status: contractWasSent ? 'sent' : 'pending', sentDate: sentAt.toLocaleDateString(), boldsignDocumentId: boldSignResult?.documentId } as any
+          ? { ...c, status: contractWasSent ? 'sent' : 'pending', sentDate: sentAt.toLocaleDateString(), boldsignDocumentId: boldSignDocumentId } as any
           : c
       ))
 
       const portalMessage = [
         emailForm.body.trim(),
         "",
-        `Contract sent for signature: ${sendingContract.name}`,
-        boldSignResult?.documentId ? `BoldSign document ID: ${boldSignResult.documentId}` : "",
+        `BoldSign signature request created for: ${sendingContract.name}`,
+        `BoldSign document ID: ${boldSignDocumentId}`,
+        `Contract file: ${contractUrl}`,
+        "BoldSign will send the secure signing email separately. If you do not receive it, please let me know so I can resend the signature request.",
       ].filter(Boolean).join("\n")
 
       await handleSendMessage(portalMessage, [], {
