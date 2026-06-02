@@ -4364,20 +4364,22 @@ ${officiantLabel}`,
       itemsDescription += `[FILES] (${selectedFiles.length}):\n${filesList}\n\n`
     }
 
-    // Add to messaging platform
-    setMessageAttachments(allAttachments)
-    setNewMessage(`[SHARED] Wedding Documents
+    const sharedMessage = `[SHARED] Wedding Documents
 
 For: ${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}
 Sent to: ${recipient}
 
 ${itemsDescription}
-${shareScriptForm.body}`)
+${shareScriptForm.body}`
+
+    // Add to messaging platform
+    setMessageAttachments(allAttachments)
+    setNewMessage(sharedMessage)
     setShowAttachments(true)
 
     // Auto-send the message
     setTimeout(() => {
-      handleSendMessage()
+      handleSendMessage(sharedMessage, allAttachments)
     }, 100)
 
     // Close dialog and reset form
@@ -4475,14 +4477,16 @@ ${shareScriptForm.body}`)
       status: 'completed'
     }
 
+    const contractMessage = `[SCRIPT]Â§ Email sent to: ${recipient}\n[SCRIPT]â€ž Subject: ${emailForm.subject}\n\n${emailForm.body}`
+
     // Add to messaging platform
     setMessageAttachments([contractAttachment])
-    setNewMessage(`[SCRIPT]Â§ Email sent to: ${recipient}\n[SCRIPT]â€ž Subject: ${emailForm.subject}\n\n${emailForm.body}`)
+    setNewMessage(contractMessage)
     setShowAttachments(true)
 
     // Auto-send the message
     setTimeout(() => {
-      handleSendMessage()
+      handleSendMessage(contractMessage, [contractAttachment])
       // Update contract status to sent
       setContracts(prev => prev.map(c =>
         c.id === sendingContract.id
@@ -6740,8 +6744,11 @@ ${cleanOfficiantFirstName}
     return 'FILE'
   }
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() && messageAttachments.length === 0) {
+  const handleSendMessage = async (messageOverride?: string, attachmentsOverride?: UploadedFile[]) => {
+    const outgoingMessage = typeof messageOverride === "string" ? messageOverride : newMessage
+    const outgoingAttachments = attachmentsOverride || messageAttachments
+
+    if (!outgoingMessage.trim() && outgoingAttachments.length === 0) {
       return
     }
 
@@ -6767,7 +6774,7 @@ ${cleanOfficiantFirstName}
           couple_id: coupleId,
           sender: "officiant",
           sender_name: officiantLabel,
-          content: newMessage || "(File attachments)",
+          content: outgoingMessage || "(File attachments)",
           read: true, // Officiant's own message is read
           created_at: new Date().toISOString(),
         }
@@ -6793,7 +6800,7 @@ ${cleanOfficiantFirstName}
               id: savedMessage[0].id,
               sender: officiantLabel,
               role: "officiant",
-              message: newMessage,
+              message: outgoingMessage || "(File attachments)",
               timestamp: "Just now",
               createdAt,
               avatar: "/api/placeholder/40/40"
@@ -6813,7 +6820,7 @@ ${cleanOfficiantFirstName}
           console.log(`[SCRIPT]Â§ Attempting to send email to: ${email}`)
 
           // Build attachments array - include both scripts (textContent) and files (base64Content)
-          const emailAttachments = messageAttachments
+          const emailAttachments = outgoingAttachments
             .filter(att => att.textContent || att.base64Content)
             .map(att => {
               if (att.textContent) {
@@ -6841,7 +6848,7 @@ ${cleanOfficiantFirstName}
             body: JSON.stringify({
               to: email,
               subject: `Message from ${officiantLabel} - Wedding Planning`,
-              message: newMessage,
+              message: outgoingMessage || "(File attachments)",
               fromName: officiantLabel,
               coupleName: coupleName,
               coupleId: coupleId,
