@@ -37,11 +37,18 @@ export function MessagesTab() {
     formatFileSize,
     getFileIcon,
     handleSendMessage,
+    isSendingMessage,
     officiantProfile,
     currentUser,
   } = useCommunicationPortal()
 
   const conversationMessages = displayMessages || messages
+  const canSendMessage = newMessage.trim().length > 0 || messageAttachments.length > 0
+
+  const submitMessage = () => {
+    if (!canSendMessage || isSendingMessage) return
+    handleSendMessage()
+  }
 
   const upcomingMeetings = meetings
     .filter((meeting) => {
@@ -149,7 +156,12 @@ export function MessagesTab() {
                         placeholder="Type your message..."
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            submitMessage()
+                          }
+                        }}
                         className="flex-1 border-blue-200 focus:border-blue-500"
                       />
                       <FileUpload
@@ -163,8 +175,8 @@ export function MessagesTab() {
                       <Button
                         size="icon"
                         className="bg-blue-500 hover:bg-blue-600"
-                        onClick={handleSendMessage}
-                        disabled={!newMessage.trim() && messageAttachments.length === 0}
+                        onClick={submitMessage}
+                        disabled={!canSendMessage || isSendingMessage}
                       >
                         <Send className="w-4 h-4" />
                       </Button>
