@@ -29,6 +29,8 @@ export function PortalShareScriptDialog() {
     return null
   }
 
+  const listScrollClass = "space-y-2 max-h-[156px] overflow-y-auto pr-1"
+
   return (
     <>
       {/* Share Script Dialog */}
@@ -53,7 +55,7 @@ export function PortalShareScriptDialog() {
                   <FileText className="w-4 h-4 mr-2" />
                   Saved Scripts
                 </h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className={listScrollClass}>
                   {coupleScripts.length === 0 ? (
                     <p className="text-sm text-pink-600 italic">No saved scripts available</p>
                   ) : (
@@ -94,7 +96,7 @@ export function PortalShareScriptDialog() {
                   <FileEdit className="w-4 h-4 mr-2" />
                   AI Generated Scripts
                 </h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className={listScrollClass}>
                   {generatedScripts.length === 0 ? (
                     <p className="text-sm text-blue-600 italic">No generated scripts available</p>
                   ) : (
@@ -135,7 +137,7 @@ export function PortalShareScriptDialog() {
                   <Paperclip className="w-4 h-4 mr-2" />
                   Uploaded Files
                 </h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className={listScrollClass}>
                   {files.length === 0 ? (
                     <p className="text-sm text-green-600 italic">No files uploaded</p>
                   ) : (
