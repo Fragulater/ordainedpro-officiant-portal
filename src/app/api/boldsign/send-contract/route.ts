@@ -19,7 +19,7 @@ type PrefillField = {
 
 type PrefillMap = Record<string, string>
 
-const SUPPORTED_BOLDSIGN_FILE_EXTENSIONS = [".pdf"]
+const SUPPORTED_BOLDSIGN_FILE_EXTENSIONS = [".pdf", ".txt"]
 const CUSTOM_CONTRACT_PREFILL_FIELD_IDS = new Set([
   "agreement_date",
   "officiant_business_name",
@@ -102,6 +102,104 @@ function isDefaultContractUrl(contractUrl: string) {
   } catch {
     return contractUrl.endsWith("/contracts/ordainedpro-default-contract.pdf")
   }
+}
+
+function isTextContractExtension(fileExtension: string) {
+  return fileExtension === ".txt"
+}
+
+function getSafePdfFileName(contractName: string) {
+  const safeName = contractName
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase() || "contract"
+
+  return `${safeName}.pdf`
+}
+
+function wrapPdfTextLine(line: string, maxCharacters: number) {
+  if (line.length <= maxCharacters) return [line]
+
+  const wrappedLines: string[] = []
+  let remainingLine = line
+
+  while (remainingLine.length > maxCharacters) {
+    const breakIndex = Math.max(
+      remainingLine.lastIndexOf(" ", maxCharacters),
+      remainingLine.lastIndexOf("\t", maxCharacters)
+    )
+    const sliceIndex = breakIndex > 20 ? breakIndex : maxCharacters
+    wrappedLines.push(remainingLine.slice(0, sliceIndex).trimEnd())
+    remainingLine = remainingLine.slice(sliceIndex).trimStart()
+  }
+
+  wrappedLines.push(remainingLine)
+  return wrappedLines
+}
+
+async function createTextContractPdfBase64(contractUrl: string, contractName: string) {
+  const response = await fetch(contractUrl)
+
+  if (!response.ok) {
+    throw new Error("Unable to load the saved contract text before sending it to BoldSign.")
+  }
+
+  const contractText = await response.text()
+  const pdfDocument = await PDFDocument.create()
+  const font = await pdfDocument.embedFont(StandardFonts.Courier)
+  const boldFont = await pdfDocument.embedFont(StandardFonts.HelveticaBold)
+  const pageWidth = 612
+  const pageHeight = 792
+  const marginX = 54
+  const marginTop = 54
+  const marginBottom = 54
+  const fontSize = 9
+  const lineHeight = 13
+  const maxCharactersPerLine = 88
+
+  let page = pdfDocument.addPage([pageWidth, pageHeight])
+  let cursorY = pageHeight - marginTop
+
+  page.drawText(contractName || "Contract", {
+    x: marginX,
+    y: cursorY,
+    size: 12,
+    font: boldFont,
+    color: rgb(0, 0, 0),
+  })
+  cursorY -= lineHeight * 2
+
+  const drawLine = (line: string) => {
+    if (cursorY < marginBottom) {
+      page = pdfDocument.addPage([pageWidth, pageHeight])
+      cursorY = pageHeight - marginTop
+    }
+
+    if (line.trim()) {
+      page.drawText(line, {
+        x: marginX,
+        y: cursorY,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      })
+    }
+
+    cursorY -= lineHeight
+  }
+
+  contractText
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .forEach((line) => {
+      const wrappedLines = wrapPdfTextLine(line, maxCharactersPerLine)
+      wrappedLines.forEach(drawLine)
+    })
+
+  const pdfBytes = await pdfDocument.save()
+  return `data:application/pdf;base64,${Buffer.from(pdfBytes).toString("base64")}`
 }
 
 const DEFAULT_CONTRACT_SIGNATURE_PAGE = 5
@@ -483,6 +581,7 @@ export async function POST(request: NextRequest) {
   const prefillFields = sanitizePrefillFields(body.prefillFields)
   const fileExtension = getFileExtension(contractUrl || contractName)
   const shouldUseManualFields = isDefaultContractUrl(contractUrl)
+  const shouldConvertTextContract = isTextContractExtension(fileExtension)
 
   if (!originalContractUrl) {
     return NextResponse.json({ error: "Contract file URL is required." }, { status: 400 })
@@ -502,7 +601,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "BoldSign contract sending is PDF-only. Please upload or use a PDF contract for signature.",
+          "BoldSign contract sending requires a PDF. Saved text contracts are automatically converted before sending.",
       },
       { status: 400 }
     )
@@ -515,16 +614,22 @@ export async function POST(request: NextRequest) {
   const personalizedDefaultContractFile = shouldUseManualFields
     ? await createPersonalizedDefaultContractBase64(contractUrl, prefillFields)
     : null
+  const convertedTextContractFile = shouldConvertTextContract
+    ? await createTextContractPdfBase64(contractUrl, contractName)
+    : null
+  const contractBase64File = personalizedDefaultContractFile || convertedTextContractFile
 
   const boldSignPayload = {
     Title: contractName,
     Message: message,
-    ...(personalizedDefaultContractFile
+    ...(contractBase64File
       ? {
           Files: [
             {
-              fileName: "OrdainedPro-Default-Wedding-Contract.pdf",
-              base64: personalizedDefaultContractFile,
+              fileName: personalizedDefaultContractFile
+                ? "OrdainedPro-Default-Wedding-Contract.pdf"
+                : getSafePdfFileName(contractName),
+              base64: contractBase64File,
             },
           ],
         }
