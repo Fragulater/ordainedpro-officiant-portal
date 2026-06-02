@@ -1,15 +1,18 @@
 "use client"
 
+import { useState } from "react"
 import { TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { CalendarDays, FileText, CheckSquare, Plus, Check, Clock, Bell, MapPin, Trash2 } from "lucide-react"
 import { Task } from "@/components/AddTaskDialog"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 export function TasksTab() {
+  const [taskPendingArchive, setTaskPendingArchive] = useState<Task | null>(null)
   const {
     setShowAddTaskDialog,
     taskFilter,
@@ -35,6 +38,12 @@ export function TasksTab() {
   const formatDueLabel = (task: Task) => {
     const dueDate = formatDate(task.dueDate)
     return task.dueTime ? `Due: ${dueDate} at ${task.dueTime}` : `Due: ${dueDate}`
+  }
+
+  const confirmArchiveTask = () => {
+    if (!taskPendingArchive) return
+    handleDeleteTask(taskPendingArchive.id)
+    setTaskPendingArchive(null)
   }
 
   return (
@@ -108,7 +117,7 @@ export function TasksTab() {
                                 variant="ghost"
                                 className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
                                 title="Archive task"
-                                onClick={() => handleDeleteTask(task.id)}
+                                onClick={() => setTaskPendingArchive(task)}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -170,6 +179,48 @@ export function TasksTab() {
                 </div>
               </CardContent>
             </Card>
+            <Dialog open={Boolean(taskPendingArchive)} onOpenChange={(open) => !open && setTaskPendingArchive(null)}>
+              <DialogContent className="max-w-md overflow-hidden border-blue-100 p-0 shadow-xl">
+                <DialogHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-5 text-left">
+                  <DialogTitle className="flex items-center gap-2 text-blue-950">
+                    <Trash2 className="h-5 w-5 text-red-600" />
+                    Archive Task
+                  </DialogTitle>
+                  <DialogDescription className="text-blue-800">
+                    Remove this task from your officiant task list.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 px-6 py-5">
+                  <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                    <p className="text-sm font-semibold text-gray-900">{taskPendingArchive?.task}</p>
+                    {taskPendingArchive?.coupleName && (
+                      <p className="mt-1 text-xs font-medium text-blue-700">{taskPendingArchive.coupleName}</p>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    This will archive the task and remove it from this list. This action cannot be undone from the portal.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                      onClick={() => setTaskPendingArchive(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      className="bg-red-600 text-white hover:bg-red-700"
+                      onClick={confirmArchiveTask}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Archive Task
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
   )
 }

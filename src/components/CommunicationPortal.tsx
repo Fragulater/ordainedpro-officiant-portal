@@ -6246,9 +6246,6 @@ ${cleanOfficiantFirstName}
     const task = tasks.find(t => t.id === taskId)
     if (!task) return
 
-    const confirmed = window.confirm(`Archive this task?\n\n${task.task}`)
-    if (!confirmed) return
-
     setTasks(prev => prev.filter(t => t.id !== taskId))
 
     const result = await deleteTaskFromDB(taskId)
