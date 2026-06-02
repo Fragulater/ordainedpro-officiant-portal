@@ -354,6 +354,7 @@ export function ContractUploadDialog({
   const [smartFieldSearch, setSmartFieldSearch] = useState("")
   const [smartFieldWorkspace, setSmartFieldWorkspace] = useState("")
   const [smartFieldEditorScroll, setSmartFieldEditorScroll] = useState({ top: 0, left: 0 })
+  const [smartFieldEditorRenderKey, setSmartFieldEditorRenderKey] = useState(0)
   const smartFieldWorkspaceRef = useRef<HTMLTextAreaElement | null>(null)
   const smartFieldContext = getSmartFieldContext(ceremonyType)
   const smartFieldWarnings = useMemo(
@@ -623,6 +624,8 @@ export function ContractUploadDialog({
 
       const contractText = await response.text()
       setSmartFieldWorkspace(contractText)
+      setSmartFieldEditorScroll({ top: 0, left: 0 })
+      setSmartFieldEditorRenderKey((currentKey) => currentKey + 1)
       if (!formData.name.trim()) {
         handleInputChange("name", file.name.replace(/\.[^/.]+$/, ""))
       }
@@ -634,7 +637,16 @@ export function ContractUploadDialog({
       setSavedTemplateMessage(`Imported "${file.name}" into the editor.`)
 
       window.setTimeout(() => {
-        smartFieldWorkspaceRef.current?.focus()
+        window.requestAnimationFrame(() => {
+          const editor = smartFieldWorkspaceRef.current
+          if (!editor) return
+
+          editor.scrollTop = 0
+          editor.scrollLeft = 0
+          editor.setSelectionRange(0, 0)
+          editor.focus()
+          setSmartFieldEditorScroll({ top: 0, left: 0 })
+        })
       }, 0)
     } catch (error) {
       console.error("Failed to import saved contract:", error)
@@ -1114,6 +1126,7 @@ export function ContractUploadDialog({
                 </div>
                 <div className="relative min-h-[520px] overflow-hidden rounded-md border border-blue-200 bg-white">
                   <pre
+                    key={`smart-field-highlight-${smartFieldEditorRenderKey}`}
                     aria-hidden="true"
                     className="pointer-events-none absolute inset-0 min-h-[520px] overflow-hidden whitespace-pre-wrap break-words p-3 font-mono text-sm leading-6 text-slate-950"
                   >
@@ -1127,6 +1140,7 @@ export function ContractUploadDialog({
                     </span>
                   </pre>
                   <Textarea
+                    key={`smart-field-editor-${smartFieldEditorRenderKey}`}
                     ref={smartFieldWorkspaceRef}
                     id="smartFieldWorkspace"
                     value={smartFieldWorkspace}
