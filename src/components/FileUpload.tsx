@@ -91,8 +91,8 @@ export function FileUpload({
     return null
   }
 
-  const simulateUpload = (fileId: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
+  const prepareFile = (fileId: string): Promise<void> => {
+    return new Promise((resolve) => {
       let progress = 0
       let notified = false
 
@@ -131,19 +131,6 @@ export function FileUpload({
           ))
         }
       }, 200)
-
-      // Simulate occasional upload failure
-      if (Math.random() < 0.1) {
-        setTimeout(() => {
-          clearInterval(interval)
-          setFiles(prev => prev.map(f =>
-            f.id === fileId
-              ? { ...f, status: 'error' as const, error: 'Upload failed. Please try again.' }
-              : f
-          ))
-          reject(new Error('Upload failed'))
-        }, 1000)
-      }
     })
   }
 
@@ -181,9 +168,9 @@ export function FileUpload({
     for (const file of newFiles) {
       if (file.status !== 'error') {
         try {
-          await simulateUpload(file.id)
+          await prepareFile(file.id)
         } catch (error) {
-          console.error('Upload failed for file:', file.name)
+          console.error('File preparation failed for file:', file.name)
         }
       }
     }
@@ -239,7 +226,7 @@ export function FileUpload({
     ))
 
     try {
-      await simulateUpload(fileId)
+      await prepareFile(fileId)
       const updatedFile = files.find(f => f.id === fileId)
       if (updatedFile) {
         onFilesUploaded([{ ...updatedFile, status: 'completed' }])
@@ -383,7 +370,7 @@ export function FileUpload({
       {files.length > 0 && (
         <div className="mt-6">
           <h4 className="text-lg font-semibold text-gray-900 mb-4">
-            Uploaded Files ({files.length}/{maxFiles})
+            Selected Files ({files.length}/{maxFiles})
           </h4>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -428,7 +415,7 @@ export function FileUpload({
                         {file.status === 'completed' && (
                           <Badge className="bg-green-100 text-green-800 border-green-200">
                             <Check className="w-3 h-3 mr-1" />
-                            Uploaded
+                            Ready
                           </Badge>
                         )}
                         {file.status === 'error' && (

@@ -68,6 +68,26 @@ const getFirstName = (fullName: string | null | undefined): string => {
   return fullName.split(' ')[0] || 'Partner'
 }
 
+const sanitizeStorageFileName = (fileName: string) => {
+  const trimmedName = fileName.trim() || "uploaded-file"
+  const lastDotIndex = trimmedName.lastIndexOf(".")
+  const baseName = lastDotIndex > 0 ? trimmedName.slice(0, lastDotIndex) : trimmedName
+  const extension = lastDotIndex > 0 ? trimmedName.slice(lastDotIndex + 1) : ""
+  const safeBaseName = baseName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120) || "uploaded-file"
+  const safeExtension = extension
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(0, 16)
+
+  return safeExtension ? `${safeBaseName}.${safeExtension}` : safeBaseName
+}
+
 const launchArchiveConfettiOnce = (ceremonyId: number | string) => {
   if (typeof window === "undefined") return
 
@@ -6787,8 +6807,8 @@ ${cleanOfficiantFirstName}
 
       try {
         // Upload file to Supabase Storage
-        const fileExt = file.name.split('.').pop()
-        const filePath = `${currentUser.id}/${editCoupleInfo.id}/${Date.now()}-${file.name}`
+        const safeFileName = sanitizeStorageFileName(file.name)
+        const filePath = `${currentUser.id}/${editCoupleInfo.id}/${Date.now()}-${safeFileName}`
 
         const { error: uploadError } = await supabase.storage
           .from('couple-files')
