@@ -4725,11 +4725,34 @@ ${shareScriptForm.body}`
     window.open(script.marketplaceUrl || `${marketplaceBaseUrl}/scripts/${script.id}`, "_blank", "noopener,noreferrer")
   }
 
+  const getCurrentCoupleRecipientEmails = () => {
+    const activeCouple = allCouples[activeCoupleIndex]
+    const matchingCouple = editCoupleInfo?.id
+      ? allCouples.find((couple: any) => String(couple.id) === String(editCoupleInfo.id))
+      : null
+    const source = {
+      ...activeCouple,
+      ...matchingCouple,
+      ...editCoupleInfo,
+    }
+
+    return [
+      source?.brideEmail,
+      source?.groomEmail,
+      source?.bride_email,
+      source?.groom_email,
+      source?.primaryEmail,
+      source?.secondaryEmail,
+      source?.email,
+    ]
+      .map((email) => String(email || "").trim())
+      .filter(Boolean)
+      .filter((email, index, all) => all.indexOf(email) === index)
+  }
+
   const getContractEmailRecipients = () => {
     if (emailForm.to === "both") {
-      return [editCoupleInfo?.brideEmail, editCoupleInfo?.groomEmail]
-        .filter((email): email is string => Boolean(email?.trim()))
-        .filter((email, index, all) => all.indexOf(email) === index)
+      return getCurrentCoupleRecipientEmails()
     }
 
     if (emailForm.to) {
@@ -6757,15 +6780,18 @@ ${cleanOfficiantFirstName}
 
     try {
       // Get couple info
-      const coupleId = editCoupleInfo.id
-      const coupleName = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
-      const brideEmail = editCoupleInfo.brideEmail
-      const groomEmail = editCoupleInfo.groomEmail
+      const coupleId = editCoupleInfo?.id || allCouples[activeCoupleIndex]?.id
+      const coupleName = `${editCoupleInfo?.brideName || allCouples[activeCoupleIndex]?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || allCouples[activeCoupleIndex]?.groomName || 'Partner 2'}`
 
       // Determine recipient emails
-      const recipientEmails = [brideEmail, groomEmail].filter(Boolean)
+      const recipientEmails = getCurrentCoupleRecipientEmails()
 
-      console.log("[SCRIPT]Â§ Sending message to:", { coupleId, coupleName, recipientEmails, message: newMessage })
+      if (recipientEmails.length === 0) {
+        alert("No recipient email is saved for this ceremony. Add a primary or secondary contact email before sending a message.")
+        return
+      }
+
+      console.log("[SCRIPT]Â§ Sending message to:", { coupleId, coupleName, recipientEmails, message: outgoingMessage })
 
       // 1. Save message to Supabase
       if (currentUser) {
@@ -6886,6 +6912,9 @@ ${cleanOfficiantFirstName}
       }
       if (emailErrors.length > 0) {
         console.warn(`[WARNING]Â Ã¯Â¸Â Some emails failed:`, emailErrors)
+        if (emailsSent === 0) {
+          alert(`Message saved in the portal, but email delivery failed: ${emailErrors.join("; ")}`)
+        }
       }
 
     } catch (error) {
