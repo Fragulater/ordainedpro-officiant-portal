@@ -254,6 +254,11 @@ const getSmartFieldWarnings = (content: string) => {
   return warnings
 }
 
+const getSmartFieldTags = (content: string) => {
+  const tags = content.match(/{{[^}\n]+}}?/g) || []
+  return Array.from(new Set(tags))
+}
+
 const formatSavedContractSize = (size?: number | null) => {
   if (!size) return "0 KB"
   if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
@@ -341,6 +346,7 @@ export function ContractUploadDialog({
   const [savedContracts, setSavedContracts] = useState<SavedContractFile[]>([])
   const [isLoadingSavedContracts, setIsLoadingSavedContracts] = useState(false)
   const [savedContractsError, setSavedContractsError] = useState("")
+  const [savedTemplateMessage, setSavedTemplateMessage] = useState("")
   const [attorneyReviewChecked, setAttorneyReviewChecked] = useState(false)
   const [uploadedAttorneyReviewChecked, setUploadedAttorneyReviewChecked] = useState(false)
   const [smartFieldGroup, setSmartFieldGroup] = useState("Recommended Fields")
@@ -350,6 +356,10 @@ export function ContractUploadDialog({
   const smartFieldContext = getSmartFieldContext(ceremonyType)
   const smartFieldWarnings = useMemo(
     () => getSmartFieldWarnings(smartFieldWorkspace),
+    [smartFieldWorkspace]
+  )
+  const smartFieldTagMatches = useMemo(
+    () => getSmartFieldTags(smartFieldWorkspace),
     [smartFieldWorkspace]
   )
   const filteredSmartFields = useMemo(() => {
@@ -377,6 +387,19 @@ export function ContractUploadDialog({
 
   const contractTypes = [
     "Wedding Service Agreement",
+    "Elopement Service Agreement",
+    "Vow Renewal Service Agreement",
+    "Coming-of-Age Ceremony Agreement",
+    "Quinceanera Ceremony Agreement",
+    "Sweet 16 Ceremony Agreement",
+    "Baby Blessing or Naming Ceremony Agreement",
+    "Celebration of Life Service Agreement",
+    "Memorial Service Agreement",
+    "Funeral Officiant Service Agreement",
+    "Graveside Service Agreement",
+    "Interfaith Ceremony Agreement",
+    "Spiritual Ceremony Agreement",
+    "Non-Religious Ceremony Agreement",
     "Photography Permission Release",
     "Music Selection Agreement",
     "Venue Requirements Form",
@@ -403,6 +426,7 @@ export function ContractUploadDialog({
     setSmartFieldGroup("Recommended Fields")
     setSmartFieldSearch("")
     setSmartFieldWorkspace("")
+    setSavedTemplateMessage("")
     setContractMode(allowDefaultContract ? "default" : "custom")
     setIsAddingDefaultContract(false)
     setIsSavingUploadedContractAcknowledgment(false)
@@ -509,16 +533,19 @@ export function ContractUploadDialog({
     window.open(file.url, "_blank", "noopener,noreferrer")
   }
 
-  const saveTaggedTemplateToFiles = async () => {
+  const saveTaggedTemplateToFiles = async (overwriteExisting = false, existingFileId = "", nameOverride = "") => {
     if (!smartFieldWorkspace.trim()) return
 
     const suggestedName = formData.name?.trim() || "Tagged Contract Template"
-    const contractName = window.prompt("Name this contract before saving it to My Files:", suggestedName)
+    const contractName = overwriteExisting
+      ? nameOverride || suggestedName
+      : window.prompt("Name this contract before saving it to My Files:", suggestedName)
     const cleanName = contractName?.trim()
 
     if (!cleanName) return
 
     setIsSavingTemplateToFiles(true)
+    setSavedTemplateMessage("")
 
     try {
       const savedName = cleanName.toLowerCase().endsWith(".txt") ? cleanName : `${cleanName}.txt`
@@ -528,6 +555,10 @@ export function ContractUploadDialog({
       formData.append("file", blob, savedName)
       formData.append("name", savedName)
       formData.append("folder", "contracts")
+      if (overwriteExisting) {
+        formData.append("overwriteExisting", "true")
+        if (existingFileId) formData.append("existingFileId", existingFileId)
+      }
 
       const response = await fetch("/api/user-files", {
         method: "POST",
@@ -535,12 +566,27 @@ export function ContractUploadDialog({
       })
       const result = await response.json().catch(() => ({}))
 
+      if (response.status === 409 && result?.duplicate) {
+        const shouldOverwrite = window.confirm(
+          `A saved contract named "${result.existingFile?.name || savedName}" already exists. Overwrite the current saved document?`
+        )
+
+        if (shouldOverwrite) {
+          await saveTaggedTemplateToFiles(true, result.existingFile?.id ? String(result.existingFile.id) : "", cleanName)
+        }
+        return
+      }
+
       if (!response.ok) {
         throw new Error(result.error || "Unable to save this contract to My Files.")
       }
 
       window.dispatchEvent(new CustomEvent("ordainedpro:user-files-updated"))
-      alert("Contract saved to My Files.")
+      setSavedTemplateMessage(
+        result.action === "updated"
+          ? "Saved contract updated in My Files."
+          : "Contract saved to My Files."
+      )
     } catch (error) {
       console.error("Failed to save contract template to My Files:", error)
       alert(error instanceof Error ? error.message : "Unable to save this contract to My Files.")
@@ -912,7 +958,7 @@ export function ContractUploadDialog({
                       type="button"
                       variant="outline"
                       className="h-8 border-blue-200 text-blue-700 hover:bg-blue-50"
-                      onClick={saveTaggedTemplateToFiles}
+                      onClick={() => saveTaggedTemplateToFiles()}
                       disabled={!smartFieldWorkspace.trim() || isSavingTemplateToFiles}
                     >
                       {isSavingTemplateToFiles ? "Saving..." : "Save in My Files"}
@@ -940,6 +986,26 @@ export function ContractUploadDialog({
                     className="relative min-h-[520px] resize-y border-0 bg-white p-3 font-mono text-sm leading-6 text-slate-950 caret-blue-700 shadow-none selection:bg-blue-200 focus-visible:ring-2 focus-visible:ring-blue-300"
                   />
                 </div>
+                {smartFieldTagMatches.length > 0 && (
+                  <div className="mt-3 rounded-md border border-blue-100 bg-blue-50 p-3">
+                    <p className="text-xs font-semibold text-blue-950">Smart fields detected</p>
+                    <div className="mt-2 flex max-h-28 flex-wrap gap-2 overflow-y-auto">
+                      {smartFieldTagMatches.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded bg-white px-2 py-1 font-mono text-xs font-semibold text-blue-700 shadow-sm"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {savedTemplateMessage && (
+                  <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
+                    {savedTemplateMessage}
+                  </div>
+                )}
                 <p className="mt-3 text-xs leading-5 text-blue-800">
                   Layout tip: once your template is tagged, paste it back into Word or Google Docs and export the finished contract as a PDF before uploading. The PDF layout is the layout BoldSign uses.
                 </p>

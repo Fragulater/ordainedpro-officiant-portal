@@ -28,6 +28,16 @@ function sanitizeFileName(name: string) {
   return cleanName.replace(/[^a-z0-9._-]+/gi, "-").replace(/-+/g, "-")
 }
 
+function getStoragePathFromPublicUrl(url?: string | null) {
+  if (!url) return null
+
+  const marker = `/storage/v1/object/public/${USER_DOCUMENTS_BUCKET}/`
+  const markerIndex = url.indexOf(marker)
+  if (markerIndex === -1) return null
+
+  return decodeURIComponent(url.slice(markerIndex + marker.length))
+}
+
 async function ensureUserDocumentsBucket(supabaseAdmin: ReturnType<typeof getSupabaseAdmin>) {
   const { data: buckets } = await supabaseAdmin.storage.listBuckets()
   const bucketExists = buckets?.some((bucket) => bucket.id === USER_DOCUMENTS_BUCKET)
@@ -92,6 +102,8 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file")
     const requestedName = String(formData.get("name") || "")
     const folder = sanitizeFileName(String(formData.get("folder") || "dashboard")).replace(/\./g, "")
+    const overwriteExisting = String(formData.get("overwriteExisting") || "") === "true"
+    const existingFileId = String(formData.get("existingFileId") || "")
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Missing document file." }, { status: 400 })
@@ -106,6 +118,34 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin()
 
     await ensureUserDocumentsBucket(supabaseAdmin)
+
+    const { data: matchingFiles, error: matchError } = await supabaseAdmin
+      .from("user_files")
+      .select("id, name, url")
+      .eq("user_id", user.id)
+      .ilike("name", savedName)
+
+    if (matchError) {
+      throw new Error(`Document lookup failed: ${matchError.message}`)
+    }
+
+    const existingFile = matchingFiles?.find((item) =>
+      existingFileId ? String(item.id) === existingFileId : item.name.toLowerCase() === savedName.toLowerCase()
+    )
+
+    if (existingFile && !overwriteExisting) {
+      return NextResponse.json(
+        {
+          error: "A saved document with this name already exists.",
+          duplicate: true,
+          existingFile: {
+            id: existingFile.id,
+            name: existingFile.name,
+          },
+        },
+        { status: 409 }
+      )
+    }
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from(USER_DOCUMENTS_BUCKET)
@@ -122,16 +162,32 @@ export async function POST(request: NextRequest) {
       .from(USER_DOCUMENTS_BUCKET)
       .getPublicUrl(storagePath)
 
-    const { data, error: insertError } = await supabaseAdmin
-      .from("user_files")
-      .insert({
-        user_id: user.id,
-        name: savedName,
-        type: contentType,
-        size: fileBuffer.byteLength,
-        url: urlData.publicUrl,
-        created_at: new Date().toISOString(),
-      })
+    const savedAt = new Date().toISOString()
+    const oldStoragePath = getStoragePathFromPublicUrl(existingFile?.url)
+    const saveQuery = existingFile
+      ? supabaseAdmin
+          .from("user_files")
+          .update({
+            name: savedName,
+            type: contentType,
+            size: fileBuffer.byteLength,
+            url: urlData.publicUrl,
+            created_at: savedAt,
+          })
+          .eq("id", existingFile.id)
+          .eq("user_id", user.id)
+      : supabaseAdmin
+          .from("user_files")
+          .insert({
+            user_id: user.id,
+            name: savedName,
+            type: contentType,
+            size: fileBuffer.byteLength,
+            url: urlData.publicUrl,
+            created_at: savedAt,
+          })
+
+    const { data, error: insertError } = await saveQuery
       .select("id, name, type, size, url, created_at")
       .single()
 
@@ -139,7 +195,17 @@ export async function POST(request: NextRequest) {
       throw new Error(`Document save failed: ${insertError.message}`)
     }
 
-    return NextResponse.json({ ok: true, file: data })
+    if (oldStoragePath && oldStoragePath !== storagePath) {
+      const { error: removeError } = await supabaseAdmin.storage
+        .from(USER_DOCUMENTS_BUCKET)
+        .remove([oldStoragePath])
+
+      if (removeError) {
+        console.error("Old saved document cleanup failed:", removeError)
+      }
+    }
+
+    return NextResponse.json({ ok: true, file: data, action: existingFile ? "updated" : "created" })
   } catch (error) {
     console.error("User file save error:", error)
     return NextResponse.json(

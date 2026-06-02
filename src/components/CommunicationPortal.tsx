@@ -4434,8 +4434,8 @@ ${shareScriptForm.body}`)
         setEmailForm({
           to: '',
           customEmail: '',
-          subject: "Wedding Contract",
-          body: `Hi,\n\nThank you for trusting me with your wedding ceremony. Please review and sign the wedding contract using the secure link from BoldSign.\n\nIf anything looks incorrect or you have questions before signing, reply to this message and I will be happy to help.\n\nThank you,\n${officiantLabel}`
+          subject: "Contract for Signature",
+          body: `Hi,\n\nThank you for trusting me with your ceremony. Please review and sign the contract using the secure link from BoldSign.\n\nIf anything looks incorrect or you have questions before signing, reply to this message and I will be happy to help.\n\nThank you,\n${officiantLabel}`
         })
         setShowSendContractDialog(true)
         console.log('Opening send dialog for contract:', contract.name)
@@ -5377,8 +5377,14 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
 
       // Add contract to the list immediately
       setContracts(prev => [...prev, newContract as any])
-      setViewingContract(newContract as any)
-      setShowContractViewerDialog(true)
+      setSendingContract(newContract as any)
+      setEmailForm({
+        to: '',
+        customEmail: '',
+        subject: "Contract for Signature",
+        body: `Hi,\n\nThank you for trusting me with your ceremony. Please review and sign the contract using the secure link from BoldSign.\n\nIf anything looks incorrect or you have questions before signing, reply to this message and I will be happy to help.\n\nThank you,\n${officiantLabel}`
+      })
+      setShowSendContractDialog(true)
 
       console.log("Ã¢Å“â€¦ Contract uploaded:", newContract)
 
