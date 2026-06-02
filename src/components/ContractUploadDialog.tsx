@@ -15,6 +15,7 @@ import {
   Download,
   Eye,
   FileBadge,
+  FileInput,
   FileSignature,
   FileText,
   FolderOpen,
@@ -350,6 +351,7 @@ export function ContractUploadDialog({
   const [savedContracts, setSavedContracts] = useState<SavedContractFile[]>([])
   const [isLoadingSavedContracts, setIsLoadingSavedContracts] = useState(false)
   const [savedContractsError, setSavedContractsError] = useState("")
+  const [importingSavedContractId, setImportingSavedContractId] = useState<string | number | null>(null)
   const [savedTemplateMessage, setSavedTemplateMessage] = useState("")
   const [attorneyReviewChecked, setAttorneyReviewChecked] = useState(false)
   const [uploadedAttorneyReviewChecked, setUploadedAttorneyReviewChecked] = useState(false)
@@ -580,6 +582,46 @@ export function ContractUploadDialog({
   const openSavedContract = (file: SavedContractFile) => {
     if (!file.url) return
     window.open(file.url, "_blank", "noopener,noreferrer")
+  }
+
+  const importSavedContractToEditor = async (file: SavedContractFile) => {
+    if (!file.url) return
+
+    const fileType = getSavedContractType(file)
+    if (fileType !== "TXT") {
+      alert("Only saved text contracts can be imported into the editor. PDFs can be viewed or downloaded.")
+      return
+    }
+
+    setImportingSavedContractId(file.id)
+
+    try {
+      const response = await fetch(file.url, { cache: "no-store" })
+      if (!response.ok) {
+        throw new Error("Unable to load this saved contract.")
+      }
+
+      const contractText = await response.text()
+      setSmartFieldWorkspace(contractText)
+      if (!formData.name.trim()) {
+        handleInputChange("name", file.name.replace(/\.[^/.]+$/, ""))
+      }
+      if (!formData.type) {
+        handleInputChange("type", "Custom Contract")
+      }
+      setContractMode("custom")
+      setShowSavedContractsDialog(false)
+      setSavedTemplateMessage(`Imported "${file.name}" into the editor.`)
+
+      window.setTimeout(() => {
+        smartFieldWorkspaceRef.current?.focus()
+      }, 0)
+    } catch (error) {
+      console.error("Failed to import saved contract:", error)
+      alert(error instanceof Error ? error.message : "Unable to import this saved contract.")
+    } finally {
+      setImportingSavedContractId(null)
+    }
   }
 
   const saveTaggedTemplateToFiles = async (overwriteExisting = false, existingFileId = "", nameOverride = "") => {
@@ -1448,6 +1490,16 @@ export function ContractUploadDialog({
                       >
                         <Download className="mr-1 h-3.5 w-3.5" />
                         Download
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 border-purple-200 bg-white text-purple-700 hover:bg-purple-50"
+                        onClick={() => importSavedContractToEditor(file)}
+                        disabled={!file.url || getSavedContractType(file) !== "TXT" || importingSavedContractId === file.id}
+                      >
+                        <FileInput className="mr-1 h-3.5 w-3.5" />
+                        {importingSavedContractId === file.id ? "Importing..." : "Import to Editor"}
                       </Button>
                     </div>
                   </div>
