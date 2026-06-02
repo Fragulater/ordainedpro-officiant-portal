@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useMemo, useRef } from "react"
 import { TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -20,6 +21,14 @@ type ConversationMessage = {
   sender?: string
   message?: string
   timestamp?: string
+  createdAt?: string
+  created_at?: string
+}
+
+const getMessageDateValue = (message: ConversationMessage) => {
+  const rawDate = message.createdAt || message.created_at
+  const time = rawDate ? Date.parse(rawDate) : Number.NaN
+  return Number.isFinite(time) ? time : null
 }
 
 export function MessagesTab() {
@@ -51,13 +60,57 @@ export function MessagesTab() {
     currentUser,
   } = useCommunicationPortal()
 
-  const conversationMessages: ConversationMessage[] = displayMessages || messages
+  const rawConversationMessages: ConversationMessage[] = displayMessages || messages
+  const conversationMessages = useMemo(
+    () =>
+      [...rawConversationMessages].sort((a, b) => {
+        const aTime = getMessageDateValue(a)
+        const bTime = getMessageDateValue(b)
+
+        if (aTime !== null && bTime !== null) return aTime - bTime
+        if (aTime !== null) return -1
+        if (bTime !== null) return 1
+        return 0
+      }),
+    [rawConversationMessages]
+  )
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null)
+  const shouldStickToBottomRef = useRef(true)
   const canSendMessage = newMessage.trim().length > 0 || messageAttachments.length > 0
 
   const submitMessage = () => {
     if (!canSendMessage || isSendingMessage) return
+    shouldStickToBottomRef.current = true
     handleSendMessage()
   }
+
+  const scrollMessagesToBottom = (behavior: ScrollBehavior = "auto") => {
+    const element = messagesScrollRef.current
+    if (!element) return
+
+    element.scrollTo({
+      top: element.scrollHeight,
+      behavior,
+    })
+  }
+
+  const handleMessagesScroll = () => {
+    const element = messagesScrollRef.current
+    if (!element) return
+
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight
+    shouldStickToBottomRef.current = distanceFromBottom < 48
+  }
+
+  useEffect(() => {
+    if (!shouldStickToBottomRef.current) return
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      scrollMessagesToBottom()
+    })
+
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [conversationMessages.length])
 
   const upcomingMeetings = meetings
     .filter((meeting) => {
@@ -89,7 +142,11 @@ export function MessagesTab() {
                     <CardDescription>Stay connected with your couple throughout the planning process</CardDescription>
                   </CardHeader>
                   <CardContent className="p-6">
-                    <div className="space-y-4 max-h-96 overflow-y-auto mb-6">
+                    <div
+                      ref={messagesScrollRef}
+                      onScroll={handleMessagesScroll}
+                      className="space-y-4 max-h-96 overflow-y-auto overflow-x-hidden mb-6"
+                    >
                       {conversationMessages.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
                           <MessageCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
@@ -98,20 +155,20 @@ export function MessagesTab() {
                         </div>
                       ) : (
                         conversationMessages.map((message) => (
-                          <div key={message.id} className={`flex space-x-3 ${message.role === 'officiant' ? 'justify-end' : ''}`}>
+                          <div key={message.id} className={`flex min-w-0 space-x-3 ${message.role === 'officiant' ? 'justify-end' : ''}`}>
                             {message.role !== 'officiant' && (
                               <Avatar className="ring-2 ring-blue-100">
                                 <AvatarImage src={message.avatar} />
                                 <AvatarFallback className="bg-blue-500 text-white">{message.sender?.split(' ').map((n: string) => n[0]).join('') || '?'}</AvatarFallback>
                               </Avatar>
                             )}
-                            <div className={`flex-1 max-w-xs lg:max-w-md ${message.role === 'officiant' ? 'order-first' : ''}`}>
+                            <div className={`flex-1 min-w-0 max-w-xs lg:max-w-md ${message.role === 'officiant' ? 'order-first' : ''}`}>
                               <div className={`p-4 rounded-xl shadow-sm ${
                                 message.role === 'officiant'
                                   ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white ml-auto'
                                   : 'bg-white border border-gray-200 text-gray-900'
                               }`}>
-                                <p className="text-sm leading-relaxed">{message.message}</p>
+                                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.message}</p>
                               </div>
                               <p className="text-xs text-gray-500 mt-2 flex items-center">
                                 <span className="font-medium">{message.sender}</span>
