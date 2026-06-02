@@ -18,6 +18,7 @@ import {
   loadAllTasks as loadAllTasksFromDB,
   addTask as addTaskToDB,
   updateTask as updateTaskInDB,
+  deleteTask as deleteTaskFromDB,
   loadFiles as loadFilesFromDB,
   addFile as addFileToDB,
   deleteFile as deleteFileFromDB,
@@ -6241,6 +6242,24 @@ ${cleanOfficiantFirstName}
     }
   }
 
+  const handleDeleteTask = async (taskId: number) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+
+    const confirmed = window.confirm(`Archive this task?\n\n${task.task}`)
+    if (!confirmed) return
+
+    setTasks(prev => prev.filter(t => t.id !== taskId))
+
+    const result = await deleteTaskFromDB(taskId)
+
+    if (!result.ok) {
+      console.error("Failed to archive task:", result.error)
+      setTasks(prev => [...prev, task])
+      alert("Failed to archive task. Please try again.")
+    }
+  }
+
   const getFilteredTasks = () => {
     const sortedTasks = [...tasks].sort((firstTask, secondTask) => {
       if (firstTask.completed !== secondTask.completed) return firstTask.completed ? 1 : -1
@@ -7859,6 +7878,7 @@ ${officiantProfile?.name || "Your officiant"}`)
     scheduleEmailNotification,
     generateTaskReminderEmail,
     toggleTaskCompletion,
+    handleDeleteTask,
     getFilteredTasks,
     getPriorityColor,
     getPriorityIcon,

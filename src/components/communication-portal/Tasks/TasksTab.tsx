@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarDays, FileText, CheckSquare, Plus, Check, Clock, Bell, MapPin } from "lucide-react"
+import { CalendarDays, FileText, CheckSquare, Plus, Check, Clock, Bell, MapPin, Trash2 } from "lucide-react"
 import { Task } from "@/components/AddTaskDialog"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
@@ -16,6 +16,7 @@ export function TasksTab() {
     setTaskFilter,
     tasks,
     toggleTaskCompletion,
+    handleDeleteTask,
     getFilteredTasks,
     getPriorityColor,
     getPriorityIcon,
@@ -97,9 +98,21 @@ export function TasksTab() {
                                 {task.coupleName || "Ceremony profile"}
                               </p>
                             </div>
-                            <Badge className={getPriorityColor(task.priority)}>
-                              {getPriorityIcon(task.priority)} {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge className={getPriorityColor(task.priority)}>
+                                {getPriorityIcon(task.priority)} {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                              </Badge>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                title="Archive task"
+                                onClick={() => handleDeleteTask(task.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
