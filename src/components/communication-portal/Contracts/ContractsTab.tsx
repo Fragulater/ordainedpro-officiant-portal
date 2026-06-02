@@ -19,6 +19,14 @@ export function ContractsTab() {
     return ["draft", "pending"].includes(normalizedStatus)
   }
 
+  const isOrdainedProDefaultContract = (contract: any) => {
+    const fileUrl = contract?.fileUrl || contract?.file_url || contract?.file?.url || ""
+    return (
+      contract?.name === "OrdainedPro Default Wedding Contract" ||
+      String(fileUrl).includes("/contracts/ordainedpro-default-contract")
+    )
+  }
+
   const getContractStatusLabel = (status?: string) => {
     const normalizedStatus = String(status || "draft").toLowerCase()
     if (normalizedStatus === "signed") return "Signed"
@@ -102,7 +110,7 @@ export function ContractsTab() {
                                 <Trash2 className="w-4 h-4 mr-1" />
                                 Delete
                               </Button>
-                              {isEditablePendingContract(contract.status) ? (
+                              {isEditablePendingContract(contract.status) && !isOrdainedProDefaultContract(contract) ? (
                                 <Button
                                   size="sm"
                                   className="bg-purple-500 hover:bg-purple-600"
