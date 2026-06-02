@@ -5446,7 +5446,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     }
   }
 
-  const handleContractUploaded = async (contractData: Omit<Contract, 'id' | 'createdDate'>) => {
+  const handleContractUploaded = async (contractData: Omit<Contract, 'id' | 'createdDate'> & { templateContent?: string }) => {
     if (!currentUser?.id || !editCoupleInfo?.id) {
       console.error("Ã¢ÂÅ’ Cannot upload contract: No user or couple selected")
       return
@@ -5455,24 +5455,30 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     console.log("[SCRIPT]Å“ Uploading contract for couple:", editCoupleInfo.id)
 
     const uploadedFile = contractData.file
-    if (!uploadedFile?.file) {
-      alert("Please upload a contract file before saving.")
+    const templateContent = contractData.templateContent?.trim()
+    if (!uploadedFile?.file && !templateContent) {
+      alert("Please upload a contract file or paste/import contract text before saving.")
       return
     }
 
-    const fileExt = uploadedFile.name.split(".").pop() || "file"
-    if (fileExt.toLowerCase() !== "pdf") {
+    const fileExt = templateContent ? "txt" : uploadedFile?.name.split(".").pop() || "file"
+    if (!templateContent && fileExt.toLowerCase() !== "pdf") {
       alert("Contracts must be uploaded as PDF files. Please export your contract to PDF and upload it again.")
       return
     }
 
+    const contractFile = templateContent
+      ? new File([contractData.templateContent || ""], `${contractData.name || "contract"}.txt`, { type: "text/plain;charset=utf-8" })
+      : uploadedFile!.file
     const fileName = `${Date.now()}_${currentUser.id}.${fileExt}`
     const filePath = `${currentUser.id}/${fileName}`
 
     const { error: uploadError } = await supabase.storage
       .from("contracts")
-      .upload(filePath, uploadedFile.file, {
-        contentType: uploadedFile.type || uploadedFile.file.type || "application/octet-stream",
+      .upload(filePath, contractFile, {
+        contentType: templateContent
+          ? "text/plain;charset=utf-8"
+          : uploadedFile?.type || uploadedFile?.file.type || "application/octet-stream",
         upsert: true
       })
 
@@ -5493,8 +5499,8 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
       type: contractData.type || "Custom Contract",
       expiryDate: contractData.expiryDate || "",
       fileUrl: publicUrlData.publicUrl,
-      fileType: uploadedFile.type || uploadedFile.file.type || "application/octet-stream",
-      fileSize: uploadedFile.size || uploadedFile.file.size || 0,
+      fileType: templateContent ? "text/plain" : uploadedFile?.type || uploadedFile?.file.type || "application/octet-stream",
+      fileSize: contractFile.size || uploadedFile?.size || uploadedFile?.file.size || 0,
       status: contractData.status || 'draft'
     })
 
@@ -5506,10 +5512,15 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
         createdDate: new Date().toLocaleDateString(),
         status: contractData.status || 'draft',
         fileUrl: result.data.file_url || publicUrlData.publicUrl,
-        fileType: result.data.file_type || uploadedFile.type || uploadedFile.file.type,
-        fileSize: result.data.file_size || uploadedFile.size || uploadedFile.file.size,
+        fileType: result.data.file_type || (templateContent ? "text/plain" : uploadedFile?.type || uploadedFile?.file.type),
+        fileSize: result.data.file_size || contractFile.size || uploadedFile?.size || uploadedFile?.file.size,
         file: {
-          ...uploadedFile,
+          ...(uploadedFile || {}),
+          id: uploadedFile?.id || `contract-text-${Date.now()}`,
+          file: contractFile,
+          name: templateContent ? `${contractData.name || "Contract"}.txt` : uploadedFile?.name || contractData.name,
+          size: contractFile.size,
+          type: templateContent ? "text/plain" : uploadedFile?.type || uploadedFile?.file.type || "application/octet-stream",
           url: result.data.file_url || publicUrlData.publicUrl,
           status: "completed" as const,
           uploadProgress: 100

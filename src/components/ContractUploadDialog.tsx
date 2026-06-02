@@ -298,7 +298,7 @@ export interface Contract {
 interface ContractUploadDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  onContractUploaded: (contract: Omit<Contract, "id" | "createdDate">) => void
+  onContractUploaded: (contract: Omit<Contract, "id" | "createdDate"> & { templateContent?: string }) => void
   onContractUpdated?: (contractId: number, contract: Omit<Contract, "id" | "createdDate"> & { templateContent?: string }) => Promise<{ ok: boolean; error?: string } | void>
   editingContract?: Contract | null
   onUseDefaultContract?: () => Promise<{ ok: boolean; error?: string; alreadyExists?: boolean } | void>
@@ -522,8 +522,8 @@ export function ContractUploadDialog({
       newErrors.type = "Contract type is required"
     }
 
-    if (uploadedFiles.length === 0) {
-      newErrors.file = "Please upload a contract file"
+    if (uploadedFiles.length === 0 && !smartFieldWorkspace.trim()) {
+      newErrors.file = "Please upload a contract file or paste/import contract text into the editor"
     }
 
     setErrors(newErrors)
@@ -836,7 +836,8 @@ export function ContractUploadDialog({
 
     onContractUploaded({
       ...formData,
-      file: uploadedFiles[0]
+      file: uploadedFiles[0],
+      templateContent: smartFieldWorkspace
     })
 
     resetForm()
@@ -1425,7 +1426,7 @@ export function ContractUploadDialog({
               isAddingDefaultContract ||
               isSavingUploadedContractAcknowledgment ||
               (contractMode === "default" && !hasAcceptedDefaultContractLegal && !attorneyReviewChecked) ||
-              (contractMode === "custom" && !editingContract && (!formData.name || !formData.type || uploadedFiles.length === 0 || !uploadedAttorneyReviewChecked)) ||
+              (contractMode === "custom" && !editingContract && (!formData.name || !formData.type || (!uploadedFiles.length && !smartFieldWorkspace.trim()) || !uploadedAttorneyReviewChecked)) ||
               (contractMode === "custom" && Boolean(editingContract) && (!formData.name || !formData.type))
             }
           >
