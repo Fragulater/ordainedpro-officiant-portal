@@ -732,7 +732,7 @@ export function ContractUploadDialog({
             </div>
           )}
 
-          {(contractMode === "default" || contractMode === "custom") && (
+          {contractMode === "default" && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
               <h4 className="font-semibold text-blue-900 mb-1">Reusable Contract Prefill Values</h4>
               <p className="text-sm text-blue-800 mb-4">
