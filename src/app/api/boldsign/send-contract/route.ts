@@ -46,6 +46,33 @@ const CUSTOM_CONTRACT_PREFILL_FIELD_IDS = new Set([
   "bride_email",
   "groom_email",
   "mailing_addr",
+  "parent_guardian_1_name",
+  "parent_guardian_1_phone",
+  "parent_guardian_1_email",
+  "parent_guardian_1_signature_date",
+  "parent_guardian_2_name",
+  "parent_guardian_2_phone",
+  "parent_guardian_2_email",
+  "parent_guardian_2_signature_date",
+  "honoree_full_name",
+  "honoree_first_name",
+  "honoree_age",
+  "honoree_birthday",
+  "honoree_celebration_type",
+  "deceased_full_name",
+  "deceased_first_name",
+  "deceased_date_of_birth",
+  "deceased_date_of_passing",
+  "memorial_service_date",
+  "memorial_service_time",
+  "memorial_venue_name",
+  "memorial_venue_address",
+  "primary_family_contact_name",
+  "secondary_family_contact_name",
+  "primary_family_contact_phone",
+  "primary_family_contact_email",
+  "primary_family_contact_signature_date",
+  "secondary_family_contact_signature_date",
 ])
 
 const CUSTOM_CONTRACT_TAG_GUIDANCE =
@@ -118,23 +145,80 @@ function getSafePdfFileName(contractName: string) {
   return `${safeName}.pdf`
 }
 
+const BOLDSIGN_TEXT_TAG_PATTERN = /{{[\s\S]*?}}/g
+const VALID_BOLDSIGN_TEXT_TAG_PATTERN =
+  /{{(?:text|sign|date|editdate|init|title|company)\|[1-9]\d*\|(?:\*| )\|[^{}\n|]*\|[A-Za-z0-9_-]+}}/g
+const VALID_BOLDSIGN_TEXT_TAG_EXACT_PATTERN =
+  /^{{(?:text|sign|date|editdate|init|title|company)\|[1-9]\d*\|(?:\*| )\|[^{}\n|]*\|[A-Za-z0-9_-]+}}$/
+
+function normalizeBoldSignTextTags(text: string) {
+  return text.replace(BOLDSIGN_TEXT_TAG_PATTERN, (tag) =>
+    tag
+      .replace(/\r?\n\s*/g, "")
+      .replace(/\t+/g, " ")
+  )
+}
+
+function getTextTagSummary(text: string) {
+  const allTags = text.match(BOLDSIGN_TEXT_TAG_PATTERN) || []
+  const validTags = text.match(VALID_BOLDSIGN_TEXT_TAG_PATTERN) || []
+  const invalidTags = allTags.filter((tag) => !VALID_BOLDSIGN_TEXT_TAG_EXACT_PATTERN.test(tag))
+  const signatureTags = validTags.filter((tag) => tag.startsWith("{{sign|"))
+
+  return {
+    totalTags: allTags.length,
+    validTags: validTags.length,
+    signatureTags: signatureTags.length,
+    invalidTags,
+  }
+}
+
+function splitLineForPdfWrap(line: string) {
+  const tokens: string[] = []
+  let lastIndex = 0
+
+  line.replace(BOLDSIGN_TEXT_TAG_PATTERN, (tag, index) => {
+    if (index > lastIndex) {
+      tokens.push(...line.slice(lastIndex, index).match(/\S+\s*|\s+/g) || [])
+    }
+
+    tokens.push(tag)
+    lastIndex = index + tag.length
+    return tag
+  })
+
+  if (lastIndex < line.length) {
+    tokens.push(...line.slice(lastIndex).match(/\S+\s*|\s+/g) || [])
+  }
+
+  return tokens
+}
+
 function wrapPdfTextLine(line: string, maxCharacters: number) {
   if (line.length <= maxCharacters) return [line]
 
   const wrappedLines: string[] = []
-  let remainingLine = line
+  let currentLine = ""
 
-  while (remainingLine.length > maxCharacters) {
-    const breakIndex = Math.max(
-      remainingLine.lastIndexOf(" ", maxCharacters),
-      remainingLine.lastIndexOf("\t", maxCharacters)
-    )
-    const sliceIndex = breakIndex > 20 ? breakIndex : maxCharacters
-    wrappedLines.push(remainingLine.slice(0, sliceIndex).trimEnd())
-    remainingLine = remainingLine.slice(sliceIndex).trimStart()
+  splitLineForPdfWrap(line).forEach((token) => {
+    if (!currentLine) {
+      currentLine = token.trimStart()
+      return
+    }
+
+    if (currentLine.length + token.length > maxCharacters && currentLine.trim()) {
+      wrappedLines.push(currentLine.trimEnd())
+      currentLine = token.trimStart()
+      return
+    }
+
+    currentLine += token
+  })
+
+  if (currentLine) {
+    wrappedLines.push(currentLine.trimEnd())
   }
 
-  wrappedLines.push(remainingLine)
   return wrappedLines
 }
 
@@ -145,7 +229,19 @@ async function createTextContractPdfBase64(contractUrl: string, contractName: st
     throw new Error("Unable to load the saved contract text before sending it to BoldSign.")
   }
 
-  const contractText = await response.text()
+  const contractText = normalizeBoldSignTextTags(await response.text())
+  const tagSummary = getTextTagSummary(contractText)
+
+  if (tagSummary.invalidTags.length > 0) {
+    throw new Error(
+      `This contract contains invalid BoldSign text tags. Please fix these tags before sending: ${tagSummary.invalidTags.slice(0, 3).join(", ")}`
+    )
+  }
+
+  if (tagSummary.totalTags > 0 && tagSummary.signatureTags === 0) {
+    throw new Error("This contract has BoldSign text tags, but no valid signature tag. Add at least one {{sign|...}} tag before sending.")
+  }
+
   const pdfDocument = await PDFDocument.create()
   const font = await pdfDocument.embedFont(StandardFonts.Courier)
   const boldFont = await pdfDocument.embedFont(StandardFonts.HelveticaBold)
@@ -500,6 +596,61 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+async function getBoldSignDocumentProperties(documentId: string, boldSignApiKey: string) {
+  const response = await fetch(
+    `https://api.boldsign.com/v1/document/properties?documentId=${encodeURIComponent(documentId)}`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-API-KEY": boldSignApiKey,
+      },
+    }
+  )
+
+  const responseText = await response.text()
+  let responseData: any = null
+  try {
+    responseData = responseText ? JSON.parse(responseText) : null
+  } catch {
+    responseData = { raw: responseText }
+  }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    data: responseData,
+  }
+}
+
+async function waitForBoldSignDocumentProperties(documentId: string, boldSignApiKey: string) {
+  let lastResult: Awaited<ReturnType<typeof getBoldSignDocumentProperties>> | null = null
+
+  for (let attempt = 1; attempt <= 8; attempt += 1) {
+    lastResult = await getBoldSignDocumentProperties(documentId, boldSignApiKey)
+
+    if (lastResult.ok && lastResult.data?.documentId) {
+      return {
+        ok: true,
+        attempts: attempt,
+        details: lastResult.data,
+      }
+    }
+
+    await sleep(Math.min(1000 * attempt, 3000))
+  }
+
+  return {
+    ok: false,
+    attempts: 8,
+    details: lastResult?.data || null,
+    status: lastResult?.status || null,
+    error:
+      extractBoldSignErrorMessages(lastResult?.data).join(" ") ||
+      "BoldSign accepted the request, but the document was not visible in document properties after processing.",
+  }
+}
+
 async function prefillBoldSignDocumentFields(
   documentId: string,
   fields: PrefillField[],
@@ -710,6 +861,27 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const statusCheck = await waitForBoldSignDocumentProperties(documentId, boldSignApiKey)
+  if (!statusCheck.ok) {
+    console.error("BoldSign document was not confirmed after send:", {
+      documentId,
+      statusCheck,
+      rawSendResponse: responseData,
+    })
+
+    return NextResponse.json(
+      {
+        error:
+          `${statusCheck.error} This usually means BoldSign's asynchronous processing failed, the webhook is not configured, or the API key belongs to a different BoldSign account than the dashboard being checked.`,
+        documentId,
+        boldSignStatus: responseData?.status || "accepted",
+        statusCheck,
+        raw: responseData,
+      },
+      { status: 502 }
+    )
+  }
+
   const customPrefillFields = shouldUseManualFields ? [] : getCustomContractPrefillFields(prefillFields)
   const prefillResult = shouldUseManualFields
     ? { ok: true, skipped: true, fieldCount: 0 }
@@ -721,8 +893,8 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     documentId,
-    boldSignStatus: responseData?.status || "accepted",
-    statusCheck: null,
+    boldSignStatus: statusCheck.details?.status || responseData?.status || "accepted",
+    statusCheck,
     prefillSkipped: Boolean(prefillResult.skipped),
     prefillResult,
     raw: responseData,
