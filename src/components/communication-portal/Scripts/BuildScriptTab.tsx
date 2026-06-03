@@ -185,6 +185,9 @@ export function BuildScriptTab() {
                         <p className="mt-1 max-w-3xl text-xs text-pink-800">
                           {styleProfileSummary || "Upload 3-5 past scripts to start teaching Mr. Script your private officiant voice."}
                         </p>
+                        <p className="mt-1 max-w-3xl text-xs text-pink-700">
+                          Uploaded scripts are analyzed to build your private writing style profile. The style library stores analysis and sample details, not the full script text. Your style profile is only used for your Mr. Script generations.
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <input
