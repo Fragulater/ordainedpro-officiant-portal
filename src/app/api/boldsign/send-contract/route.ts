@@ -863,23 +863,11 @@ export async function POST(request: NextRequest) {
 
   const statusCheck = await waitForBoldSignDocumentProperties(documentId, boldSignApiKey)
   if (!statusCheck.ok) {
-    console.error("BoldSign document was not confirmed after send:", {
+    console.warn("BoldSign document properties were not available immediately after send:", {
       documentId,
       statusCheck,
       rawSendResponse: responseData,
     })
-
-    return NextResponse.json(
-      {
-        error:
-          `${statusCheck.error} This usually means BoldSign's asynchronous processing failed, the webhook is not configured, or the API key belongs to a different BoldSign account than the dashboard being checked.`,
-        documentId,
-        boldSignStatus: responseData?.status || "accepted",
-        statusCheck,
-        raw: responseData,
-      },
-      { status: 502 }
-    )
   }
 
   const customPrefillFields = shouldUseManualFields ? [] : getCustomContractPrefillFields(prefillFields)
@@ -893,8 +881,9 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     documentId,
-    boldSignStatus: statusCheck.details?.status || responseData?.status || "accepted",
+    boldSignStatus: statusCheck.ok ? statusCheck.details?.status || responseData?.status || "accepted" : responseData?.status || "accepted",
     statusCheck,
+    statusCheckWarning: statusCheck.ok ? "" : statusCheck.error,
     prefillSkipped: Boolean(prefillResult.skipped),
     prefillResult,
     raw: responseData,
