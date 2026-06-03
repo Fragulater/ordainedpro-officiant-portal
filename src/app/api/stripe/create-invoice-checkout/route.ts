@@ -101,8 +101,12 @@ export async function POST(request: NextRequest) {
   )
   params.set("metadata[paymentId]", paymentId)
   params.set("metadata[invoiceNumber]", invoiceNumber)
+  params.set("payment_intent_data[metadata][paymentId]", paymentId)
+  params.set("payment_intent_data[metadata][invoiceNumber]", invoiceNumber)
   if (body.coupleId) params.set("metadata[coupleId]", String(body.coupleId))
+  if (body.coupleId) params.set("payment_intent_data[metadata][coupleId]", String(body.coupleId))
   if (body.officiantId) params.set("metadata[officiantId]", String(body.officiantId))
+  if (body.officiantId) params.set("payment_intent_data[metadata][officiantId]", String(body.officiantId))
   if (body.coupleEmail) params.set("customer_email", String(body.coupleEmail))
 
   const applicationFeeAmount = calculateApplicationFee(amount)

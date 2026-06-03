@@ -66,7 +66,9 @@ async function handleCheckoutSessionCompleted(session: Record<string, any>) {
   }
 
   if (session.mode === "payment" && session.client_reference_id) {
-    await markPaymentPaid(String(session.client_reference_id), "Stripe Checkout")
+    await markPaymentPaid(String(session.client_reference_id), "Stripe Checkout", {
+      stripePaymentIntentId: session.payment_intent ? String(session.payment_intent) : null,
+    })
   }
 }
 
@@ -178,18 +180,28 @@ async function upsertSubscriptionFromStripe(input: {
   if (error) throw error
 }
 
-async function markPaymentPaid(paymentId: string, paymentMethod: string) {
+async function markPaymentPaid(
+  paymentId: string,
+  paymentMethod: string,
+  options: { stripePaymentIntentId?: string | null } = {}
+) {
   const numericPaymentId = Number(paymentId)
   if (!Number.isFinite(numericPaymentId)) return
 
+  const updates: Record<string, any> = {
+    status: "paid",
+    paid_date: new Date().toISOString().slice(0, 10),
+    payment_method: paymentMethod,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (options.stripePaymentIntentId) {
+    updates.stripe_payment_intent_id = options.stripePaymentIntentId
+  }
+
   const { error } = await getSupabaseAdmin()
     .from("payments")
-    .update({
-      status: "paid",
-      paid_date: new Date().toISOString().slice(0, 10),
-      payment_method: paymentMethod,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq("id", numericPaymentId)
 
   if (error) throw error
@@ -209,4 +221,3 @@ async function markPaymentOverdue(paymentId: string) {
 
   if (error) throw error
 }
-

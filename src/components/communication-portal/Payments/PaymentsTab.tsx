@@ -457,23 +457,6 @@ export function PaymentsTab() {
                       Record Payment
                     </Button>
                     <Button
-                      className="h-9 w-full justify-start border border-rose-400 bg-rose-500/15 text-rose-800 hover:bg-rose-500/25"
-                      onClick={() => {
-                        setNewPayment((current: any) => ({
-                          ...current,
-                          amount: "",
-                          date: new Date().toISOString().split("T")[0],
-                          method: "Original payment method",
-                          notes: "",
-                          kind: "refund",
-                        }))
-                        setShowRecordPaymentDialog(true)
-                      }}
-                    >
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      Record Refund
-                    </Button>
-                    <Button
                       className="h-9 w-full justify-start border border-red-400 bg-red-500/15 text-red-800 hover:bg-red-500/25"
                       onClick={() => setShowRefundsDialog(true)}
                     >

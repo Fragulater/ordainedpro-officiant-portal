@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/supabase/utils/client";
-import { AlertCircle, Check, DollarSign, RefreshCw, RotateCcw, Search } from "lucide-react";
+import { AlertCircle, CreditCard, DollarSign, RefreshCw, RotateCcw, Search } from "lucide-react";
 
 type RefundCouple = {
   id: number;
@@ -30,6 +30,12 @@ type RefundPayment = {
   payment_method?: string | null;
   due_date?: string | null;
   notes?: string | null;
+  stripe_payment_intent_id?: string | null;
+  stripe_refund_id?: string | null;
+  refunded_payment_id?: number | null;
+  refund_fee_rate?: number | string | null;
+  refund_fee_amount?: number | string | null;
+  total_officiant_charge?: number | string | null;
   created_at?: string | null;
 };
 
@@ -61,6 +67,7 @@ export function RefundsView({ userId }: RefundsViewProps) {
   const [couples, setCouples] = useState<RefundCouple[]>([]);
   const [payments, setPayments] = useState<RefundPayment[]>([]);
   const [selectedCoupleId, setSelectedCoupleId] = useState("");
+  const [selectedPaymentId, setSelectedPaymentId] = useState("");
   const [refundAmount, setRefundAmount] = useState("");
   const [refundDate, setRefundDate] = useState(todayLocal());
   const [refundMethod, setRefundMethod] = useState("Original payment method");
@@ -69,6 +76,7 @@ export function RefundsView({ userId }: RefundsViewProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [statusText, setStatusText] = useState("");
 
   const loadRefundData = async () => {
     if (!userId) return;
@@ -83,7 +91,7 @@ export function RefundsView({ userId }: RefundsViewProps) {
           .order("created_at", { ascending: false }),
         supabase
           .from("payments")
-          .select("id, couple_id, invoice_number, amount, status, payment_method, due_date, notes, created_at")
+          .select("*")
           .eq("user_id", userId)
           .order("created_at", { ascending: false }),
       ]);
@@ -136,7 +144,38 @@ export function RefundsView({ userId }: RefundsViewProps) {
   }, [coupleSummaries, searchQuery]);
 
   const selectedSummary = coupleSummaries.find(({ couple }) => String(couple.id) === selectedCoupleId);
+  const selectedPayments = payments.filter((payment) => Number(payment.couple_id) === Number(selectedCoupleId));
+  const paidPaymentsForSelectedCouple = selectedPayments.filter(isPaidPayment);
+  const selectedPayment = paidPaymentsForSelectedCouple.find((payment) => String(payment.id) === selectedPaymentId);
   const recentRefunds = payments.filter(isRefundPayment).slice(0, 10);
+
+  useEffect(() => {
+    setSelectedPaymentId("");
+    setRefundAmount("");
+    setRefundMethod("Original payment method");
+    setStatus("idle");
+    setStatusText("");
+  }, [selectedCoupleId]);
+
+  useEffect(() => {
+    if (!selectedPayment) return;
+    const refundable = getRefundableForPayment(selectedPayment);
+    if (refundable > 0) setRefundAmount(refundable.toFixed(2));
+    setRefundMethod(selectedPayment.stripe_payment_intent_id ? "Stripe" : "Original payment method");
+  }, [selectedPaymentId]);
+
+  const getRefundedAgainstPayment = (payment: RefundPayment) => {
+    return selectedPayments
+      .filter((refund) => isRefundPayment(refund) && Number(refund.refunded_payment_id) === Number(payment.id))
+      .reduce((sum, refund) => sum + Number(refund.amount || 0), 0);
+  };
+
+  const getRefundableForPayment = (payment: RefundPayment) => {
+    return Math.max(0, Number(payment.amount || 0) - getRefundedAgainstPayment(payment));
+  };
+
+  const selectedPaymentRefundable = selectedPayment ? getRefundableForPayment(selectedPayment) : selectedSummary?.refundable || 0;
+  const canRefundThroughStripe = Boolean(selectedPayment?.stripe_payment_intent_id && refundMethod === "Stripe");
 
   const handleSubmitRefund = async () => {
     if (!userId || !selectedCoupleId) return;
@@ -144,13 +183,80 @@ export function RefundsView({ userId }: RefundsViewProps) {
     const amount = Number(refundAmount);
     if (!amount || amount <= 0) {
       setStatus("error");
+      setStatusText("Enter a valid refund amount.");
+      return;
+    }
+
+    if (selectedPayment && amount > selectedPaymentRefundable) {
+      setStatus("error");
+      setStatusText(`Refund amount cannot exceed ${money(selectedPaymentRefundable)} for the selected payment.`);
       return;
     }
 
     setSaving(true);
     setStatus("idle");
+    setStatusText("");
+
+    if (canRefundThroughStripe && selectedPayment) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (!accessToken) {
+        setSaving(false);
+        setStatus("error");
+        setStatusText("Please sign in again before issuing a Stripe refund.");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/stripe/refund-invoice-payment", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            paymentId: selectedPayment.id,
+            amount,
+            refundDate,
+            notes: refundNotes,
+          }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        setSaving(false);
+
+        if (!response.ok || !data.refund) {
+          setStatus("error");
+          setStatusText(data.error || "Unable to issue Stripe refund.");
+          return;
+        }
+
+        setPayments((current) => [data.refund, ...current]);
+        setRefundAmount("");
+        setRefundNotes("");
+        setRefundDate(todayLocal());
+        setRefundMethod("Original payment method");
+        setSelectedPaymentId("");
+        setStatus("saved");
+        setStatusText(`Stripe refund created. Refund fee tracked: ${money(Number(data.refundFeeAmount || 0))}.`);
+        window.setTimeout(() => {
+          setStatus("idle");
+          setStatusText("");
+        }, 3600);
+        return;
+      } catch (error) {
+        console.error("Unable to issue Stripe refund:", error);
+        setSaving(false);
+        setStatus("error");
+        setStatusText("Unable to issue Stripe refund. Please try again.");
+        return;
+      }
+    }
 
     const selectedCouple = couples.find((couple) => String(couple.id) === selectedCoupleId);
+    const refundFeeAmount = Math.round(amount * 0.05 * 100) / 100;
     const result = await supabase
       .from("payments")
       .insert({
@@ -162,8 +268,12 @@ export function RefundsView({ userId }: RefundsViewProps) {
         due_date: refundDate || null,
         payment_method: "refund",
         notes: `Refund - ${getCoupleName(selectedCouple)}${refundMethod ? ` via ${refundMethod}` : ""}${refundNotes ? `: ${refundNotes}` : ""}`,
+        refund_fee_rate: 0.05,
+        refund_fee_amount: refundFeeAmount,
+        total_officiant_charge: Math.round((amount + refundFeeAmount) * 100) / 100,
+        refunded_payment_id: selectedPayment ? selectedPayment.id : null,
       })
-      .select("id, couple_id, invoice_number, amount, status, payment_method, due_date, notes, created_at")
+      .select("*")
       .single();
 
     setSaving(false);
@@ -171,6 +281,7 @@ export function RefundsView({ userId }: RefundsViewProps) {
     if (result.error) {
       console.error("Unable to record refund:", result.error);
       setStatus("error");
+      setStatusText("Unable to record refund.");
       return;
     }
 
@@ -179,8 +290,13 @@ export function RefundsView({ userId }: RefundsViewProps) {
     setRefundNotes("");
     setRefundDate(todayLocal());
     setRefundMethod("Original payment method");
+    setSelectedPaymentId("");
     setStatus("saved");
-    window.setTimeout(() => setStatus("idle"), 2400);
+    setStatusText("Manual refund recorded.");
+    window.setTimeout(() => {
+      setStatus("idle");
+      setStatusText("");
+    }, 2400);
   };
 
   return (
@@ -249,6 +365,38 @@ export function RefundsView({ userId }: RefundsViewProps) {
               </div>
             )}
 
+            {selectedCoupleId && (
+              <div>
+                <Label htmlFor="refund-payment">Original payment</Label>
+                <select
+                  id="refund-payment"
+                  value={selectedPaymentId}
+                  onChange={(event) => setSelectedPaymentId(event.target.value)}
+                  className="mt-2 h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                >
+                  <option value="">Manual refund / no Stripe transaction selected</option>
+                  {paidPaymentsForSelectedCouple.map((payment) => {
+                    const refundable = getRefundableForPayment(payment);
+                    return (
+                      <option key={payment.id} value={payment.id} disabled={refundable <= 0}>
+                        {payment.invoice_number || `Payment ${payment.id}`} - {money(Number(payment.amount || 0))}
+                        {payment.stripe_payment_intent_id ? " - Stripe" : " - Manual"}
+                        {refundable !== Number(payment.amount || 0) ? ` - ${money(refundable)} remaining` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+                {selectedPayment && (
+                  <p className="mt-2 text-xs text-gray-600">
+                    Refundable from this payment: <span className="font-semibold">{money(selectedPaymentRefundable)}</span>
+                    {selectedPayment.stripe_payment_intent_id
+                      ? " - Stripe refund available."
+                      : " - No Stripe payment ID saved, so this can only be recorded manually."}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="refund-amount">Refund amount</Label>
@@ -286,6 +434,7 @@ export function RefundsView({ userId }: RefundsViewProps) {
                 onChange={(event) => setRefundMethod(event.target.value)}
                 className="mt-2 h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
               >
+                {selectedPayment?.stripe_payment_intent_id && <option>Stripe</option>}
                 <option>Original payment method</option>
                 <option>Credit Card</option>
                 <option>Cash</option>
@@ -296,6 +445,11 @@ export function RefundsView({ userId }: RefundsViewProps) {
                 <option>PayPal</option>
                 <option>Other</option>
               </select>
+              {refundMethod === "Stripe" && (
+                <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+                  Stripe will refund the customer to the original payment method, reverse the connected-account transfer, and keep the platform application fee when available. OrdainedPro will also track a 5% refund fee internally.
+                </div>
+              )}
             </div>
 
             <div>
@@ -317,15 +471,15 @@ export function RefundsView({ userId }: RefundsViewProps) {
                 }`}
                 aria-live="polite"
               >
-                {status === "saved" ? "Refund recorded." : status === "error" ? "Unable to record refund." : "Ready"}
+                {statusText || (status === "saved" ? "Refund recorded." : status === "error" ? "Unable to record refund." : "Ready")}
               </p>
               <Button
                 onClick={handleSubmitRefund}
                 disabled={saving || !selectedCoupleId || !refundAmount || Number(refundAmount) <= 0}
                 className="bg-red-500 hover:bg-red-600"
               >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                {saving ? "Recording..." : "Record Refund"}
+                {canRefundThroughStripe ? <CreditCard className="mr-2 h-4 w-4" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+                {saving ? "Processing..." : canRefundThroughStripe ? "Refund via Stripe" : "Record Manual Refund"}
               </Button>
             </div>
           </CardContent>

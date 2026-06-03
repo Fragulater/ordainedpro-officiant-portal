@@ -390,8 +390,6 @@ const formatMeetingDateTime = (meeting: { date?: string; time?: string | null })
 
 const getPaymentDateValue = (payment: any) => new Date(payment.dueDate || payment.paidDate || payment.createdAt || payment.date || Date.now())
 
-const REFUND_FEE_RATE = 0.05
-
 const roundCurrency = (amount: number) => Math.round(amount * 100) / 100
 
 const sanitizeMessageText = (value: string) =>
@@ -4072,34 +4070,19 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
       return
     }
 
-    const isRefund = newPayment.kind === "refund"
-
-    if (!isRefund && paymentInfo.balance > 0 && amount > paymentInfo.balance) {
+    if (paymentInfo.balance > 0 && amount > paymentInfo.balance) {
       alert(`Payment amount (${amount}) cannot exceed balance due (${paymentInfo.balance})`)
       return
     }
 
-    if (isRefund && amount > paymentInfo.depositPaid) {
-      alert(`Refund amount (${amount}) cannot exceed total paid (${paymentInfo.depositPaid})`)
-      return
-    }
-
-    const refundFeeAmount = isRefund ? roundCurrency(amount * REFUND_FEE_RATE) : 0
-    const totalOfficiantCharge = isRefund ? roundCurrency(amount + refundFeeAmount) : 0
-
     console.log("Recording payment for couple:", editCoupleInfo.id)
 
     const result = await addPaymentToDB(currentUser.id, editCoupleInfo.id, {
-      description: isRefund
-        ? `Refund - ${newPayment.notes || "Manual refund"} | Officiant refund fee: $${refundFeeAmount.toFixed(2)} | Total officiant charge: $${totalOfficiantCharge.toFixed(2)}`
-        : amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
+      description: amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
       amount: amount,
-      paymentType: isRefund ? "refund" : newPayment.method,
+      paymentType: newPayment.method,
       status: "paid",
       dueDate: newPayment.date,
-      refundFeeRate: isRefund ? REFUND_FEE_RATE : undefined,
-      refundFeeAmount: isRefund ? refundFeeAmount : undefined,
-      totalOfficiantCharge: isRefund ? totalOfficiantCharge : undefined,
     })
 
     if (result.ok && result.data) {
@@ -4107,28 +4090,21 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
         id: result.data.id,
         date: new Date(newPayment.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
         amount: amount,
-        type: isRefund ? "Refund" : amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
+        type: amount === paymentInfo.balance ? "Final Payment" : "Partial Payment",
         method: newPayment.method,
-        status: isRefund ? "refunded" : "paid",
+        status: "paid",
         notes: newPayment.notes,
-        refundFeeRate: isRefund ? REFUND_FEE_RATE : undefined,
-        refundFee: isRefund ? refundFeeAmount : undefined,
-        totalOfficiantCharge: isRefund ? totalOfficiantCharge : undefined,
       }
 
       setPaymentHistory(prev => [...prev, payment])
 
-      const newDepositPaid = isRefund ? Math.max(0, paymentInfo.depositPaid - amount) : paymentInfo.depositPaid + amount
-      const newBalance = isRefund ? paymentInfo.balance + amount : Math.max(0, paymentInfo.balance - amount)
-      const newRefundFeesCharged = isRefund
-        ? roundCurrency((paymentInfo.refundFeesCharged || 0) + refundFeeAmount)
-        : paymentInfo.refundFeesCharged || 0
+      const newDepositPaid = paymentInfo.depositPaid + amount
+      const newBalance = Math.max(0, paymentInfo.balance - amount)
 
       setPaymentInfo(prev => ({
         ...prev,
         depositPaid: newDepositPaid,
         balance: newBalance,
-        refundFeesCharged: newRefundFeesCharged,
         paymentStatus: newBalance === 0 ? "paid_in_full" : prev.paymentStatus
       }))
 
@@ -4143,9 +4119,7 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
       loadFinancialPaymentsForUser()
 
       console.log("Payment recorded:", payment)
-      if (isRefund) {
-        alert(`Refund of ${amount} recorded successfully.\n\nOfficiant refund fee (5%): ${refundFeeAmount.toFixed(2)}\nTotal officiant charge: ${totalOfficiantCharge.toFixed(2)}\nNew balance due: ${newBalance}`)
-      } else if (newBalance === 0) {
+      if (newBalance === 0) {
         alert("Payment recorded successfully! This ceremony is now PAID IN FULL! [CELEBRATE]")
       } else {
         alert(`Payment of ${amount} recorded successfully!\n\nRemaining balance: ${newBalance}`)
@@ -8278,7 +8252,6 @@ ${officiantProfile?.name || "Your officiant"}`)
     setShowRecordPaymentDialog,
     newPayment,
     setNewPayment,
-    REFUND_FEE_RATE,
     uploadingScript,
     setUploadingScript,
     coupleScripts,

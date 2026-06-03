@@ -18,12 +18,7 @@ export function PortalRecordPaymentDialog() {
     setShowRecordPaymentDialog,
     newPayment,
     setNewPayment,
-    REFUND_FEE_RATE,
   } = useCommunicationPortal()
-
-  const enteredAmount = parseFloat(newPayment.amount) || 0
-  const refundFeeAmount = newPayment.kind === "refund" ? Math.round(enteredAmount * REFUND_FEE_RATE * 100) / 100 : 0
-  const totalOfficiantCharge = newPayment.kind === "refund" ? Math.round((enteredAmount + refundFeeAmount) * 100) / 100 : 0
 
   // Don't render if editCoupleInfo is not available
   if (!editCoupleInfo?.brideName) {
@@ -54,20 +49,7 @@ export function PortalRecordPaymentDialog() {
             {/* Payment Form */}
             <div className="space-y-4">
               <div>
-                <Label htmlFor="paymentKind">Entry Type *</Label>
-                <select
-                  id="paymentKind"
-                  value={newPayment.kind || "payment"}
-                  onChange={(e) => setNewPayment({...newPayment, kind: e.target.value})}
-                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="payment">Payment Received</option>
-                  <option value="refund">Refund Issued</option>
-                </select>
-              </div>
-
-              <div>
-                <Label htmlFor="paymentAmount">{newPayment.kind === "refund" ? "Refund Amount" : "Payment Amount"} *</Label>
+                <Label htmlFor="paymentAmount">Payment Amount *</Label>
                 <div className="relative mt-1">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
@@ -75,18 +57,16 @@ export function PortalRecordPaymentDialog() {
                     type="number"
                     step="0.01"
                     min="0"
-                    max={newPayment.kind === "refund" ? undefined : paymentInfo.balance}
+                    max={paymentInfo.balance}
                     value={newPayment.amount}
                     onChange={(e) => setNewPayment({...newPayment, amount: e.target.value})}
                     placeholder="0.00"
                     className="pl-10"
                   />
                 </div>
-                {newPayment.kind !== "refund" && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Maximum: ${paymentInfo.balance}
-                  </p>
-                )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Maximum: ${paymentInfo.balance}
+                </p>
               </div>
 
               <div>
@@ -137,33 +117,19 @@ export function PortalRecordPaymentDialog() {
             {/* Preview */}
             {newPayment.amount && parseFloat(newPayment.amount) > 0 && (
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h4 className="font-semibold text-green-900 mb-2">{newPayment.kind === "refund" ? "Refund Preview" : "Payment Preview"}</h4>
+                <h4 className="font-semibold text-green-900 mb-2">Payment Preview</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-green-800">{newPayment.kind === "refund" ? "Refund Amount:" : "Payment Amount:"}</span>
+                    <span className="text-green-800">Payment Amount:</span>
                     <span className="font-bold text-green-900">${parseFloat(newPayment.amount).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-green-800">New Balance:</span>
                     <span className="font-bold text-green-900">
-                      ${newPayment.kind === "refund"
-                        ? (paymentInfo.balance + parseFloat(newPayment.amount)).toFixed(2)
-                        : (paymentInfo.balance - parseFloat(newPayment.amount)).toFixed(2)}
+                      ${(paymentInfo.balance - parseFloat(newPayment.amount)).toFixed(2)}
                     </span>
                   </div>
-                  {newPayment.kind === "refund" && (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="text-green-800">Officiant Refund Fee (5%):</span>
-                        <span className="font-bold text-green-900">${refundFeeAmount.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between border-t border-green-200 pt-2">
-                        <span className="text-green-900 font-medium">Total Officiant Charge:</span>
-                        <span className="font-bold text-green-900">${totalOfficiantCharge.toFixed(2)}</span>
-                      </div>
-                    </>
-                  )}
-                  {newPayment.kind !== "refund" && (paymentInfo.balance - parseFloat(newPayment.amount)) === 0 && (
+                  {(paymentInfo.balance - parseFloat(newPayment.amount)) === 0 && (
                     <div className="mt-3 p-2 bg-green-100 rounded-lg border border-green-300">
                       <p className="text-center font-bold text-green-800">
                         🎉 This payment will mark the invoice as PAID IN FULL!
@@ -197,7 +163,7 @@ export function PortalRecordPaymentDialog() {
               className="bg-green-500 hover:bg-green-600"
             >
               <Check className="w-4 h-4 mr-2" />
-              {newPayment.kind === "refund" ? "Record Refund" : "Record Payment"}
+              Record Payment
             </Button>
           </div>
         </DialogContent>
