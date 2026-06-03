@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/supabase/utils/server";
 
 // Force Node.js runtime (not Edge) for Netlify compatibility
 export const runtime = "nodejs";
@@ -16,8 +17,41 @@ interface EmailAttachment {
 // Uses Resend for reliable email delivery
 // Fallback: Can be configured to use SMTP directly
 
+function isAllowedEmailOrigin(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+
+  const requestHost = request.headers.get("host");
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://portal.ordainedpro.com";
+  const allowedHosts = new Set(
+    [requestHost, new URL(configuredSiteUrl).host, "portal.ordainedpro.com"]
+      .filter(Boolean)
+      .map((host) => String(host).toLowerCase())
+  );
+
+  try {
+    return allowedHosts.has(new URL(origin).host.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
+    if (!isAllowedEmailOrigin(request)) {
+      return NextResponse.json({ error: "Email requests are only allowed from the OrdainedPro portal." }, { status: 403 });
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Please log in before sending email." }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       to,
