@@ -404,6 +404,12 @@ const sanitizeMessageText = (value: string) =>
     .replace(/Â/g, "")
     .replace(/Ãƒ/g, "")
 
+const sanitizeProfileNotesForScript = (value: string) =>
+  String(value || "")
+    .replace(/\bvuiew\b/gi, "view")
+    .replace(/\bsectrions\b/gi, "sections")
+    .replace(/\bThis is were\b/gi, "This is where")
+
 const isRefundPayment = (payment: any) =>
   payment?.status === "refunded" || String(payment?.type || payment?.payment_method || "").toLowerCase() === "refund"
 
@@ -2774,7 +2780,7 @@ Mr. Script - Your Personal Wedding Script Creator`
     const venueName = editWeddingDetails?.venueName || ""
     const venueAddress = editWeddingDetails?.venueAddress || editCoupleInfo?.address || ""
     const expectedGuests = editWeddingDetails?.expectedGuests || ""
-    const specialRequests = editCoupleInfo?.specialRequests || ""
+    const specialRequests = sanitizeProfileNotesForScript(editCoupleInfo?.specialRequests || "")
     const detailsAny = editWeddingDetails as any
     const privateNotes = editWeddingDetails?.officiantNotes || detailsAny?.privateNotes || ""
     const honoreeAge = editCoupleInfo?.honoreeAge || editCoupleInfo?.age || getCeremonyAgeFromNotes(specialRequests, "Honoree")
