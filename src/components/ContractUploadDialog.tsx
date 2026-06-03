@@ -409,7 +409,7 @@ export function ContractUploadDialog({
       }
 
       nodes.push(
-        <span key={`${tag}-${index}`} className="rounded bg-blue-50 px-0.5 font-semibold text-blue-700">
+        <span key={`${tag}-${index}`} className="bg-blue-50 text-blue-700">
           {tag}
         </span>
       )
@@ -1149,7 +1149,7 @@ export function ContractUploadDialog({
                   <pre
                     key={`smart-field-highlight-${smartFieldEditorRenderKey}`}
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words p-3 font-mono text-sm leading-6 text-slate-950"
+                    className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words p-3 font-mono text-sm leading-6 text-transparent"
                     style={{
                       boxSizing: "border-box",
                       overflowWrap: "break-word",
@@ -1187,7 +1187,7 @@ export function ContractUploadDialog({
                     placeholder="Paste your contract here, then click where a smart field belongs..."
                     rows={22}
                     spellCheck={false}
-                    className="relative h-full min-h-full max-h-full resize-none overflow-auto border-0 bg-transparent p-3 pb-10 font-mono text-sm leading-6 text-transparent caret-blue-700 shadow-none selection:bg-blue-200 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-blue-300"
+                    className="relative h-full min-h-full max-h-full resize-none overflow-auto border-0 bg-transparent p-3 pb-10 font-mono text-sm leading-6 text-slate-950 caret-blue-700 shadow-none selection:bg-blue-200 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-blue-300"
                     style={{
                       boxSizing: "border-box",
                       overflowWrap: "break-word",
