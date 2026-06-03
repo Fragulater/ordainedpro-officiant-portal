@@ -68,6 +68,8 @@ const SMART_FIELD_GROUPS = [
   "Legal / Acknowledgment Fields",
 ]
 
+const SMART_FIELD_EDITOR_MIN_HEIGHT = 560
+
 const BOLDSIGN_CONTRACT_TAGS: SmartField[] = [
   { group: "Common Agreement Fields", label: "Agreement date", tag: "{{editdate|3|*|Agreement date|agreement_date}}", contexts: ["wedding", "minor", "memorial"] },
   { group: "Common Agreement Fields", label: "Ceremony/Event date", tag: "{{editdate|3|*|Wedding date|wedding_date}}", contexts: ["wedding", "minor", "memorial"], keywords: "wedding date event date service date" },
@@ -354,6 +356,7 @@ export function ContractUploadDialog({
   const [smartFieldSearch, setSmartFieldSearch] = useState("")
   const [smartFieldWorkspace, setSmartFieldWorkspace] = useState("")
   const [smartFieldEditorScroll, setSmartFieldEditorScroll] = useState({ top: 0, left: 0 })
+  const [smartFieldEditorContentHeight, setSmartFieldEditorContentHeight] = useState(SMART_FIELD_EDITOR_MIN_HEIGHT)
   const [smartFieldEditorRenderKey, setSmartFieldEditorRenderKey] = useState(0)
   const smartFieldWorkspaceRef = useRef<HTMLTextAreaElement | null>(null)
   const smartFieldContext = getSmartFieldContext(ceremonyType)
@@ -376,6 +379,22 @@ export function ContractUploadDialog({
     })
   }, [smartFieldContext, smartFieldGroup, smartFieldSearch])
   const smartFieldCategories = SMART_FIELD_GROUPS.filter((group) => group !== "All Fields")
+
+  const syncSmartFieldEditorLayout = () => {
+    const editor = smartFieldWorkspaceRef.current
+    if (!editor) return
+
+    setSmartFieldEditorContentHeight(Math.max(SMART_FIELD_EDITOR_MIN_HEIGHT, editor.scrollHeight))
+    setSmartFieldEditorScroll({
+      top: editor.scrollTop,
+      left: editor.scrollLeft,
+    })
+  }
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(syncSmartFieldEditorLayout)
+    return () => window.cancelAnimationFrame(frame)
+  }, [smartFieldWorkspace, smartFieldEditorRenderKey, contractMode])
 
   const renderSmartFieldWorkspaceHighlight = (content: string) => {
     if (!content) return null
@@ -622,9 +641,10 @@ export function ContractUploadDialog({
         throw new Error("Unable to load this saved contract.")
       }
 
-      const contractText = await response.text()
+      const contractText = (await response.text()).replace(/\r\n?/g, "\n")
       setSmartFieldWorkspace(contractText)
       setSmartFieldEditorScroll({ top: 0, left: 0 })
+      setSmartFieldEditorContentHeight(SMART_FIELD_EDITOR_MIN_HEIGHT)
       setSmartFieldEditorRenderKey((currentKey) => currentKey + 1)
       if (!formData.name.trim()) {
         handleInputChange("name", file.name.replace(/\.[^/.]+$/, ""))
@@ -646,6 +666,7 @@ export function ContractUploadDialog({
           editor.setSelectionRange(0, 0)
           editor.focus()
           setSmartFieldEditorScroll({ top: 0, left: 0 })
+          syncSmartFieldEditorLayout()
         })
       }, 0)
     } catch (error) {
@@ -1124,15 +1145,23 @@ export function ContractUploadDialog({
                     </Button>
                   </div>
                 </div>
-                <div className="relative min-h-[520px] overflow-hidden rounded-md border border-blue-200 bg-white">
+                <div className="relative h-[560px] max-h-[65vh] overflow-hidden rounded-md border border-blue-200 bg-white">
                   <pre
                     key={`smart-field-highlight-${smartFieldEditorRenderKey}`}
                     aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 min-h-[520px] overflow-hidden whitespace-pre-wrap break-words p-3 font-mono text-sm leading-6 text-slate-950"
+                    className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words p-3 font-mono text-sm leading-6 text-slate-950"
+                    style={{
+                      boxSizing: "border-box",
+                      overflowWrap: "break-word",
+                      scrollbarGutter: "stable",
+                      wordBreak: "break-word",
+                    }}
                   >
                     <span
                       style={{
                         display: "block",
+                        minHeight: smartFieldEditorContentHeight,
+                        paddingBottom: 40,
                         transform: `translate(${-smartFieldEditorScroll.left}px, ${-smartFieldEditorScroll.top}px)`,
                       }}
                     >
@@ -1144,8 +1173,12 @@ export function ContractUploadDialog({
                     ref={smartFieldWorkspaceRef}
                     id="smartFieldWorkspace"
                     value={smartFieldWorkspace}
-                    onChange={(event) => setSmartFieldWorkspace(event.target.value)}
+                    onChange={(event) => {
+                      setSmartFieldWorkspace(event.target.value.replace(/\r\n?/g, "\n"))
+                      window.requestAnimationFrame(syncSmartFieldEditorLayout)
+                    }}
                     onScroll={(event) => {
+                      setSmartFieldEditorContentHeight(Math.max(SMART_FIELD_EDITOR_MIN_HEIGHT, event.currentTarget.scrollHeight))
                       setSmartFieldEditorScroll({
                         top: event.currentTarget.scrollTop,
                         left: event.currentTarget.scrollLeft,
@@ -1154,7 +1187,13 @@ export function ContractUploadDialog({
                     placeholder="Paste your contract here, then click where a smart field belongs..."
                     rows={22}
                     spellCheck={false}
-                    className="relative min-h-[520px] resize-y border-0 bg-transparent p-3 font-mono text-sm leading-6 text-transparent caret-blue-700 shadow-none selection:bg-blue-200 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-blue-300"
+                    className="relative h-full min-h-full max-h-full resize-none overflow-auto border-0 bg-transparent p-3 pb-10 font-mono text-sm leading-6 text-transparent caret-blue-700 shadow-none selection:bg-blue-200 placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-blue-300"
+                    style={{
+                      boxSizing: "border-box",
+                      overflowWrap: "break-word",
+                      scrollbarGutter: "stable",
+                      wordBreak: "break-word",
+                    }}
                   />
                 </div>
                 {savedTemplateMessage && (
