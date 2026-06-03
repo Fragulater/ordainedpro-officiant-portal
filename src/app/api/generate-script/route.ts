@@ -60,23 +60,38 @@ type ScriptGenerationBody = {
   usePremiumModel?: boolean;
 };
 
-const WORDS_PER_MINUTE = 130;
+const TARGET_WORDS_PER_MINUTE = 125;
+
+const DURATION_WORD_TARGETS: Record<string, number> = {
+  "5-10 minutes": 1250,
+  "10-15 minutes": 1875,
+  "15-20 minutes": 2500,
+  "20-30 minutes": 3750,
+  "25-30 minutes": 3750,
+  "30-45 minutes": 5625,
+  "45 minutes": 5625,
+  "45+ minutes": 5625,
+};
 
 const normalize = (value?: string) => (value || "").trim();
 
 const safeList = (items: string[]) => items.filter(Boolean).map((item) => `- ${item}`).join("\n");
 
-const parseDurationMinutes = (duration?: string) => {
-  if (!duration) return 18;
+const parseDurationUpperMinutes = (duration?: string) => {
+  if (!duration) return 30;
   const numbers = duration.match(/\d+/g)?.map(Number) || [];
-  if (numbers.length >= 2) return Math.round((numbers[0] + numbers[1]) / 2);
+  if (numbers.length >= 2) return Math.max(...numbers);
   if (numbers.length === 1) return numbers[0];
-  return 18;
+  return 30;
 };
 
 const getTargetWordCount = (duration?: string) => {
-  const minutes = parseDurationMinutes(duration);
-  return Math.min(5200, Math.max(650, minutes * WORDS_PER_MINUTE));
+  const normalizedDuration = normalize(duration);
+  const explicitTarget = DURATION_WORD_TARGETS[normalizedDuration];
+  if (explicitTarget) return explicitTarget;
+
+  const minutes = parseDurationUpperMinutes(duration);
+  return Math.min(6000, Math.max(650, minutes * TARGET_WORDS_PER_MINUTE));
 };
 
 const chunkSections = (sections: string[], chunkCount: number) => {
@@ -112,7 +127,7 @@ const getScriptSectionsForBody = (service: MrScriptService, body?: ScriptGenerat
 };
 
 const getSegmentCount = (service: MrScriptService, sectionCount: number, duration?: string) => {
-  const minutes = parseDurationMinutes(duration);
+  const minutes = parseDurationUpperMinutes(duration);
   if (service.id === "writing_service") return Math.min(4, sectionCount);
   if (minutes <= 10) return Math.min(3, sectionCount);
   if (minutes <= 20) return Math.min(4, sectionCount);
@@ -276,6 +291,8 @@ const buildContextBlock = (body: ScriptGenerationBody, service: MrScriptService)
   const subjectName = getSubjectName(body, service);
   const date = normalize(body.ceremonyDate) || normalize(body.weddingDate) || "date to be confirmed";
   const venue = normalize(body.venue) || "location to be confirmed";
+  const targetDuration = body.ceremonyLength || responses["ceremony-duration"] || "20-30 minutes";
+  const targetWordCount = getTargetWordCount(targetDuration);
   const intakeResponses =
     Object.entries(responses)
       .filter(([key, value]) => key.startsWith("intake-") && normalize(value))
@@ -326,7 +343,8 @@ const buildContextBlock = (body: ScriptGenerationBody, service: MrScriptService)
     profileContext.primaryContactName ? `Profile primary family contact: ${profileContext.primaryContactName}` : "",
     `Date: ${date}`,
     `Location: ${venue}`,
-    `Target length: ${body.ceremonyLength || responses["ceremony-duration"] || "20-30 minutes"}`,
+    `Target length: ${targetDuration}`,
+    `Target word count: approximately ${targetWordCount.toLocaleString()} words. Aim for the higher end of the selected ceremony length instead of the shortest acceptable draft.`,
     `Tone: ${body.ceremonyTone || responses["ceremony-tone"] || service.toneOptions[0] || "Warm and natural"}`,
     `Officiant style: ${body.officiantStyle || responses["officiant-style"] || "Warm, natural, and professional"}`,
     `Core details: ${body.coreDetails || responses["core-details"] || "No extra core details provided yet."}`,
@@ -359,6 +377,7 @@ const buildSegmentPrompt = (
   const sensitivity = safeList(getSensitivityInstructions(service));
   const boundaries = safeList(getServiceBoundaries(service));
   const faithStyle = safeList(getFaithStyleInstructions(body));
+  const totalTargetWords = segments.reduce((sum, item) => sum + item.wordTarget, 0);
 
   return `You are Mr. Script, an expert life-ceremony writing assistant for professional officiants.
 
@@ -369,7 +388,8 @@ IMPORTANT:
 - Write in first person as the officiant speaking aloud unless the selected service is writing-only.
 - Use natural spoken language, not stiff template language.
 - Include concise stage directions in brackets only when useful.
-- Target approximately ${segment.wordTarget} words for this segment.
+- Target approximately ${segment.wordTarget} words for this segment, contributing to an overall script target near ${totalTargetWords.toLocaleString()} words.
+- Prefer a complete ceremony at the higher end of the selected length. Do not shorten unless the user explicitly asks for brief wording.
 - Keep names, dates, places, and details exactly as provided when possible.
 - If a detail is missing, use a clean bracketed placeholder instead of inventing facts.
 
