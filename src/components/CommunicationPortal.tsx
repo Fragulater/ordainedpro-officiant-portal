@@ -2744,6 +2744,72 @@ Mr. Script - Your Personal Wedding Script Creator`
     return currentCeremonyConfig?.label || "Custom Life Ceremony"
   }
 
+  const getMrScriptAllowedServiceOptions = () => {
+    const profileType = resolveCeremonyTypeValue(currentCeremonyType || editCoupleInfo?.ceremonyTypeLabel)
+
+    const profileOptionMap: Record<string, string[]> = {
+      wedding: [
+        "Wedding",
+        "Elopement or License Signing",
+        "Vow Renewal",
+        "Cultural or Religious Tradition",
+        "Spiritual or Milestone Ceremony",
+        "Eulogy, Vows, or Speech",
+        "Rehearsal or Ceremony Planning",
+        "Custom Life Ceremony",
+        "Something Else",
+      ],
+      vow_renewal: [
+        "Vow Renewal",
+        "Cultural or Religious Tradition",
+        "Spiritual or Milestone Ceremony",
+        "Eulogy, Vows, or Speech",
+        "Rehearsal or Ceremony Planning",
+        "Custom Life Ceremony",
+        "Something Else",
+      ],
+      quinceanera: [
+        "Coming-of-Age",
+        "Family Ceremony",
+        "Cultural or Religious Tradition",
+        "Spiritual or Milestone Ceremony",
+        "Eulogy, Vows, or Speech",
+        "Custom Life Ceremony",
+        "Something Else",
+      ],
+      celebration_of_life: [
+        "Celebration of Life",
+        "Pet Memorial",
+        "Spiritual or Milestone Ceremony",
+        "Eulogy, Vows, or Speech",
+        "Custom Life Ceremony",
+        "Something Else",
+      ],
+      baby_blessing: [
+        "Baby Blessing",
+        "Family Ceremony",
+        "Cultural or Religious Tradition",
+        "Spiritual or Milestone Ceremony",
+        "Custom Life Ceremony",
+        "Something Else",
+      ],
+    }
+
+    return profileOptionMap[profileType] || MR_SCRIPT_SERVICE_OPTIONS
+  }
+
+  const getProfileFilteredGuidedQuestions = (responses: Record<string, string> = {}) => {
+    const allowedOptions = getMrScriptAllowedServiceOptions()
+    return getActiveGuidedQuestions(responses).map((question) =>
+      question.id === "ceremony-type"
+        ? {
+            ...question,
+            options: question.options?.filter((option) => allowedOptions.includes(option)) || allowedOptions,
+          }
+        : question
+    )
+  }
+
   const buildMrScriptProfileContext = () => {
     const profileType = resolveCeremonyTypeValue(currentCeremonyType || editCoupleInfo?.ceremonyTypeLabel)
     const serviceOption = getMrScriptProfileService()
@@ -2862,7 +2928,11 @@ Mr. Script - Your Personal Wedding Script Creator`
 
   const buildQuickSetupResponses = (baseResponses: Record<string, string> = {}) => {
     const profileContext = buildMrScriptProfileContext()
-    const scriptTypeSelection = selectedCeremonyStyle || profileContext.serviceOption || baseResponses['ceremony-type']
+    const allowedOptions = getMrScriptAllowedServiceOptions()
+    const requestedScriptType = selectedCeremonyStyle || profileContext.serviceOption || baseResponses['ceremony-type']
+    const scriptTypeSelection = allowedOptions.includes(requestedScriptType)
+      ? requestedScriptType
+      : profileContext.serviceOption || allowedOptions[0] || requestedScriptType
     const quickSetupResponses: Record<string, string> = {
       ...baseResponses,
     }
@@ -2931,7 +3001,7 @@ Mr. Script - Your Personal Wedding Script Creator`
       quickSetupResponses['quick-setup-summary'] = quickSetupFacts.map((fact) => `- ${fact}`).join("\n")
     }
 
-    const coreQuestion = getActiveGuidedQuestions(quickSetupResponses).find((question) => question.id === "core-details")
+    const coreQuestion = getProfileFilteredGuidedQuestions(quickSetupResponses).find((question) => question.id === "core-details")
     if (coreQuestion && !hasUnansweredGuidedDetails(coreQuestion, quickSetupResponses)) {
       const coreSummary = buildGuidedDetailSummary(coreQuestion, quickSetupResponses)
       if (coreSummary) quickSetupResponses['core-details'] = coreSummary
@@ -2941,11 +3011,19 @@ Mr. Script - Your Personal Wedding Script Creator`
   }
 
   useEffect(() => {
-    setSelectedCeremonyStyle(getMrScriptProfileService())
-  }, [editCoupleInfo?.id, currentCeremonyType])
+    const allowedOptions = getMrScriptAllowedServiceOptions()
+    const profileService = getMrScriptProfileService()
+    const fallbackService = allowedOptions.includes(profileService)
+      ? profileService
+      : allowedOptions[0] || "Custom Life Ceremony"
+
+    setSelectedCeremonyStyle((current) =>
+      current && allowedOptions.includes(current) ? current : fallbackService
+    )
+  }, [editCoupleInfo?.id, currentCeremonyType, editCoupleInfo?.ceremonyTypeLabel])
 
   const getFirstUnansweredGuidedQuestionIndex = (responses: Record<string, string>) => {
-    const activeQuestions = getActiveGuidedQuestions(responses)
+    const activeQuestions = getProfileFilteredGuidedQuestions(responses)
     const firstUnansweredIndex = activeQuestions.findIndex((question) =>
       !responses[question.id] || hasUnansweredGuidedDetails(question, responses)
     )
@@ -2974,7 +3052,7 @@ Mr. Script - Your Personal Wedding Script Creator`
     }
 
     if (scriptMode === "guided") {
-      const activeQuestions = getActiveGuidedQuestions(syncedResponses)
+      const activeQuestions = getProfileFilteredGuidedQuestions(syncedResponses)
       const currentQuestion = activeQuestions[currentQuestionIndex]
       const currentQuestionAnswered = currentQuestion
         ? Boolean(syncedResponses[currentQuestion.id]) && !hasUnansweredGuidedDetails(currentQuestion, syncedResponses)
@@ -3013,7 +3091,7 @@ Mr. Script - Your Personal Wedding Script Creator`
   const initializeChatbot = () => {
     const profileContext = buildMrScriptProfileContext()
     const startingResponses = buildQuickSetupResponses(profileContext.responsePrefill)
-    const activeQuestions = getActiveGuidedQuestions(startingResponses)
+    const activeQuestions = getProfileFilteredGuidedQuestions(startingResponses)
     const rawFirstUnansweredIndex = activeQuestions.findIndex((question) =>
       !startingResponses[question.id] || hasUnansweredGuidedDetails(question, startingResponses)
     )
@@ -3048,7 +3126,7 @@ Mr. Script - Your Personal Wedding Script Creator`
 
   const askNextQuestion = (questionIndex: number, responseOverrides: Record<string, string> = userResponses) => {
     const mergedResponses = buildQuickSetupResponses(responseOverrides)
-    const activeQuestions = getActiveGuidedQuestions(mergedResponses)
+    const activeQuestions = getProfileFilteredGuidedQuestions(mergedResponses)
 
     if (questionIndex >= activeQuestions.length) {
       // All questions completed, generate recommendation
@@ -3085,7 +3163,7 @@ Mr. Script - Your Personal Wedding Script Creator`
 
   const handleGuidedDetailResponse = (response: string) => {
     const mergedUserResponses = buildQuickSetupResponses(userResponses)
-    const currentQuestion = getActiveGuidedQuestions(mergedUserResponses)[currentQuestionIndex]
+    const currentQuestion = getProfileFilteredGuidedQuestions(mergedUserResponses)[currentQuestionIndex]
     if (!currentQuestion || !hasUnansweredGuidedDetails(currentQuestion, mergedUserResponses)) return false
 
     const detailIndex = getFirstUnansweredGuidedDetailIndex(currentQuestion, mergedUserResponses)
@@ -3129,7 +3207,7 @@ Mr. Script - Your Personal Wedding Script Creator`
 
   const handleLovedOneHonorFollowUp = (response: string) => {
     const mergedUserResponses = buildQuickSetupResponses(userResponses)
-    const activeQuestions = getActiveGuidedQuestions(mergedUserResponses)
+    const activeQuestions = getProfileFilteredGuidedQuestions(mergedUserResponses)
     const currentQuestion = activeQuestions[currentQuestionIndex]
     const trimmedResponse = response.trim()
 
@@ -3196,7 +3274,7 @@ Mr. Script - Your Personal Wedding Script Creator`
     if (!isClarificationRequest(response)) return false
 
     const mergedUserResponses = buildQuickSetupResponses(userResponses)
-    const activeQuestions = getActiveGuidedQuestions(mergedUserResponses)
+    const activeQuestions = getProfileFilteredGuidedQuestions(mergedUserResponses)
     const currentQuestion = activeQuestions[currentQuestionIndex]
     if (!currentQuestion && mergedUserResponses[PENDING_LOVED_ONE_HONOR_KEY] !== "true") return false
 
@@ -3247,7 +3325,7 @@ Mr. Script - Your Personal Wedding Script Creator`
 
   const saveCurrentGuidedQuestionResponse = (response: string) => {
     const mergedResponses = buildQuickSetupResponses(userResponses)
-    const activeQuestions = getActiveGuidedQuestions(mergedResponses)
+    const activeQuestions = getProfileFilteredGuidedQuestions(mergedResponses)
     const currentQuestion = activeQuestions[currentQuestionIndex]
 
     if (!currentQuestion) return false
@@ -3634,7 +3712,7 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
         aiResponse += `\n\nI also have these Quick Setup details:\n${quickSetupResponses['quick-setup-summary']}`
       }
 
-      const activeQuestions = getActiveGuidedQuestions(quickSetupResponses)
+      const activeQuestions = getProfileFilteredGuidedQuestions(quickSetupResponses)
       const nextQuestionIndex = activeQuestions.findIndex((question) =>
         !quickSetupResponses[question.id] || hasUnansweredGuidedDetails(question, quickSetupResponses)
       )
@@ -3650,7 +3728,7 @@ Based on this, I will keep the questions focused on the kind of ceremony you are
         setCurrentQuestionIndex(nextQuestionIndex)
       } else {
         aiResponse += `\n\nI have everything I need! I'll now generate your complete ceremony script.`
-        setCurrentQuestionIndex(getActiveGuidedQuestions(quickSetupResponses).length)
+        setCurrentQuestionIndex(getProfileFilteredGuidedQuestions(quickSetupResponses).length)
 
         // Automatically generate the script since we have all the info
         setTimeout(() => {
@@ -7879,7 +7957,7 @@ ${officiantProfile?.name || "Your officiant"}`)
     }, 1500)
   }
   const mrScriptServiceSelection = selectedCeremonyStyle || userResponses['ceremony-type']
-  const activeGuidedQuestions = getActiveGuidedQuestions({
+  const activeGuidedQuestions = getProfileFilteredGuidedQuestions({
     ...userResponses,
     'ceremony-type': mrScriptServiceSelection
   })
@@ -7887,7 +7965,7 @@ ${officiantProfile?.name || "Your officiant"}`)
   const storyPromptSuggestions = getMrScriptStoryPrompts(mrScriptServiceSelection)
   const getGuidedQuickResponseOptions = () => {
     const mergedResponses = buildQuickSetupResponses(userResponses)
-    const activeQuestions = getActiveGuidedQuestions(mergedResponses)
+    const activeQuestions = getProfileFilteredGuidedQuestions(mergedResponses)
     const currentQuestion = activeQuestions[currentQuestionIndex]
     const service = getMrScriptServiceByResponse(mergedResponses["ceremony-type"])
 
