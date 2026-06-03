@@ -3226,6 +3226,41 @@ Mr. Script - Your Personal Wedding Script Creator`
     return true
   }
 
+  const normalizeGuidedQuestionAnswer = (question: Question, response: string) => {
+    const trimmedResponse = response.trim()
+
+    if (question.id === "avoidances" && (
+      isNegativeResponse(trimmedResponse) ||
+      /\b(nothing|nothing to avoid|no avoid|no avoids|keep it general|general is fine|all good)\b/i.test(trimmedResponse)
+    )) {
+      return "None"
+    }
+
+    return trimmedResponse
+  }
+
+  const saveCurrentGuidedQuestionResponse = (response: string) => {
+    const mergedResponses = buildQuickSetupResponses(userResponses)
+    const activeQuestions = getActiveGuidedQuestions(mergedResponses)
+    const currentQuestion = activeQuestions[currentQuestionIndex]
+
+    if (!currentQuestion) return false
+
+    const nextResponses = {
+      ...mergedResponses,
+      [currentQuestion.id]: normalizeGuidedQuestionAnswer(currentQuestion, response)
+    }
+    const nextQuestionIndex = getFirstUnansweredGuidedQuestionIndex(nextResponses)
+
+    setUserResponses(nextResponses)
+    setTimeout(() => {
+      setCurrentQuestionIndex(nextQuestionIndex)
+      askNextQuestion(nextQuestionIndex, nextResponses)
+    }, 500)
+
+    return true
+  }
+
   const handleChatSubmit = () => {
     if (!chatInput.trim()) return
 
@@ -3273,25 +3308,9 @@ Mr. Script - Your Personal Wedding Script Creator`
       return
     }
 
-    // Save user response
-    const currentQuestion = getActiveGuidedQuestions(userResponses)[currentQuestionIndex]
-    const nextResponses = currentQuestion
-      ? {
-          ...userResponses,
-          [currentQuestion.id]: chatInput
-        }
-      : userResponses
-    if (currentQuestion) {
-      setUserResponses(nextResponses)
-    }
-
     setChatInput("")
 
-    // Ask next question
-    setTimeout(() => {
-      setCurrentQuestionIndex(prev => prev + 1)
-      askNextQuestion(currentQuestionIndex + 1, nextResponses)
-    }, 500)
+    saveCurrentGuidedQuestionResponse(chatInput)
   }
 
   const handleQuickResponse = (response: string) => {
@@ -3322,23 +3341,7 @@ Mr. Script - Your Personal Wedding Script Creator`
       return
     }
 
-    // Save user response
-    const currentQuestion = getActiveGuidedQuestions(userResponses)[currentQuestionIndex]
-    const nextResponses = currentQuestion
-      ? {
-          ...userResponses,
-          [currentQuestion.id]: response
-        }
-      : userResponses
-    if (currentQuestion) {
-      setUserResponses(nextResponses)
-    }
-
-    // Ask next question
-    setTimeout(() => {
-      setCurrentQuestionIndex(prev => prev + 1)
-      askNextQuestion(currentQuestionIndex + 1, nextResponses)
-    }, 500)
+    saveCurrentGuidedQuestionResponse(response)
   }
 
   const generateFinalRecommendation = (responses: Record<string, string> = userResponses) => {
