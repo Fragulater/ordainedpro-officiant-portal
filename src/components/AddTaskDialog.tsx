@@ -43,7 +43,7 @@ export interface Task {
 }
 
 export interface AddTaskDialogProps {
-  onAddTask: (task: Omit<Task, "id" | "createdDate">) => void
+  onAddTask: (task: Omit<Task, "id" | "createdDate">) => void | Promise<void>
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   reminderRecipient?: string
@@ -111,7 +111,7 @@ export function AddTaskDialog({ onAddTask, isOpen, onOpenChange, reminderRecipie
       // with the correct couple context
       console.log("📋 Submitting task via parent handler:", formData);
 
-      onAddTask({ ...formData, completed: false });
+      await onAddTask({ ...formData, completed: false });
 
       // Reset form
       setFormData({

@@ -6487,6 +6487,12 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     alert("Ceremony has been restored on the server and is now active!")
   }
 
+  type TaskEmailNotificationResult = {
+    sent: string[]
+    failed: Array<{ email: string; error: string }>
+    skippedReason?: string
+  }
+
   const handleAddTask = async (newTaskData: Omit<Task, 'id' | 'createdDate'>) => {
     if (!currentUser?.id || !editCoupleInfo?.id) {
       console.error("Ã¢ÂÅ’ Cannot add task: No user or couple selected")
@@ -6522,7 +6528,10 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
 
       // Send an immediate notification; future reminders are handled by the scheduled checker.
       if (newTaskData.emailReminder) {
-        scheduleEmailNotification(newTask)
+        const emailResult = await scheduleEmailNotification(newTask)
+        if (emailResult.failed.length > 0) {
+          console.warn("Task was saved, but one or more task notification emails failed.", emailResult)
+        }
       }
 
       console.log("Ã¢Å“â€¦ Task added:", newTask)
@@ -6532,9 +6541,17 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     }
   }
 
-  const scheduleEmailNotification = async (task: Task) => {
+  const scheduleEmailNotification = async (task: Task): Promise<TaskEmailNotificationResult> => {
+    const result: TaskEmailNotificationResult = { sent: [], failed: [] }
+
     // Calculate reminder date
     const reminderDate = new Date(task.dueDate)
+    if (Number.isNaN(reminderDate.getTime())) {
+      result.skippedReason = "Task does not have a valid due date."
+      console.warn("Task notification skipped:", result.skippedReason, task)
+      return result
+    }
+
     reminderDate.setDate(reminderDate.getDate() - task.reminderDays)
 
     console.log(`[SCRIPT]Â§ Scheduling email notification:`)
@@ -6543,6 +6560,11 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     console.log(`Due: ${task.dueDate} at ${task.dueTime}`)
 
     const recipients = [officiantProfile?.email || currentUser?.email].filter(Boolean)
+    if (recipients.length === 0) {
+      result.skippedReason = "No officiant email address is available."
+      console.warn("Task notification skipped:", result.skippedReason)
+      return result
+    }
 
     const coupleName = `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`
     const taskOfficiantName = officiantName
@@ -6564,6 +6586,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
         })
 
         if (response.ok) {
+          result.sent.push(String(email))
           console.log(`Ã¢Å“â€¦ Task notification sent to ${email}`)
         } else {
           console.error(`Ã¢ÂÅ’ Failed to send task notification to ${email}`)
@@ -6574,6 +6597,7 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     }
 
     console.log(`[SCRIPT]â€¦ Reminder scheduled for ${reminderDate.toDateString()} - Recipients: ${recipients.join(', ')}`)
+    return result
   }
 
   const generateTaskReminderEmail = (task: Task, coupleName: string, officiantName: string) => {
