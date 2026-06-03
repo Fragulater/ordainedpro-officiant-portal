@@ -23,8 +23,8 @@ export function PortalScriptViewerDialog() {
     <>
       {/* Script Viewer Dialog */}
       <Dialog open={showScriptViewerDialog} onOpenChange={setShowScriptViewerDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
+          <DialogHeader className="shrink-0 bg-white pr-8">
             <DialogTitle className="text-pink-900 flex items-center">
               <Eye className="w-5 h-5 mr-2" />
               Script Preview - {viewingScript?.title}
@@ -34,12 +34,12 @@ export function PortalScriptViewerDialog() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
-            {viewingScript && (
-              <div className="space-y-4">
-                {/* Script Info */}
-                <div className="bg-pink-50 p-4 rounded-lg border border-pink-200">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          {viewingScript && (
+            <>
+              {/* Script Info */}
+              <div className="shrink-0 bg-white py-4">
+                <div className="rounded-lg border border-pink-200 bg-pink-50 p-4">
+                  <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
                     <div>
                       <span className="font-medium text-pink-900">Type:</span>
                       <p className="text-pink-700">{viewingScript.type}</p>
@@ -58,46 +58,50 @@ export function PortalScriptViewerDialog() {
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Script Content */}
-                <div className="bg-white p-6 border-2 border-gray-200 rounded-lg">
-                  <div
-                    className="prose prose-lg max-w-none"
-                    style={{
-                      lineHeight: '1.8',
-                      fontSize: '16px',
-                      fontFamily: 'Georgia, serif',
-                      whiteSpace: 'pre-wrap'
-                    }}
-                  >
-                    {viewingScript.content}
+              <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+                <div className="space-y-4 pb-4">
+                  {/* Script Content */}
+                  <div className="rounded-lg border-2 border-gray-200 bg-white p-6">
+                    <div
+                      className="prose prose-lg max-w-none"
+                      style={{
+                        lineHeight: '1.8',
+                        fontSize: '16px',
+                        fontFamily: 'Georgia, serif',
+                        whiteSpace: 'pre-wrap'
+                      }}
+                    >
+                      {viewingScript.content}
+                    </div>
                   </div>
-                </div>
 
-                {/* Statistics */}
-                <div className="bg-gray-50 p-4 rounded-lg border">
-                  <h4 className="font-medium text-gray-900 mb-2">Script Statistics</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium">Word Count:</span>
-                      <span className="ml-2">{viewingScript.content.split(/\s+/).filter((word: string) => word.length > 0).length}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium">Characters:</span>
-                      <span className="ml-2">{viewingScript.content.length}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium">Est. Reading Time:</span>
-                      <span className="ml-2">{Math.ceil(viewingScript.content.split(/\s+/).filter((word: string) => word.length > 0).length / 150)} min</span>
+                  {/* Statistics */}
+                  <div className="rounded-lg border bg-gray-50 p-4">
+                    <h4 className="mb-2 font-medium text-gray-900">Script Statistics</h4>
+                    <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
+                      <div>
+                        <span className="font-medium">Word Count:</span>
+                        <span className="ml-2">{viewingScript.content.split(/\s+/).filter((word: string) => word.length > 0).length}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Characters:</span>
+                        <span className="ml-2">{viewingScript.content.length}</span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Est. Reading Time:</span>
+                        <span className="ml-2">{Math.ceil(viewingScript.content.split(/\s+/).filter((word: string) => word.length > 0).length / 150)} min</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+            </>
+          )}
 
           {/* Action Buttons */}
-          <div className="flex justify-between items-center pt-4 border-t">
+          <div className="flex shrink-0 items-center justify-between border-t bg-white pt-4">
             <div className="text-sm text-gray-500">
               Script for {editCoupleInfo?.brideName || 'Partner 1'} & {editCoupleInfo?.groomName || 'Partner 2'}
             </div>
