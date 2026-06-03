@@ -8,6 +8,7 @@ import {
   formatReadingsForPrompt,
   getReadingRecommendations,
 } from "@/data/ceremony-readings";
+import { createClient } from "@/supabase/utils/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ type ScriptGenerationBody = {
   religiousElements?: string;
   culturalTraditions?: string;
   ceremonyProfileContext?: Record<string, any>;
+  officiantStyleProfile?: Record<string, any> | null;
   refinementInstructions?: string;
   regenerateSegmentIndex?: number;
   existingSegments?: string[];
@@ -103,6 +105,65 @@ const stripMarkdownFormatting = (content: string) =>
     .replace(/__(.*?)__/g, "$1")
     .replace(/^\s*[-_*]{3,}\s*$/gm, "")
     .trim();
+
+async function loadOfficiantStyleProfile() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return null;
+
+    const { data, error } = await supabase
+      .from("officiant_script_style_profiles")
+      .select("profile, sample_count")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error || !data?.profile) return null;
+
+    return {
+      sampleCount: data.sample_count || 0,
+      ...(data.profile as Record<string, any>),
+    };
+  } catch (error) {
+    console.error("Unable to load officiant style profile:", error);
+    return null;
+  }
+}
+
+function formatOfficiantStyleProfile(profile?: Record<string, any> | null) {
+  if (!profile) return "";
+
+  const list = (items?: unknown) =>
+    Array.isArray(items) ? items.map((item) => String(item).trim()).filter(Boolean).slice(0, 8).join("; ") : "";
+
+  const lines = [
+    profile.sampleCount ? `Samples learned from: ${profile.sampleCount}` : "",
+    profile.summary ? `Overall voice: ${profile.summary}` : "",
+    list(profile.ceremonyTypes) ? `Ceremony types represented: ${list(profile.ceremonyTypes)}` : "",
+    list(profile.tone) ? `Tone patterns: ${list(profile.tone)}` : "",
+    profile.openingStyle ? `Opening style: ${profile.openingStyle}` : "",
+    profile.vowStyle ? `Vow style: ${profile.vowStyle}` : "",
+    profile.ringExchangeStyle ? `Ring exchange style: ${profile.ringExchangeStyle}` : "",
+    profile.storytellingStyle ? `Storytelling style: ${profile.storytellingStyle}` : "",
+    profile.transitionStyle ? `Transition style: ${profile.transitionStyle}` : "",
+    profile.blessingClosingStyle ? `Blessing/closing style: ${profile.blessingClosingStyle}` : "",
+    profile.humorLevel ? `Humor level: ${profile.humorLevel}` : "",
+    profile.religiousSpiritualStyle ? `Religious/spiritual language: ${profile.religiousSpiritualStyle}` : "",
+    profile.readingPreference ? `Reading preference: ${profile.readingPreference}` : "",
+    profile.sectionStructure ? `Section structure: ${profile.sectionStructure}` : "",
+    profile.personalizationLevel ? `Personalization level: ${profile.personalizationLevel}` : "",
+    profile.legalLanguagePreference ? `Legal language preference: ${profile.legalLanguagePreference}` : "",
+    profile.familyCommunityInvolvement ? `Family/community involvement: ${profile.familyCommunityInvolvement}` : "",
+    list(profile.signaturePhrases) ? `Signature phrases to echo sparingly, without copying whole scripts: ${list(profile.signaturePhrases)}` : "",
+    list(profile.phrasesToAvoid) ? `Avoid or minimize these phrases: ${list(profile.phrasesToAvoid)}` : "",
+    profile.lengthRhythm ? `Length/rhythm: ${profile.lengthRhythm}` : "",
+  ].filter(Boolean);
+
+  return lines.length ? lines.join("\n") : "";
+}
 
 const chunkSections = (sections: string[], chunkCount: number) => {
   const chunks: string[][] = [];
@@ -314,6 +375,7 @@ const buildContextBlock = (body: ScriptGenerationBody, service: MrScriptService)
   const profileFacts = Array.isArray(profileContext.knownFacts)
     ? profileContext.knownFacts.filter(Boolean).map((fact) => `- ${fact}`).join("\n")
     : "";
+  const officiantStyleProfile = formatOfficiantStyleProfile(body.officiantStyleProfile);
   const readingRecommendations = getReadingRecommendations({
     ceremonyType: service.id,
     tone: body.ceremonyTone || responses["ceremony-tone"],
@@ -373,6 +435,9 @@ const buildContextBlock = (body: ScriptGenerationBody, service: MrScriptService)
     `Recommended safe reading library options:\n${formatReadingsForPrompt(readingRecommendations)}`,
     `Religious / cultural notes: ${[body.religiousElements, body.culturalTraditions].filter(Boolean).join("; ") || "None specified"}`,
     profileFacts ? `Known profile facts:\n${profileFacts}` : "",
+    officiantStyleProfile
+      ? `OFFICIANT WRITING STYLE PROFILE:\n${officiantStyleProfile}\nUse this as private style guidance. Do not copy uploaded samples verbatim.`
+      : "",
   ].filter(Boolean).join("\n");
 };
 
@@ -565,6 +630,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as ScriptGenerationBody;
+    body.officiantStyleProfile = await loadOfficiantStyleProfile();
     const service = getMrScriptServiceByResponse(body.ceremonyType || body.ceremonyStyle);
     const segments = buildSegments(service, body.ceremonyLength || body.userResponses?.["ceremony-duration"], body);
     const isRefinement = Boolean(body.refinementInstructions);

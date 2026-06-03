@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -89,6 +90,57 @@ export function BuildScriptTab() {
     selectedCeremonyStyle === "Eulogy, Vows, or Speech"
       ? "Eulogy"
       : selectedMrScriptService?.shortName || selectedCeremonyStyle
+  const styleUploadInputRef = useRef<HTMLInputElement>(null)
+  const [styleSampleCount, setStyleSampleCount] = useState(0)
+  const [styleProfileSummary, setStyleProfileSummary] = useState("")
+  const [isUploadingStyleSamples, setIsUploadingStyleSamples] = useState(false)
+
+  const loadStyleProfile = async () => {
+    try {
+      const response = await fetch("/api/mr-script/style-profile")
+      if (!response.ok) return
+      const data = await response.json()
+      setStyleSampleCount(Number(data.sampleCount || 0))
+      setStyleProfileSummary(data.profile?.summary || "")
+    } catch (error) {
+      console.error("Unable to load writing style profile:", error)
+    }
+  }
+
+  useEffect(() => {
+    loadStyleProfile()
+  }, [])
+
+  const handleStyleSampleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ""
+
+    if (!files.length) return
+
+    setIsUploadingStyleSamples(true)
+    try {
+      const formData = new FormData()
+      files.forEach((file) => formData.append("files", file))
+      formData.append("ceremonyType", selectedCeremonyStyle || selectedMrScriptService?.displayName || "")
+
+      const response = await fetch("/api/mr-script/style-profile", {
+        method: "POST",
+        body: formData,
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to analyze these style samples.")
+      }
+
+      setStyleSampleCount(Number(data.sampleCount || 0))
+      setStyleProfileSummary(data.profile?.summary || "")
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to analyze these style samples.")
+    } finally {
+      setIsUploadingStyleSamples(false)
+    }
+  }
 
   return (
 <TabsContent value="buildscript">
@@ -118,6 +170,43 @@ export function BuildScriptTab() {
                     >
                       Mr. Script Expert
                     </Button>
+                  </div>
+
+                  <div className="mb-5 rounded-lg border border-pink-100 bg-pink-50 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-pink-900">
+                          <Sparkles className="h-4 w-4" />
+                          Writing Style Library
+                          <Badge variant="outline" className="border-pink-200 bg-white text-pink-700">
+                            {styleSampleCount} sample{styleSampleCount === 1 ? "" : "s"}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 max-w-3xl text-xs text-pink-800">
+                          {styleProfileSummary || "Upload 3-5 past scripts to start teaching Mr. Script your private officiant voice."}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={styleUploadInputRef}
+                          type="file"
+                          multiple
+                          accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          className="hidden"
+                          onChange={handleStyleSampleUpload}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="border-pink-200 bg-white text-pink-700 hover:bg-pink-100"
+                          disabled={isUploadingStyleSamples}
+                          onClick={() => styleUploadInputRef.current?.click()}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          {isUploadingStyleSamples ? "Learning..." : "Upload Style Samples"}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Mode Descriptions */}
