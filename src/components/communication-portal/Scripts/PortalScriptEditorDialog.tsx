@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { BasicTextEditor, stripEditorHtml } from "@/components/BasicTextEditor"
+import { BasicTextEditor, SCRIPT_EDITOR_MAX_CHARACTERS, stripEditorHtml } from "@/components/BasicTextEditor"
 import { Edit, Save } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
@@ -22,7 +22,7 @@ export function PortalScriptEditorDialog() {
     : stripEditorHtml(scriptContent)
   const charCount = plainText.length
   const isTooShort = charCount < 50
-  const isTooLong = charCount > 7000
+  const isTooLong = charCount > SCRIPT_EDITOR_MAX_CHARACTERS
 
   return (
     <Dialog open={showScriptEditorDialog} onOpenChange={setShowScriptEditorDialog}>
@@ -42,7 +42,7 @@ export function PortalScriptEditorDialog() {
             value={scriptContent}
             onChange={setScriptContent}
             minHeightClassName="min-h-[560px]"
-            maxCharacters={7000}
+            maxCharacters={SCRIPT_EDITOR_MAX_CHARACTERS}
           />
         </div>
 
@@ -60,8 +60,8 @@ export function PortalScriptEditorDialog() {
               {isTooShort
                 ? `Need ${50 - charCount} more characters to save`
                 : isTooLong
-                ? `${charCount - 7000} characters over limit`
-                : "Requirements: 50-7,000 characters"}
+                ? `${charCount - SCRIPT_EDITOR_MAX_CHARACTERS} characters over limit`
+                : `Requirements: 50-${SCRIPT_EDITOR_MAX_CHARACTERS.toLocaleString()} characters`}
             </div>
           </div>
 

@@ -12,6 +12,8 @@ type BasicTextEditorProps = {
   maxCharacters?: number
 }
 
+export const SCRIPT_EDITOR_MAX_CHARACTERS = 50000
+
 const colors = [
   "#000000",
   "#ff0000",
@@ -52,7 +54,7 @@ export function BasicTextEditor({
   value,
   onChange,
   minHeightClassName = "min-h-[420px]",
-  maxCharacters = 7000,
+  maxCharacters = SCRIPT_EDITOR_MAX_CHARACTERS,
 }: BasicTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
 

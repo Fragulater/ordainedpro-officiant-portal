@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { Select } from "@/components/ui/select"
 import { MessageCircle, FileText, Users, Send, Download, Plus, Check, MapPin, Heart, Edit, FileEdit, Eye, Save, Upload, ChevronRight, Printer, Mail, BookOpen, Sparkles } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
+import { SCRIPT_EDITOR_MAX_CHARACTERS } from "@/components/BasicTextEditor"
 
 export function BuildScriptTab() {
   const {
@@ -980,12 +981,12 @@ export function BuildScriptTab() {
                                 ${(() => {
                                   const charCount = scriptContent.replace(/<[^>]*>/g, '').length;
                                   if (charCount < 50) return 'text-red-600 font-medium';
-                                  if (charCount > 6500) return 'text-orange-600 font-medium';
-                                  if (charCount > 7000) return 'text-red-600 font-medium';
+                                  if (charCount > SCRIPT_EDITOR_MAX_CHARACTERS) return 'text-red-600 font-medium';
+                                  if (charCount > SCRIPT_EDITOR_MAX_CHARACTERS * 0.9) return 'text-orange-600 font-medium';
                                   return 'text-gray-600';
                                 })()}
                               `}>
-                                Characters: {scriptContent.replace(/<[^>]*>/g, '').length}/7,000
+                                Characters: {scriptContent.replace(/<[^>]*>/g, '').length}/{SCRIPT_EDITOR_MAX_CHARACTERS.toLocaleString()}
                               </span> |
                               Lines: {scriptContent.split(/<br\s*\/?>/gi).length}
                             </div>
@@ -1046,7 +1047,7 @@ export function BuildScriptTab() {
                                 className="bg-blue-500 hover:bg-blue-600"
                                 disabled={(() => {
                                   const charCount = scriptContent.replace(/<[^>]*>/g, '').length;
-                                  return charCount < 50 || charCount > 7000;
+                                  return charCount < 50 || charCount > SCRIPT_EDITOR_MAX_CHARACTERS;
                                 })()}
                               >
                                 <Save className="w-4 h-4 mr-2" />
