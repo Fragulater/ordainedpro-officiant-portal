@@ -8,6 +8,16 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Send, AlertCircle } from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
+const sanitizeReminderText = (value: string) =>
+  String(value || "")
+    .replace(/Quincea(?:ÃƒÆ’Ã‚Â±|ÃƒÂ±|ÃƒÆ’Ã‚Â±|Ã±)era/gi, "Quinceanera")
+    .replace(/Ã¢â‚¬Â¢|ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢/g, "-")
+    .replace(/ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢/g, "'")
+    .replace(/ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ|ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â/g, '"')
+    .replace(/ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“|ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â/g, "-")
+    .replace(/Ã‚/g, "")
+    .replace(/ÃƒÆ’/g, "")
+
 export function PortalSendPaymentReminderDialog() {
   const {
     showSendPaymentReminderDialog,
@@ -128,7 +138,7 @@ export function PortalSendPaymentReminderDialog() {
                 <Input
                   id="paymentReminderSubject"
                   value={paymentReminderForm.subject}
-                  onChange={(e) => setPaymentReminderForm({...paymentReminderForm, subject: e.target.value})}
+                  onChange={(e) => setPaymentReminderForm({...paymentReminderForm, subject: sanitizeReminderText(e.target.value)})}
                   placeholder="Payment reminder subject"
                   className="mt-1 border-orange-200 focus:border-orange-500"
                 />
@@ -141,7 +151,7 @@ export function PortalSendPaymentReminderDialog() {
                 <Textarea
                   id="paymentReminderBody"
                   value={paymentReminderForm.body}
-                  onChange={(e) => setPaymentReminderForm({...paymentReminderForm, body: e.target.value})}
+                  onChange={(e) => setPaymentReminderForm({...paymentReminderForm, body: sanitizeReminderText(e.target.value)})}
                   placeholder="Payment reminder message"
                   rows={6}
                   className="mt-1 border-orange-200 focus:border-orange-500"
@@ -158,7 +168,7 @@ export function PortalSendPaymentReminderDialog() {
                     ? `${editCoupleInfo.brideEmail}, ${editCoupleInfo.groomEmail}`
                     : paymentReminderForm.to || paymentReminderForm.customEmail || 'No recipient selected'
                 }</p>
-                <p><span className="font-medium">Subject:</span> {paymentReminderForm.subject || 'No subject'}</p>
+                <p><span className="font-medium">Subject:</span> {sanitizeReminderText(paymentReminderForm.subject) || 'No subject'}</p>
                 <p><span className="font-medium">Payment Details:</span> {paymentInfo.totalAmount} total, {paymentInfo.depositPaid} paid, {paymentInfo.balance} due</p>
               </div>
             </div>

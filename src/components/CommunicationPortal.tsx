@@ -394,6 +394,16 @@ const REFUND_FEE_RATE = 0.05
 
 const roundCurrency = (amount: number) => Math.round(amount * 100) / 100
 
+const sanitizeMessageText = (value: string) =>
+  String(value || "")
+    .replace(/Quincea(?:ÃƒÂ±|Ã±|ÃƒÂ±|ñ)era/gi, "Quinceanera")
+    .replace(/â€¢|Ã¢â‚¬Â¢|ÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â/g, "-")
+    .replace(/Ã¢â‚¬â„¢/g, "'")
+    .replace(/Ã¢â‚¬Å“|Ã¢â‚¬Â/g, '"')
+    .replace(/Ã¢â‚¬â€œ|Ã¢â‚¬â€/g, "-")
+    .replace(/Â/g, "")
+    .replace(/Ãƒ/g, "")
+
 const isRefundPayment = (payment: any) =>
   payment?.status === "refunded" || String(payment?.type || payment?.payment_method || "").toLowerCase() === "refund"
 
@@ -5425,6 +5435,15 @@ ${shareScriptForm.body}`
 
   const getPaymentReminderTemplate = () => {
     const serviceLabel = currentCeremonyConfig?.label || "Ceremony"
+    const pendingInvoice = paymentHistory
+      .filter((payment: any) => payment.status === "pending" && Number(payment.amount || 0) > 0 && payment.id)
+      .sort((a: any, b: any) => getPaymentDateValue(b).getTime() - getPaymentDateValue(a).getTime())[0]
+    const paymentPortalUrl = pendingInvoice
+      ? `${typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || "https://portal.ordainedpro.com"}/pay/invoice/${pendingInvoice.id}`
+      : ""
+    const paymentLinkSection = paymentPortalUrl
+      ? `\n\nMake a Payment:\n${paymentPortalUrl}`
+      : ""
     const primaryFirst = getFirstName(editCoupleInfo?.brideName)
     const secondaryFirst = getFirstName(editCoupleInfo?.groomName)
     const greetingNames =
@@ -5448,9 +5467,9 @@ ${shareScriptForm.body}`
         closing: "It is an honor to support your family with this service.",
       },
       quinceanera: {
-        subject: "Payment Reminder - QuinceaÃ±era Ceremony",
+        subject: "Payment Reminder - Quinceanera Ceremony",
         intro: "I hope the celebration planning is going smoothly.",
-        reminder: "This is a friendly reminder regarding your upcoming payment for the quinceaÃ±era ceremony services.",
+        reminder: "This is a friendly reminder regarding your upcoming payment for the quinceanera ceremony services.",
         due: "Please submit the remaining balance by the due date so the ceremony arrangements can remain confirmed.",
         closing: "Looking forward to helping make this celebration meaningful and memorable!",
       },
@@ -5480,8 +5499,9 @@ ${shareScriptForm.body}`
     const template = templates[currentCeremonyType] || templates.other
 
     return {
-      subject: template.subject,
-      body: `Dear ${greetingNames},
+      subject: sanitizeMessageText(template.subject),
+      paymentPortalUrl,
+      body: sanitizeMessageText(`Dear ${greetingNames},
 
 ${template.intro}
 
@@ -5492,6 +5512,7 @@ Payment Details:
 * Deposit Paid: $${paymentInfo.depositPaid}
 * Balance Due: $${paymentInfo.balance}
 * Due Date: ${paymentInfo.finalPaymentDue}
+${paymentLinkSection}
 
 ${template.due}
 
@@ -5500,7 +5521,7 @@ If you have any questions about the payment or need to discuss payment options, 
 ${template.closing}
 
 Warm regards,
-${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail ? `\n${officiantEmail}` : ''}`,
+${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail ? `\n${officiantEmail}` : ''}`),
     }
   }
 
@@ -5510,8 +5531,8 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
     setPaymentReminderForm({
       to: 'both', // Default to both couple members
       customEmail: '',
-      subject: reminderTemplate.subject,
-      body: reminderTemplate.body
+      subject: sanitizeMessageText(reminderTemplate.subject),
+      body: sanitizeMessageText(reminderTemplate.body)
     })
     setShowSendPaymentReminderDialog(true)
   }
@@ -5534,12 +5555,24 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
       return
     }
 
-    if (!paymentReminderForm.subject.trim()) {
+    const pendingInvoice = paymentHistory
+      .filter((payment: any) => payment.status === "pending" && Number(payment.amount || 0) > 0 && payment.id)
+      .sort((a: any, b: any) => getPaymentDateValue(b).getTime() - getPaymentDateValue(a).getTime())[0]
+    const paymentPortalUrl = pendingInvoice
+      ? `${typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL || "https://portal.ordainedpro.com"}/pay/invoice/${pendingInvoice.id}`
+      : ""
+    const sanitizedSubject = sanitizeMessageText(paymentReminderForm.subject).trim()
+    const sanitizedBody = sanitizeMessageText(paymentReminderForm.body).trim()
+    const messageWithPaymentLink = paymentPortalUrl && !sanitizedBody.includes(paymentPortalUrl)
+      ? `${sanitizedBody}\n\nMake a Payment:\n${paymentPortalUrl}`
+      : sanitizedBody
+
+    if (!sanitizedSubject) {
       alert('Please enter a subject.')
       return
     }
 
-    if (!paymentReminderForm.body.trim()) {
+    if (!messageWithPaymentLink) {
       alert('Please enter a message body.')
       return
     }
@@ -5556,12 +5589,16 @@ ${officiantLabel}${officiantPhone ? `\n${officiantPhone}` : ''}${officiantEmail 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             to: email,
-            subject: paymentReminderForm.subject,
-            message: paymentReminderForm.body,
+            subject: sanitizedSubject,
+            message: messageWithPaymentLink,
             fromName: officiantLabel,
             coupleName,
             coupleId: editCoupleInfo?.id,
             officiantId: currentUser?.id,
+            actionUrl: paymentPortalUrl || undefined,
+            actionLabel: paymentPortalUrl ? "Make a payment" : undefined,
+            emailTitle: "Payment Reminder",
+            emailSubtitle: "From your officiant",
             attachments: []
           })
         })
