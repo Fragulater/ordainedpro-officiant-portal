@@ -166,6 +166,8 @@ export default async function InvoicePaymentPage({
   const officiantName = profile?.business_name || profile?.full_name || "Your officiant"
   const isPaid = payment.status === "paid"
   const amountDue = isPaid ? 0 : Number(payment.amount)
+  const hasBalanceDue = amountDue > 0
+  const statusLabel = isPaid ? "Paid" : hasBalanceDue ? payment.status : "No balance due"
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8">
@@ -192,8 +194,8 @@ export default async function InvoicePaymentPage({
                 <CardTitle>{payment.invoice_number}</CardTitle>
                 <CardDescription>{coupleName}</CardDescription>
               </div>
-              <Badge className={isPaid ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}>
-                {isPaid ? "Paid" : payment.status}
+              <Badge className={isPaid ? "bg-green-100 text-green-800" : hasBalanceDue ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800"}>
+                {statusLabel}
               </Badge>
             </div>
           </CardHeader>
@@ -209,7 +211,7 @@ export default async function InvoicePaymentPage({
               </div>
               <div className="rounded-xl border bg-white p-4">
                 <p className="text-sm text-slate-500">Status</p>
-                <p className="mt-1 font-semibold capitalize text-slate-950">{isPaid ? "paid" : payment.status}</p>
+                <p className="mt-1 font-semibold capitalize text-slate-950">{statusLabel}</p>
               </div>
             </div>
 
@@ -243,7 +245,7 @@ export default async function InvoicePaymentPage({
               officiantId={payment.user_id}
               coupleEmail={coupleEmail}
               coupleName={coupleName}
-              disabled={isPaid || Number(payment.amount) <= 0}
+              disabled={isPaid || !hasBalanceDue}
             />
           </CardContent>
         </Card>

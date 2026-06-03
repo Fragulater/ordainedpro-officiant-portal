@@ -432,7 +432,7 @@ export function PortalGenerateInvoiceDialog() {
                       id="depositPaid"
                       type="number"
                       value={invoiceForm.depositPaid}
-                      onChange={(e) => setInvoiceForm({...invoiceForm, depositPaid: parseFloat(e.target.value) || 0})}
+                      onChange={(e) => setInvoiceForm({...invoiceForm, depositPaid: Math.max(0, parseFloat(e.target.value) || 0)})}
                       placeholder="0"
                       min="0"
                       step="0.01"
@@ -520,34 +520,43 @@ export function PortalGenerateInvoiceDialog() {
 
                 {/* Financial Summary */}
                 <div className="space-y-3">
+                  {(() => {
+                    const subtotal = invoiceForm.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0)
+                    const total = subtotal * (1 + invoiceForm.taxRate / 100)
+                    const depositPaid = Math.min(Math.max(Number(invoiceForm.depositPaid || 0), 0), total)
+                    const balanceDue = Math.max(0, total - depositPaid)
+
+                    return (
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="font-medium">Subtotal:</span>
-                      <span className="font-mono">${invoiceForm.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0).toFixed(2)}</span>
+                      <span className="font-mono">${subtotal.toFixed(2)}</span>
                     </div>
                     {invoiceForm.taxRate > 0 && (
                       <div className="flex justify-between text-sm border-t pt-2">
                         <span className="font-medium">Tax ({invoiceForm.taxRate}%):</span>
-                        <span className="font-mono">${(invoiceForm.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0) * (invoiceForm.taxRate / 100)).toFixed(2)}</span>
+                        <span className="font-mono">${(subtotal * (invoiceForm.taxRate / 100)).toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm border-t pt-2">
                       <span className="font-medium">Total Invoice:</span>
-                      <span className="font-mono font-semibold">${(invoiceForm.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0) * (1 + invoiceForm.taxRate / 100)).toFixed(2)}</span>
+                      <span className="font-mono font-semibold">${total.toFixed(2)}</span>
                     </div>
-                    {invoiceForm.depositPaid > 0 && (
+                    {depositPaid > 0 && (
                       <>
                         <div className="flex justify-between text-sm text-green-600">
                           <span className="font-medium">Deposit Paid:</span>
-                          <span className="font-mono">-${invoiceForm.depositPaid.toFixed(2)}</span>
+                          <span className="font-mono">-${depositPaid.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between text-lg font-bold text-blue-900 pt-2 border-t border-blue-200">
                           <span>Balance Due:</span>
-                          <span className="font-mono">${Math.max(0, (invoiceForm.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0) * (1 + invoiceForm.taxRate / 100)) - invoiceForm.depositPaid).toFixed(2)}</span>
+                          <span className="font-mono">${balanceDue.toFixed(2)}</span>
                         </div>
                       </>
                     )}
                   </div>
+                    )
+                  })()}
                 </div>
               </div>
 

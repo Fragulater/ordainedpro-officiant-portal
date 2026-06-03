@@ -532,12 +532,14 @@ const calculateInvoiceValues = (form: any) => {
   const subtotal = form.items.reduce((sum: number, item: any) => sum + getInvoiceItemAmount(item), 0)
   const taxAmount = subtotal * (form.taxRate / 100)
   const total = subtotal + taxAmount
-  const balanceDue = Math.max(0, total - (form.depositPaid || 0))
+  const depositPaid = Math.min(Math.max(Number(form.depositPaid || 0), 0), total)
+  const balanceDue = Math.max(0, total - depositPaid)
 
   return {
     subtotal: Math.round(subtotal * 100) / 100,
     taxAmount: Math.round(taxAmount * 100) / 100,
     total: Math.round(total * 100) / 100,
+    depositPaid: Math.round(depositPaid * 100) / 100,
     balanceDue: Math.round(balanceDue * 100) / 100,
   }
 }
@@ -7367,7 +7369,7 @@ ${officiantLabel}${officiantPhone ? `\nPhone: ${officiantPhone}` : ''}${offician
         description: `Invoice ${invoiceForm.invoiceNumber} - ${invoiceForm.coupleName}`,
         amount: totals.balanceDue,
         paymentType: "invoice",
-        status: totals.balanceDue > 0 ? "pending" : "paid",
+        status: "pending",
         dueDate: invoiceForm.dueDate,
       })
 
