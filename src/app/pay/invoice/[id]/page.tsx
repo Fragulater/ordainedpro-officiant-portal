@@ -239,7 +239,7 @@ export default async function InvoicePaymentPage({
 
             <InvoicePaymentButton
               paymentId={payment.id}
-              amount={Number(payment.amount)}
+              amount={amountDue}
               invoiceNumber={payment.invoice_number}
               coupleId={payment.couple_id}
               officiantId={payment.user_id}

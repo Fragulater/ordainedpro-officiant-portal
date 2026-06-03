@@ -3816,7 +3816,7 @@ ${officiantFullName}`;
                     </CardContent>
                   </Card>
 
-                  <Card className="mb-6 border-2 border-emerald-200 shadow-lg">
+                  <Card className="hidden mb-6 border-2 border-emerald-200 shadow-lg">
                     <CardHeader className="bg-gradient-to-r from-emerald-50 to-green-50">
                       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div>

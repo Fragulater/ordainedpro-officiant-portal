@@ -564,7 +564,12 @@ export function PortalGenerateInvoiceDialog() {
               <div className="mt-4 p-3 bg-white rounded-lg border">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Payment Status:</span>
-                  {invoiceForm.depositPaid > 0 ? (
+                  {(() => {
+                    const subtotal = invoiceForm.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0)
+                    const total = subtotal * (1 + invoiceForm.taxRate / 100)
+                    const depositPaid = Math.min(Math.max(Number(invoiceForm.depositPaid || 0), 0), total)
+                    return depositPaid > 0
+                  })() ? (
                     <Badge className="bg-yellow-100 text-yellow-800">
                       Partial Payment Received
                     </Badge>

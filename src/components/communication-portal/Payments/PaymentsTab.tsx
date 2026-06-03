@@ -1,11 +1,34 @@
 "use client"
 
+import { useMemo, useState } from "react"
 import { TabsContent } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { FileText, Send, Plus, Check, Clock, Mail, DollarSign, AlertCircle, CreditCard, Receipt, Download, Printer, RotateCcw } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import {
+  AlertCircle,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  CreditCard,
+  DollarSign,
+  Download,
+  ExternalLink,
+  FileText,
+  Loader2,
+  Mail,
+  Plus,
+  Printer,
+  Receipt,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  X,
+} from "lucide-react"
 import { useCommunicationPortal } from "../CommunicationPortalContext"
 
 export function PaymentsTab() {
@@ -24,10 +47,114 @@ export function PaymentsTab() {
     setNewPayment,
     setShowRefundsDialog,
     handleOpenInvoiceDialog,
+    stripeConnectAccount,
+    stripeConnectLoading,
+    stripeConnectMessage,
+    refreshStripeConnectStatus,
+    handleStartStripeConnectOnboarding,
+    handleOpenStripeExpressDashboard,
   } = useCommunicationPortal()
 
+  const [showPaymentHistoryDialog, setShowPaymentHistoryDialog] = useState(false)
+  const [paymentHistorySearch, setPaymentHistorySearch] = useState("")
+  const [showAllOutstandingBalances, setShowAllOutstandingBalances] = useState(false)
+  const [showAllRefundRows, setShowAllRefundRows] = useState(false)
+
+  const visibleOutstandingBalanceRows = showAllOutstandingBalances
+    ? outstandingBalanceRows
+    : outstandingBalanceRows.slice(0, 3)
+  const visibleRefundRows = showAllRefundRows ? refundRows : refundRows.slice(0, 3)
+
+  const filteredPaymentHistory = useMemo(() => {
+    const query = paymentHistorySearch.trim().toLowerCase()
+    if (!query) return paymentHistory
+
+    return paymentHistory.filter((payment: any) =>
+      [
+        payment.type,
+        payment.date,
+        payment.method,
+        payment.status,
+        payment.amount,
+        payment.description,
+        payment.notes,
+      ]
+        .filter(Boolean)
+        .some(value => String(value).toLowerCase().includes(query))
+    )
+  }, [paymentHistory, paymentHistorySearch])
+
+  const renderPaymentHistoryRow = (payment: any) => (
+    <div key={payment.id} className="flex items-center justify-between rounded-xl border border-blue-100 bg-white p-4">
+      <div className="flex items-center space-x-3">
+        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${
+          payment.status === "paid" ? "bg-green-100" : payment.status === "refunded" ? "bg-red-100" : "bg-orange-100"
+        }`}>
+          {payment.status === "paid" ? (
+            <Receipt className="h-6 w-6 text-green-600" />
+          ) : payment.status === "refunded" ? (
+            <RotateCcw className="h-6 w-6 text-red-600" />
+          ) : (
+            <Clock className="h-6 w-6 text-orange-600" />
+          )}
+        </div>
+        <div>
+          <p className="font-semibold text-gray-900">{payment.type}</p>
+          <p className="text-sm text-gray-500">{payment.date} - {payment.method}</p>
+        </div>
+      </div>
+      <div className="text-right">
+        <p className={`text-lg font-bold ${payment.status === "refunded" ? "text-red-700" : "text-gray-900"}`}>
+          {payment.status === "refunded" ? "-" : ""}${payment.amount}
+        </p>
+        <Badge
+          variant={payment.status === "paid" ? "default" : "secondary"}
+          className={payment.status === "paid" ? "bg-green-100 text-green-800" : payment.status === "refunded" ? "bg-red-100 text-red-800" : "bg-orange-100 text-orange-800"}
+        >
+          {payment.status === "paid" ? "Completed" : payment.status === "refunded" ? "Refunded" : "Pending"}
+        </Badge>
+        {payment.status === "refunded" && (
+          <p className="mt-1 text-xs text-red-600">Fee: ${Number(payment.refundFee || 0).toFixed(2)}</p>
+        )}
+      </div>
+    </div>
+  )
+
   return (
-<TabsContent value="payments">
+    <TabsContent value="payments">
+      <Dialog open={showPaymentHistoryDialog} onOpenChange={setShowPaymentHistoryDialog}>
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-hidden border-blue-100 p-0 shadow-xl">
+          <DialogHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-5">
+            <DialogTitle className="text-blue-900">Payment History</DialogTitle>
+            <DialogDescription>Search payment, invoice, and refund transactions for this ceremony.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 px-6 pb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-500" />
+              <Input
+                value={paymentHistorySearch}
+                onChange={(event) => setPaymentHistorySearch(event.target.value)}
+                placeholder="Search by invoice, method, status, date, or amount..."
+                className="border-blue-200 pl-9"
+              />
+            </div>
+            <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-2">
+              {paymentHistory.length === 0 ? (
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+                  No payment transactions recorded for this ceremony yet.
+                </div>
+              ) : filteredPaymentHistory.length === 0 ? (
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+                  No payment transactions match your search.
+                </div>
+              ) : (
+                filteredPaymentHistory.map(renderPaymentHistoryRow)
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
                 <div className="space-y-6">
@@ -163,7 +290,7 @@ export function PaymentsTab() {
                           <div className="rounded-lg border border-green-100 bg-green-50 p-4 text-sm text-green-800">No outstanding balances recorded.</div>
                         ) : (
                           <div className="space-y-2">
-                            {outstandingBalanceRows.slice(0, 5).map((row: any) => (
+                            {visibleOutstandingBalanceRows.map((row: any) => (
                               <div key={row.id} className="flex items-center justify-between rounded-lg border border-orange-100 bg-white p-3">
                                 <div>
                                   <p className="font-medium text-gray-900">{row.coupleName}</p>
@@ -178,6 +305,22 @@ export function PaymentsTab() {
                                 </div>
                               </div>
                             ))}
+                            {outstandingBalanceRows.length > 3 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full border-orange-200 text-orange-700 hover:bg-orange-50"
+                                onClick={() => setShowAllOutstandingBalances(current => !current)}
+                              >
+                                {showAllOutstandingBalances ? (
+                                  <ChevronUp className="mr-2 h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="mr-2 h-4 w-4" />
+                                )}
+                                {showAllOutstandingBalances ? "Show fewer balances" : `Expanded view (${outstandingBalanceRows.length - 3} more)`}
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -188,7 +331,7 @@ export function PaymentsTab() {
                           <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm text-gray-600">No refunds recorded.</div>
                         ) : (
                           <div className="space-y-2">
-                            {refundRows.slice(0, 5).map((row: any) => (
+                            {visibleRefundRows.map((row: any) => (
                               <div key={row.id} className="flex items-center justify-between rounded-lg border border-red-100 bg-white p-3">
                                 <div className="flex items-center gap-2">
                                   <RotateCcw className="w-4 h-4 text-red-600" />
@@ -203,6 +346,22 @@ export function PaymentsTab() {
                                 </div>
                               </div>
                             ))}
+                            {refundRows.length > 3 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full border-red-200 text-red-700 hover:bg-red-50"
+                                onClick={() => setShowAllRefundRows(current => !current)}
+                              >
+                                {showAllRefundRows ? (
+                                  <ChevronUp className="mr-2 h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="mr-2 h-4 w-4" />
+                                )}
+                                {showAllRefundRows ? "Show fewer refunds" : `Expanded view (${refundRows.length - 3} more)`}
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -210,7 +369,7 @@ export function PaymentsTab() {
                   </Card>
 
                   {/* Payment History */}
-                  <Card className="border-blue-100 shadow-md">
+                  <Card className="hidden border-blue-100 shadow-md">
                     <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
                       <CardTitle className="text-blue-900">Payment History</CardTitle>
                       <CardDescription>Track all payments and transactions</CardDescription>
@@ -328,6 +487,13 @@ export function PaymentsTab() {
                       <Mail className="w-4 h-4 mr-2" />
                       Send Payment Reminder
                     </Button>
+                    <Button
+                      className="h-9 w-full justify-start border border-indigo-400 bg-indigo-500/15 text-indigo-800 hover:bg-indigo-500/25"
+                      onClick={() => setShowPaymentHistoryDialog(true)}
+                    >
+                      <Clock className="w-4 h-4 mr-2" />
+                      Payment History
+                    </Button>
                     <Separator />
                     <div>
                       <h4 className="font-semibold mb-3 text-blue-900">Payment Status</h4>
@@ -346,6 +512,111 @@ export function PaymentsTab() {
                 </Card>
               </div>
             </div>
+            <Card className="mt-6 border-2 border-emerald-200 shadow-lg">
+              <CardHeader className="bg-gradient-to-r from-emerald-50 to-green-50">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center space-x-2 text-xl text-emerald-950">
+                      <CreditCard className="h-6 w-6 text-emerald-600" />
+                      <span>Stripe Payouts</span>
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      Connect Stripe so script sales and ceremony invoice payments can be deposited to your bank account.
+                    </CardDescription>
+                  </div>
+                  <Badge
+                    className={
+                      stripeConnectAccount?.onboarding_complete
+                        ? "bg-green-100 text-green-800"
+                        : "bg-amber-100 text-amber-800"
+                    }
+                  >
+                    {stripeConnectAccount?.onboarding_complete
+                      ? "Payouts Ready"
+                      : stripeConnectAccount
+                      ? "Setup Incomplete"
+                      : "Not Connected"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 p-6">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-lg border bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Charges</p>
+                    <p className="mt-2 flex items-center gap-2 text-sm font-semibold">
+                      {stripeConnectAccount?.charges_enabled ? (
+                        <Check className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <X className="h-4 w-4 text-gray-400" />
+                      )}
+                      {stripeConnectAccount?.charges_enabled ? "Enabled" : "Not ready"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Payouts</p>
+                    <p className="mt-2 flex items-center gap-2 text-sm font-semibold">
+                      {stripeConnectAccount?.payouts_enabled ? (
+                        <Check className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <X className="h-4 w-4 text-gray-400" />
+                      )}
+                      {stripeConnectAccount?.payouts_enabled ? "Enabled" : "Not ready"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Account</p>
+                    <p className="mt-2 truncate text-sm font-semibold text-gray-900">
+                      {stripeConnectAccount?.stripe_account_id || "Connect required"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
+                  OrdainedPro will create the checkout, collect any configured platform fee, and route the remaining funds to the officiant's connected Stripe account. Stripe controls bank verification, tax details, and payout timing.
+                </div>
+
+                {stripeConnectMessage && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {stripeConnectMessage}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    className="bg-emerald-600 text-white hover:bg-emerald-700"
+                    onClick={handleStartStripeConnectOnboarding}
+                    disabled={stripeConnectLoading}
+                  >
+                    {stripeConnectLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CreditCard className="mr-2 h-4 w-4" />
+                    )}
+                    {stripeConnectAccount ? "Continue Stripe Setup" : "Set Up Payouts"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    onClick={refreshStripeConnectStatus}
+                    disabled={stripeConnectLoading}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh Status
+                  </Button>
+                  {stripeConnectAccount?.onboarding_complete && (
+                    <Button
+                      variant="outline"
+                      className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                      onClick={handleOpenStripeExpressDashboard}
+                      disabled={stripeConnectLoading}
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Open Stripe Dashboard
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
   )
 }

@@ -1250,12 +1250,23 @@ interface CommunicationPortalProps {
   onScriptUploaded?: (content: string, fileName: string) => void;
 }
 
+type StripeConnectAccount = {
+  stripe_account_id: string
+  charges_enabled: boolean
+  payouts_enabled: boolean
+  details_submitted: boolean
+  onboarding_complete: boolean
+}
+
 export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalProps = {}) {
   // Auth and profile state
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [officiantProfile, setOfficiantProfile] = useState<any>(null)
   const [messages, setMessages] = useState<any[]>([])
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [stripeConnectAccount, setStripeConnectAccount] = useState<StripeConnectAccount | null>(null)
+  const [stripeConnectLoading, setStripeConnectLoading] = useState(false)
+  const [stripeConnectMessage, setStripeConnectMessage] = useState("")
 
   const getCleanDisplayName = (...candidates: Array<string | null | undefined>) => {
     const name = candidates
@@ -1279,6 +1290,112 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
   const officiantPhone = officiantProfile?.phone || ""
   const [contractPrefillDefaults, setContractPrefillDefaults] = useState(DEFAULT_CONTRACT_PREFILL_DEFAULTS)
   const [hasAcceptedDefaultContractLegal, setHasAcceptedDefaultContractLegal] = useState(false)
+
+  const getStripeConnectAccessToken = async () => {
+    const { data } = await supabase.auth.getSession()
+    return data.session?.access_token || ""
+  }
+
+  const refreshStripeConnectStatus = useCallback(async () => {
+    if (!currentUser?.id) return
+
+    try {
+      setStripeConnectLoading(true)
+      setStripeConnectMessage("")
+      const token = await getStripeConnectAccessToken()
+
+      if (!token) {
+        setStripeConnectMessage("Please sign in again before setting up payouts.")
+        return
+      }
+
+      const response = await fetch("/api/stripe/connect/account", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to load Stripe payout status.")
+      }
+
+      setStripeConnectAccount((data.account as StripeConnectAccount | null) || null)
+    } catch (error: any) {
+      console.error("Unable to refresh Stripe Connect status:", error)
+      setStripeConnectMessage(error?.message || "Unable to load Stripe payout status.")
+    } finally {
+      setStripeConnectLoading(false)
+    }
+  }, [currentUser?.id])
+
+  const handleStartStripeConnectOnboarding = async () => {
+    if (!currentUser?.id) return
+
+    try {
+      setStripeConnectLoading(true)
+      setStripeConnectMessage("")
+      const token = await getStripeConnectAccessToken()
+
+      if (!token) {
+        setStripeConnectMessage("Please sign in again before setting up payouts.")
+        return
+      }
+
+      const response = await fetch("/api/stripe/connect/account", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Unable to start Stripe payout setup.")
+      }
+
+      window.location.href = data.url
+    } catch (error: any) {
+      console.error("Unable to start Stripe Connect onboarding:", error)
+      setStripeConnectMessage(error?.message || "Unable to start Stripe payout setup.")
+    } finally {
+      setStripeConnectLoading(false)
+    }
+  }
+
+  const handleOpenStripeExpressDashboard = async () => {
+    if (!currentUser?.id) return
+
+    try {
+      setStripeConnectLoading(true)
+      setStripeConnectMessage("")
+      const token = await getStripeConnectAccessToken()
+
+      if (!token) {
+        setStripeConnectMessage("Please sign in again before opening Stripe.")
+        return
+      }
+
+      const response = await fetch("/api/stripe/connect/dashboard", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "Unable to open Stripe Express dashboard.")
+      }
+
+      window.location.href = data.url
+    } catch (error: any) {
+      console.error("Unable to open Stripe Express dashboard:", error)
+      setStripeConnectMessage(error?.message || "Unable to open Stripe Express dashboard.")
+    } finally {
+      setStripeConnectLoading(false)
+    }
+  }
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [newMessage, setNewMessage] = useState("")
@@ -1686,6 +1803,10 @@ export function CommunicationPortal({ onScriptUploaded }: CommunicationPortalPro
     window.addEventListener("ordainedpro:profile-updated", handleProfileUpdated)
     return () => window.removeEventListener("ordainedpro:profile-updated", handleProfileUpdated)
   }, [])
+
+  useEffect(() => {
+    refreshStripeConnectStatus()
+  }, [refreshStripeConnectStatus])
 
   useEffect(() => {
     if (!premiumScriptStorageKey || typeof window === "undefined") {
@@ -7152,8 +7273,8 @@ ${cleanOfficiantFirstName}
       coupleName: `${editCoupleInfo?.brideName || 'Partner 1'} & ${editCoupleInfo?.groomName || 'Partner 2'}`,
       weddingDate: weddingDetails?.weddingDate || "",
       venue: weddingDetails?.venueName || "",
-      depositPaid: paymentInfo.depositPaid,
-      balanceDue: paymentInfo.balance
+      depositPaid: 0,
+      balanceDue: 0
     }))
 
     setShowGenerateInvoiceDialog(true)
@@ -7207,7 +7328,7 @@ ${invoiceForm.items.map(item =>
 PAYMENT SUMMARY:
 * Subtotal: ${formatCurrency(totals.subtotal)}
 ${invoiceForm.taxRate > 0 ? `* Tax (${invoiceForm.taxRate}%): ${formatCurrency(totals.taxAmount)}` : ''}
-* Deposit Previously Paid: -${formatCurrency(invoiceForm.depositPaid)}
+* Deposit Previously Paid: -${formatCurrency(totals.depositPaid)}
 * Balance Due: ${formatCurrency(totals.balanceDue)}
 * TOTAL INVOICE AMOUNT: ${formatCurrency(totals.total)}
 
@@ -7275,7 +7396,7 @@ ${services}
 
 Payment Summary
 Subtotal: ${formatCurrency(totals.subtotal)}
-${invoiceForm.taxRate > 0 ? `Tax (${invoiceForm.taxRate}%): ${formatCurrency(totals.taxAmount)}\n` : ''}Deposit previously paid: -${formatCurrency(invoiceForm.depositPaid)}
+${invoiceForm.taxRate > 0 ? `Tax (${invoiceForm.taxRate}%): ${formatCurrency(totals.taxAmount)}\n` : ''}Deposit previously paid: -${formatCurrency(totals.depositPaid)}
 Balance due: ${formatCurrency(totals.balanceDue)}
 Total invoice amount: ${formatCurrency(totals.total)}
 
@@ -8096,6 +8217,12 @@ ${officiantProfile?.name || "Your officiant"}`)
     getFileIcon,
     handleSendMessage,
     handleOpenInvoiceDialog,
+    stripeConnectAccount,
+    stripeConnectLoading,
+    stripeConnectMessage,
+    refreshStripeConnectStatus,
+    handleStartStripeConnectOnboarding,
+    handleOpenStripeExpressDashboard,
     calculateInvoiceTotals,
     generateInvoiceContent,
     handleGenerateAndSendInvoice,
