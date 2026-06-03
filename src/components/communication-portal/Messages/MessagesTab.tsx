@@ -76,6 +76,12 @@ export function MessagesTab() {
   )
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const shouldStickToBottomRef = useRef(true)
+  const latestConversationMessage = conversationMessages[conversationMessages.length - 1]
+  const latestConversationMessageKey = [
+    conversationMessages.length,
+    latestConversationMessage?.id || "",
+    latestConversationMessage?.createdAt || latestConversationMessage?.created_at || "",
+  ].join(":")
   const canSendMessage = newMessage.trim().length > 0 || messageAttachments.length > 0
 
   const submitMessage = () => {
@@ -94,6 +100,13 @@ export function MessagesTab() {
     })
   }
 
+  const scheduleScrollMessagesToBottom = (behavior: ScrollBehavior = "auto") => {
+    window.requestAnimationFrame(() => {
+      scrollMessagesToBottom(behavior)
+      window.setTimeout(() => scrollMessagesToBottom(behavior), 0)
+    })
+  }
+
   const handleMessagesScroll = () => {
     const element = messagesScrollRef.current
     if (!element) return
@@ -106,11 +119,30 @@ export function MessagesTab() {
     if (!shouldStickToBottomRef.current) return
 
     const animationFrame = window.requestAnimationFrame(() => {
-      scrollMessagesToBottom()
+      scheduleScrollMessagesToBottom()
     })
 
     return () => window.cancelAnimationFrame(animationFrame)
-  }, [conversationMessages.length])
+  }, [latestConversationMessageKey])
+
+  useEffect(() => {
+    const element = messagesScrollRef.current
+    if (!element) return
+
+    shouldStickToBottomRef.current = true
+    scheduleScrollMessagesToBottom()
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (shouldStickToBottomRef.current) {
+        scheduleScrollMessagesToBottom()
+      }
+    })
+
+    resizeObserver.observe(element)
+    Array.from(element.children).forEach((child) => resizeObserver.observe(child))
+
+    return () => resizeObserver.disconnect()
+  }, [latestConversationMessageKey])
 
   const upcomingMeetings = meetings
     .filter((meeting) => {
