@@ -3490,8 +3490,10 @@ Mr. Script - Your Personal Wedding Script Creator`
           groomName: editCoupleInfo?.groomName || "",
           subjectName: profileContext.subjectName || [editCoupleInfo?.brideName, editCoupleInfo?.groomName].filter(Boolean).join(" & "),
           venue: editWeddingDetails?.venueName || "",
+          venueAddress: profileContext.venueAddress || editWeddingDetails?.venueAddress || editCoupleInfo?.address || "",
           weddingDate: editWeddingDetails?.weddingDate || "",
           ceremonyDate: editWeddingDetails?.weddingDate || "",
+          ceremonyTime: profileContext.ceremonyTime || formatProfileTime(editWeddingDetails?.startTime),
           ceremonyProfileContext: profileContext,
           usePremiumModel,
           userResponses: responseMap,
@@ -7838,7 +7840,7 @@ ${invoiceContent}`)
 
     // Set up the editor with the generated content
     setEditingScript(scriptForEditor)
-    setScriptContent(generatedScriptContent)
+    setScriptContent(generatedScriptContent.replace(/\n/g, '<br>'))
     setShowScriptEditorDialog(true)
   }
 

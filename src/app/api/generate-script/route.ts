@@ -38,8 +38,10 @@ type ScriptGenerationBody = {
   groomName?: string;
   subjectName?: string;
   venue?: string;
+  venueAddress?: string;
   weddingDate?: string;
   ceremonyDate?: string;
+  ceremonyTime?: string;
   userResponses?: Record<string, string>;
   storyNotes?: string;
   coreDetails?: string;
@@ -93,6 +95,14 @@ const getTargetWordCount = (duration?: string) => {
   const minutes = parseDurationUpperMinutes(duration);
   return Math.min(6000, Math.max(650, minutes * TARGET_WORDS_PER_MINUTE));
 };
+
+const stripMarkdownFormatting = (content: string) =>
+  content
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/^\s*[-_*]{3,}\s*$/gm, "")
+    .trim();
 
 const chunkSections = (sections: string[], chunkCount: number) => {
   const chunks: string[][] = [];
@@ -291,6 +301,8 @@ const buildContextBlock = (body: ScriptGenerationBody, service: MrScriptService)
   const subjectName = getSubjectName(body, service);
   const date = normalize(body.ceremonyDate) || normalize(body.weddingDate) || "date to be confirmed";
   const venue = normalize(body.venue) || "location to be confirmed";
+  const venueAddress = normalize(body.venueAddress) || normalize(profileContext.venueAddress);
+  const ceremonyTime = normalize(body.ceremonyTime) || normalize(profileContext.ceremonyTime);
   const targetDuration = body.ceremonyLength || responses["ceremony-duration"] || "20-30 minutes";
   const targetWordCount = getTargetWordCount(targetDuration);
   const intakeResponses =
@@ -343,6 +355,8 @@ const buildContextBlock = (body: ScriptGenerationBody, service: MrScriptService)
     profileContext.primaryContactName ? `Profile primary family contact: ${profileContext.primaryContactName}` : "",
     `Date: ${date}`,
     `Location: ${venue}`,
+    venueAddress ? `Address: ${venueAddress}` : "",
+    ceremonyTime ? `Time: ${ceremonyTime}` : "",
     `Target length: ${targetDuration}`,
     `Target word count: approximately ${targetWordCount.toLocaleString()} words. Aim for the higher end of the selected ceremony length instead of the shortest acceptable draft.`,
     `Tone: ${body.ceremonyTone || responses["ceremony-tone"] || service.toneOptions[0] || "Warm and natural"}`,
@@ -385,6 +399,9 @@ Write SEGMENT ${segmentIndex + 1} of ${segments.length}: ${segment.name}.
 
 IMPORTANT:
 - Write only this segment's sections. Do not write sections assigned to other segments.
+- For every assigned section, start with the exact section title on its own line, then a blank line, then the spoken ceremony text.
+- Do not label sections as Part 1, Segment 1, or with markdown symbols. Use plain section titles like a Word document.
+- Use blank lines between paragraphs and section blocks so the editor reads like a formatted ceremony script.
 - Write in first person as the officiant speaking aloud unless the selected service is writing-only.
 - Use natural spoken language, not stiff template language.
 - Include concise stage directions in brackets only when useful.
@@ -511,37 +528,30 @@ function buildFinalScript(
   const subjectName = getSubjectName(body, service);
   const date = normalize(body.ceremonyDate) || normalize(body.weddingDate) || "Date TBD";
   const venue = normalize(body.venue) || "Location TBD";
+  const venueAddress = normalize(body.venueAddress) || normalize(body.ceremonyProfileContext?.venueAddress);
+  const ceremonyTime = normalize(body.ceremonyTime) || normalize(body.ceremonyProfileContext?.ceremonyTime);
   const tone = body.ceremonyTone || body.userResponses?.["ceremony-tone"] || service.toneOptions[0] || "Warm and natural";
   const duration = body.ceremonyLength || body.userResponses?.["ceremony-duration"] || "20-30 minutes";
+  const wordTarget = getTargetWordCount(duration);
 
   const bodyText = segmentsContent
-    .map((content, index) => {
-      const heading = `PART ${index + 1}: ${segments[index].name.toUpperCase()}`;
-      return `\n\n${"-".repeat(heading.length)}\n${heading}\n${"-".repeat(heading.length)}\n\n${content.trim()}`;
-    })
-    .join("");
+    .map((content) => stripMarkdownFormatting(content))
+    .filter(Boolean)
+    .join("\n\n");
 
-  return `${service.displayName.toUpperCase()} SCRIPT
-${isRefinement ? "REFINED VERSION\n" : ""}Prepared by Mr. Script for ${subjectName}
-Service category: ${service.category}
-Date: ${date}
-Location: ${venue}
-Target duration: ${duration}
-Tone: ${tone}
-
-${bodyText}
-
-${"-".repeat(32)}
-END OF SCRIPT
-${"-".repeat(32)}
-
-SCRIPT NOTES
-- Service: ${service.displayName}
-- Sensitivity: ${service.sensitivity}
-- Output type: ${service.outputTypes[0] || "ceremony_script"}
-- Segments generated: ${segments.length}
-
-Prepared with Mr. Script for professional officiant review and editing.`;
+  return [
+    `Venue: ${venue}`,
+    venueAddress ? `Address: ${venueAddress}` : "",
+    `Date: ${date}`,
+    ceremonyTime ? `Time: ${ceremonyTime}` : "",
+    "",
+    `${service.displayName} Script for ${subjectName}`,
+    `Approx. ${wordTarget.toLocaleString()} words`,
+    isRefinement ? "Refined version" : "",
+    `Tone: ${tone}`,
+    "",
+    bodyText,
+  ].filter((line, index, lines) => line || lines[index - 1]).join("\n").trim();
 }
 
 export async function POST(request: NextRequest) {
